@@ -5646,15 +5646,15 @@ function showAmmoSelectionModal(damageFormula, weaponName, weaponId, damageType)
 function getWeaponTypeForAmmo(weaponName) {
     // Определяем тип оружия по названию для поиска боеприпасов
     const weaponTypeMappings = {
-        'Лёгкие пистолеты': 'Лёгкий пистолет',
-        'Обычные пистолеты': 'Обычный пистолет',
-        'Пистолеты-пулемёты': 'Пистолет-пулемёт',
-        'Тяжёлые пистолеты-пулемёты': 'Тяжёлый пистолет-пулемёт',
-        'Штурмовые винтовки': 'Штурмовая винтовка',
-        'Крупнокалиберные пистолеты': 'Крупнокалиберный пистолет',
-        'Пулемёты': 'Пулемёт',
-        'Снайперские винтовки': 'Снайперская винтовка',
-        'Дробовики': 'Дробовик',
+        'Лёгкий пистолет': 'Лёгкий пистолет',
+        'Обычный пистолет': 'Обычный пистолет',
+        'Крупнокалиберный пистолет': 'Крупнокалиберный пистолет',
+        'Пистолет-пулемёт': 'Пистолет-пулемёт',
+        'Тяжёлый пистолет-пулемёт': 'Тяжёлый пистолет-пулемёт',
+        'Штурмовая винтовка': 'Штурмовая винтовка',
+        'Пулемёт': 'Пулемёт',
+        'Снайперская винтовка': 'Снайперская винтовка',
+        'Дробовик': 'Дробовик',
         'Оружие с самонаведением': 'Оружие с самонаведением',
         'Гранатомёт': 'Гранаты',
         'Ракетомёт': 'Ракеты',
@@ -6876,7 +6876,7 @@ function showAmmoShop() {
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
                         <div>
                             <span style="color: var(--text); font-weight: 600;">Пиропатрон</span>
-                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для дробовой активной защиты (урон 4d4)</div>
+                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для дробовой Активной защиты</div>
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
                             <span class="ammo-price" style="color: var(--accent); font-size: 0.9rem;" data-original-price="50">50 уе</span>
@@ -6887,7 +6887,7 @@ function showAmmoShop() {
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
                         <div>
                             <span style="color: var(--text); font-weight: 600;">Высоковольтная мини-батарея</span>
-                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для лазерной активной защиты (без урона)</div>
+                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для лазерной Активной защиты</div>
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
                             <span class="ammo-price" style="color: var(--accent); font-size: 0.9rem;" data-original-price="250">250 уе</span>
@@ -6898,7 +6898,7 @@ function showAmmoShop() {
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
                         <div>
                             <span style="color: var(--text); font-weight: 600;">Микроракета</span>
-                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для микроракетной активной защиты (урон 6d6)</div>
+                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для Активной защита с Микроракетами</div>
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
                             <span class="ammo-price" style="color: var(--accent); font-size: 0.9rem;" data-original-price="500">500 уе</span>
@@ -7030,6 +7030,16 @@ function showAmmoQuantityModal(ammoType, weaponType, price) {
         const input = document.getElementById('ammoQuantity');
         if (input) input.focus();
     }, 100);
+    
+    // Обработка клавиши Enter для покупки
+    modal.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            buyAmmoWithQuantity(ammoType, weaponType, price);
+        } else if (e.key === 'Escape') {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
 }
 
 function updateAmmoTotal(pricePerUnit) {
@@ -7085,13 +7095,9 @@ function buyAmmoWithQuantity(ammoType, weaponType, pricePerUnit) {
     const ammoName = isActiveDefense ? 'Активная защита' : ammoType;
     
     // Проверяем, есть ли уже такой тип боеприпасов
-    // Для активной защиты ищем по типу и weaponType
+    // Ищем по типу и weaponType для всех боеприпасов
     const existingAmmoIndex = state.ammo.findIndex(a => {
-        if (isActiveDefense) {
-            return a.type === ammoName && a.weaponType === weaponType;
-        } else {
-            return a.type === ammoName;
-        }
+        return a.type === ammoName && a.weaponType === weaponType;
     });
     
     if (existingAmmoIndex !== -1) {
@@ -7724,7 +7730,7 @@ function executeShotgunShoot(weaponId) {
     document.getElementById('weaponShootButton').style.display = 'none';
     
     // Выполняем бросок урона с анимацией
-    performWeaponDamageRoll(actualDamageFormula, weaponName, modifier, slotData.type, fireTypeText, 1, weaponId, 'Дробовик', true, 'shotgun');
+    performWeaponDamageRoll(actualDamageFormula, weapon.name, modifier, slotData.type, fireTypeText, 1, weaponId, 'Дробовик', true, 'shotgun');
 }
 
 // Функции для работы с профессиональными навыками
@@ -11328,6 +11334,7 @@ function renderAmmo() {
 function showConfirmModal(title, message, onConfirm, onCancel = null) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
+    modal.tabIndex = -1; // Позволяет модальному окну получать фокус
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
     
@@ -11340,8 +11347,8 @@ function showConfirmModal(title, message, onConfirm, onCancel = null) {
             <div class="modal-body">
                 <p style="color: var(--text); margin-bottom: 1.5rem;">${message}</p>
                 <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                    <button class="pill-button secondary-button" onclick="closeConfirmModal(false)">Отмена</button>
-                    <button class="pill-button danger-button" onclick="closeConfirmModal(true)">Да</button>
+                    <button class="pill-button secondary-button" onclick="closeConfirmModal(false, this.closest('.modal-overlay'))">Отмена</button>
+                    <button class="pill-button danger-button" onclick="closeConfirmModal(true, this.closest('.modal-overlay'))">Да</button>
                 </div>
             </div>
         </div>
@@ -11355,13 +11362,31 @@ function showConfirmModal(title, message, onConfirm, onCancel = null) {
     
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
-            closeConfirmModal(false);
+            closeConfirmModal(false, modal);
         }
     });
+    
+    // Обработка клавиши Enter для подтверждения
+    modal.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            closeConfirmModal(true, modal);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            closeConfirmModal(false, modal);
+        }
+    });
+    
+    // Фокусируемся на модальном окне для обработки клавиш
+    setTimeout(() => {
+        modal.focus();
+    }, 100);
 }
 
-function closeConfirmModal(result) {
-    const modal = document.querySelector('.modal-overlay:last-child');
+function closeConfirmModal(result, modalElement = null) {
+    const modal = modalElement || document.querySelector('.modal-overlay:last-child');
     if (modal) {
         modal.remove();
         if (result && modal.onConfirm) {

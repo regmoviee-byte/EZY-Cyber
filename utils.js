@@ -377,6 +377,7 @@ function clearAllData() {
 function showConfirmModal(title, message, onConfirm, onCancel = null) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
+    modal.tabIndex = -1; // Позволяет модальному окну получать фокус
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
     
@@ -389,8 +390,8 @@ function showConfirmModal(title, message, onConfirm, onCancel = null) {
             <div class="modal-body">
                 <p style="color: var(--text); margin-bottom: 1.5rem;">${message}</p>
                 <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                    <button class="pill-button secondary-button" onclick="closeConfirmModal(false)">Отмена</button>
-                    <button class="pill-button danger-button" onclick="closeConfirmModal(true)">Да</button>
+                    <button class="pill-button secondary-button" onclick="closeConfirmModal(false, this.closest('.modal-overlay'))">Отмена</button>
+                    <button class="pill-button danger-button" onclick="closeConfirmModal(true, this.closest('.modal-overlay'))">Да</button>
                 </div>
             </div>
         </div>
@@ -404,13 +405,31 @@ function showConfirmModal(title, message, onConfirm, onCancel = null) {
     
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
-            closeConfirmModal(false);
+            closeConfirmModal(false, modal);
         }
     });
+    
+    // Обработка клавиши Enter для подтверждения
+    modal.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            closeConfirmModal(true, modal);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            closeConfirmModal(false, modal);
+        }
+    });
+    
+    // Фокусируемся на модальном окне для обработки клавиш
+    setTimeout(() => {
+        modal.focus();
+    }, 100);
 }
 
-function closeConfirmModal(result) {
-    const modal = document.querySelector('.modal-overlay:last-child');
+function closeConfirmModal(result, modalElement = null) {
+    const modal = modalElement || document.querySelector('.modal-overlay:last-child');
     if (modal) {
         modal.remove();
         if (result && modal.onConfirm) {
@@ -515,6 +534,20 @@ function showAlertModal(title, message) {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Обработка клавиши Enter для закрытия окна
+    modal.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            closeModal(modal.querySelector('.icon-button'));
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
 }
+
+// Алиас для showModal (используем window для глобальной области видимости)
+window.showModal = showAlertModal;
 
 console.log('Utils.js loaded - вспомогательные функции загружены');
