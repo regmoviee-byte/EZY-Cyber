@@ -736,11 +736,11 @@ function expandSection(sectionId) {
 }
 
 function clearRollLog() {
-    if (confirm('Вы уверены, что хотите очистить лог бросков?')) {
+    showConfirmModal('Подтверждение', 'Вы уверены, что хотите очистить лог бросков?', () => {
         state.rollLog = [];
         renderRollLog();
         scheduleSave();
-    }
+    });
 }
 
 // Универсальная бросалка
@@ -1899,11 +1899,11 @@ function installProgram(name, price, ram, lethal, description) {
 }
 
 function removeDeckProgram(index) {
-    if (confirm('Удалить программу?')) {
+    showConfirmModal('Подтверждение', 'Удалить программу?', () => {
         state.deckPrograms.splice(index, 1);
         renderDeckPrograms();
         scheduleSave();
-    }
+    });
 }
 
 function addMemoryChip() {
@@ -2090,11 +2090,11 @@ function saveEditedChip(index) {
 }
 
 function removeMemoryChip(index) {
-    if (confirm('Удалить щепку памяти?')) {
+    showConfirmModal('Подтверждение', 'Удалить щепку памяти?', () => {
         state.deckChips.splice(index, 1);
         renderDeckChips();
         scheduleSave();
-    }
+    });
 }
 
 function showProgramInstallModalForChip(chipIndex) {
@@ -2182,14 +2182,14 @@ function installProgramOnChip(chipIndex, name, price, ram, lethal, description) 
 }
 
 function removeProgramFromChip(chipIndex) {
-    if (confirm('Удалить программу с щепки?')) {
+    showConfirmModal('Подтверждение', 'Удалить программу с щепки?', () => {
         delete state.deckChips[chipIndex].program;
         renderDeckChips();
         scheduleSave();
         
         closeModal(document.querySelector('.modal-overlay .icon-button'));
         showModal('Программа удалена', `&#x2705; Программа удалена с щепки!`);
-    }
+    });
 }
 
 // Функции для работы с киберимплантами
@@ -3754,11 +3754,11 @@ function saveHousing() {
 }
 
 function removeHousing(index) {
-    if (confirm('Удалить жилье?')) {
+    showConfirmModal('Подтверждение', 'Удалить жилье?', () => {
         state.property.housing.splice(index, 1);
         renderHousing();
         scheduleSave();
-    }
+    });
 }
 
 function addVehicle() {
@@ -3828,11 +3828,11 @@ function saveVehicle() {
 }
 
 function removeVehicle(index) {
-    if (confirm('Удалить транспорт?')) {
+    showConfirmModal('Подтверждение', 'Удалить транспорт?', () => {
         state.property.vehicles.splice(index, 1);
         renderVehicles();
         scheduleSave();
-    }
+    });
 }
 
 function uploadVehicleImage(index, input) {
@@ -3849,11 +3849,11 @@ function uploadVehicleImage(index, input) {
 }
 
 function removeVehicleImage(index) {
-    if (confirm('Удалить изображение транспорта?')) {
+    showConfirmModal('Подтверждение', 'Удалить изображение транспорта?', () => {
         state.property.vehicles[index].image = null;
         renderVehicles();
         scheduleSave();
-    }
+    });
 }
 
 // Функции для работы со снаряжением
@@ -4294,7 +4294,7 @@ function savePickedGear() {
 }
 
 function removeGear(index) {
-    if (confirm('Удалить снаряжение?')) {
+    showConfirmModal('Подтверждение', 'Удалить снаряжение?', () => {
         const item = state.gear[index];
         if (item) {
             // Возвращаем нагрузку
@@ -4308,7 +4308,7 @@ function removeGear(index) {
             updateLoadDisplay();
             scheduleSave();
         }
-    }
+    });
 }
 
 // Функции для работы с оружием
@@ -6574,7 +6574,7 @@ function installImplantFromGear(gearIndex) {
 }
 
 function removeGear(index) {
-    if (confirm('Удалить предмет из снаряжения?')) {
+    showConfirmModal('Подтверждение', 'Удалить предмет из снаряжения?', () => {
         const item = state.gear[index];
         if (item) {
             // Возвращаем нагрузку
@@ -6586,7 +6586,7 @@ function removeGear(index) {
             updateLoadDisplay();
             scheduleSave();
         }
-    }
+    });
 }
 
 function takeWeaponFromGear(gearIndex) {
@@ -7176,7 +7176,7 @@ function changeAmmoQuantity(index, delta) {
 }
 
 function removeAmmo(index) {
-    if (confirm('Удалить этот тип боеприпасов?')) {
+    showConfirmModal('Подтверждение', 'Удалить этот тип боеприпасов?', () => {
         const ammo = state.ammo[index];
         if (ammo) {
             // Возвращаем нагрузку
@@ -7190,7 +7190,7 @@ function removeAmmo(index) {
         state.ammo.splice(index, 1);
         renderAmmo();
         scheduleSave();
-    }
+    });
 }
 
 // Функция перезарядки оружия
@@ -7675,31 +7675,34 @@ function executeShotgunShoot(weaponId) {
 
 // Функции для работы с профессиональными навыками
 function addProfessionalSkill() {
-    const name = prompt('Введите название профессионального навыка:');
-    if (!name) return;
-    
-    const description = prompt('Введите описание навыка:');
-    if (!description) return;
-    
-    const level = prompt('Введите уровень навыка (0-10):');
-    const skillLevel = Math.max(0, Math.min(10, parseInt(level) || 0));
-    
-    // Проверяем, не добавлен ли уже этот навык
-    if (state.professionalSkills.find(s => s.name === name)) {
-        showModal('Ошибка', 'Этот профессиональный навык уже добавлен!');
-        return;
-    }
-    
-    const newSkill = {
-        id: generateId('proSkill'),
-        name: name,
-        description: description,
-        level: skillLevel
-    };
-    
-    state.professionalSkills.push(newSkill);
-    renderProfessionalSkills();
-    scheduleSave();
+    showPromptModal('Добавить профессиональный навык', 'Введите название профессионального навыка:', '', (name) => {
+        if (!name) return;
+        
+        showPromptModal('Добавить профессиональный навык', 'Введите описание навыка:', '', (description) => {
+            if (!description) return;
+            
+            showPromptModal('Добавить профессиональный навык', 'Введите уровень навыка (0-10):', '1', (level) => {
+                const skillLevel = Math.max(0, Math.min(10, parseInt(level) || 0));
+                
+                // Проверяем, не добавлен ли уже этот навык
+                if (state.professionalSkills.find(s => s.name === name)) {
+                    showModal('Ошибка', 'Этот профессиональный навык уже добавлен!');
+                    return;
+                }
+                
+                const newSkill = {
+                    id: generateId('proSkill'),
+                    name: name,
+                    description: description,
+                    level: skillLevel
+                };
+                
+                state.professionalSkills.push(newSkill);
+                renderProfessionalSkills();
+                scheduleSave();
+            });
+        });
+    });
 }
 
 function updateProfessionalSkillLevel(skillId, newLevel) {
@@ -9677,7 +9680,7 @@ function updateNoteContent(noteId, content) {
 }
 
 function deleteNote(noteIndex) {
-    if (confirm('Удалить эту заметку навсегда?')) {
+    showConfirmModal('Подтверждение', 'Удалить эту заметку навсегда?', () => {
         const note = notes[noteIndex];
         if (!note) return;
         
@@ -9704,7 +9707,7 @@ function deleteNote(noteIndex) {
             modal.remove();
             showNotesModal();
         }
-    }
+    });
 }
 
 function closeNoteWindow(noteWindow) {
@@ -11108,11 +11111,11 @@ function removeHousing(housingId) {
     const housing = state.property.housing.find(h => h.id === housingId);
     if (!housing) return;
     
-    if (confirm(`Удалить жилье "${housing.name}"?`)) {
+    showConfirmModal('Подтверждение', `Удалить жилье "${housing.name}"?`, () => {
         state.property.housing = state.property.housing.filter(h => h.id !== housingId);
         renderHousing();
         scheduleSave();
-    }
+    });
 }
 
 // Функции для управления характеристиками с кнопками +/-
@@ -11264,4 +11267,149 @@ function renderAmmo() {
             </div>
         </div>
     `).join('');
+}
+
+// Универсальные функции для модальных окон (замена alert/confirm/prompt)
+
+function showConfirmModal(title, message, onConfirm, onCancel = null) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>${title}</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text); margin-bottom: 1.5rem;">${message}</p>
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button class="pill-button secondary-button" onclick="closeConfirmModal(false)">Отмена</button>
+                    <button class="pill-button danger-button" onclick="closeConfirmModal(true)">Да</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Сохраняем функции обратного вызова
+    modal.onConfirm = onConfirm;
+    modal.onCancel = onCancel;
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeConfirmModal(false);
+        }
+    });
+}
+
+function closeConfirmModal(result) {
+    const modal = document.querySelector('.modal-overlay:last-child');
+    if (modal) {
+        modal.remove();
+        if (result && modal.onConfirm) {
+            modal.onConfirm();
+        } else if (!result && modal.onCancel) {
+            modal.onCancel();
+        }
+    }
+}
+
+function showPromptModal(title, message, defaultValue = '', onConfirm, onCancel = null) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>${title}</h3>
+                <button class="icon-button" onclick="closePromptModal(null)">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text); margin-bottom: 1rem;">${message}</p>
+                <input type="text" id="promptInput" value="${defaultValue}" style="width: 100%; padding: 0.5rem; margin-bottom: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button class="pill-button secondary-button" onclick="closePromptModal(null)">Отмена</button>
+                    <button class="pill-button primary-button" onclick="closePromptModal(document.getElementById('promptInput').value)">ОК</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Фокусируемся на поле ввода
+    setTimeout(() => {
+        const input = document.getElementById('promptInput');
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    }, 100);
+    
+    // Обработка Enter и Escape
+    modal.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            closePromptModal(document.getElementById('promptInput').value);
+        } else if (e.key === 'Escape') {
+            closePromptModal(null);
+        }
+    });
+    
+    // Сохраняем функции обратного вызова
+    modal.onConfirm = onConfirm;
+    modal.onCancel = onCancel;
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closePromptModal(null);
+        }
+    });
+}
+
+function closePromptModal(result) {
+    const modal = document.querySelector('.modal-overlay:last-child');
+    if (modal) {
+        modal.remove();
+        if (result !== null && modal.onConfirm) {
+            modal.onConfirm(result);
+        } else if (result === null && modal.onCancel) {
+            modal.onCancel();
+        }
+    }
+}
+
+function showAlertModal(title, message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>${title}</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text); margin-bottom: 1.5rem;">${message}</p>
+                <div style="display: flex; justify-content: flex-end;">
+                    <button class="pill-button primary-button" onclick="closeModal(this.parentElement.parentElement.parentElement)">ОК</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
 }

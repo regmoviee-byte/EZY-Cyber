@@ -356,7 +356,7 @@ function importData() {
                     saveState();
                     location.reload();
                 } catch (error) {
-                    alert('Ошибка при импорте файла');
+                    showAlertModal('Ошибка', 'Ошибка при импорте файла');
                 }
             };
             reader.readAsText(file);
@@ -366,10 +366,155 @@ function importData() {
 }
 
 function clearAllData() {
-    if (confirm('Вы уверены, что хотите очистить все данные?')) {
+    showConfirmModal('Подтверждение', 'Вы уверены, что хотите очистить все данные?', () => {
         localStorage.removeItem('ezyCyberCharacter');
         location.reload();
+    });
+}
+
+// Универсальные функции для модальных окон (замена alert/confirm/prompt)
+
+function showConfirmModal(title, message, onConfirm, onCancel = null) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>${title}</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text); margin-bottom: 1.5rem;">${message}</p>
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button class="pill-button secondary-button" onclick="closeConfirmModal(false)">Отмена</button>
+                    <button class="pill-button danger-button" onclick="closeConfirmModal(true)">Да</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Сохраняем функции обратного вызова
+    modal.onConfirm = onConfirm;
+    modal.onCancel = onCancel;
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeConfirmModal(false);
+        }
+    });
+}
+
+function closeConfirmModal(result) {
+    const modal = document.querySelector('.modal-overlay:last-child');
+    if (modal) {
+        modal.remove();
+        if (result && modal.onConfirm) {
+            modal.onConfirm();
+        } else if (!result && modal.onCancel) {
+            modal.onCancel();
+        }
     }
+}
+
+function showPromptModal(title, message, defaultValue = '', onConfirm, onCancel = null) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>${title}</h3>
+                <button class="icon-button" onclick="closePromptModal(null)">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text); margin-bottom: 1rem;">${message}</p>
+                <input type="text" id="promptInput" value="${defaultValue}" style="width: 100%; padding: 0.5rem; margin-bottom: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button class="pill-button secondary-button" onclick="closePromptModal(null)">Отмена</button>
+                    <button class="pill-button primary-button" onclick="closePromptModal(document.getElementById('promptInput').value)">ОК</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Фокусируемся на поле ввода
+    setTimeout(() => {
+        const input = document.getElementById('promptInput');
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    }, 100);
+    
+    // Обработка Enter и Escape
+    modal.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            closePromptModal(document.getElementById('promptInput').value);
+        } else if (e.key === 'Escape') {
+            closePromptModal(null);
+        }
+    });
+    
+    // Сохраняем функции обратного вызова
+    modal.onConfirm = onConfirm;
+    modal.onCancel = onCancel;
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closePromptModal(null);
+        }
+    });
+}
+
+function closePromptModal(result) {
+    const modal = document.querySelector('.modal-overlay:last-child');
+    if (modal) {
+        modal.remove();
+        if (result !== null && modal.onConfirm) {
+            modal.onConfirm(result);
+        } else if (result === null && modal.onCancel) {
+            modal.onCancel();
+        }
+    }
+}
+
+function showAlertModal(title, message) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>${title}</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text); margin-bottom: 1.5rem;">${message}</p>
+                <div style="display: flex; justify-content: flex-end;">
+                    <button class="pill-button primary-button" onclick="closeModal(this.parentElement.parentElement.parentElement)">ОК</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
 }
 
 console.log('Utils.js loaded - вспомогательные функции загружены');
