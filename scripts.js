@@ -4420,8 +4420,8 @@ function showRangedWeaponsShop() {
                                 <div class="property-name">${weapon.type}</div>
                                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                                     <span class="ranged-weapon-price" style="color: var(--muted); font-size: 0.9rem;" data-original-price="${weapon.price}" data-load="${weapon.load}">Цена: ${weapon.price} уе | Нагрузка: ${weapon.load}</span>
-                                    <button class="pill-button primary-button ranged-weapon-buy-button" onclick="buyRangedWeapon(${JSON.stringify(weapon.type)}, ${weapon.price}, ${weapon.load}, ${JSON.stringify(weapon.primaryDamage)}, ${JSON.stringify(weapon.altDamage)}, ${JSON.stringify(weapon.concealable)}, ${JSON.stringify(weapon.hands)}, ${weapon.stealth}, ${JSON.stringify(weapon.magazine)})" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-load="${weapon.load}" data-primary-damage="${weapon.primaryDamage}" data-alt-damage="${weapon.altDamage}" data-concealable="${weapon.concealable}" data-hands="${weapon.hands}" data-stealth="${weapon.stealth}" data-magazine="${weapon.magazine}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                                    <button class="pill-button success-button ranged-weapon-gear-button" onclick="buyRangedWeaponToGear(${JSON.stringify(weapon.type)}, ${weapon.price}, ${weapon.load}, ${JSON.stringify(weapon.primaryDamage)}, ${JSON.stringify(weapon.altDamage)}, ${JSON.stringify(weapon.concealable)}, ${JSON.stringify(weapon.hands)}, ${weapon.stealth}, ${JSON.stringify(weapon.magazine)})" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-load="${weapon.load}" data-primary-damage="${weapon.primaryDamage}" data-alt-damage="${weapon.altDamage}" data-concealable="${weapon.concealable}" data-hands="${weapon.hands}" data-stealth="${weapon.stealth}" data-magazine="${weapon.magazine}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">В сумку</button>
+                                    <button class="pill-button primary-button ranged-weapon-buy-button" onclick="if(typeof buyRangedWeapon === 'function') { buyRangedWeapon('${weapon.type.replace(/'/g, "\\'")}', ${weapon.price}, ${weapon.load}, '${weapon.primaryDamage}', '${weapon.altDamage}', '${weapon.concealable}', '${weapon.hands}', ${weapon.stealth}, '${weapon.magazine}'); }" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-load="${weapon.load}" data-primary-damage="${weapon.primaryDamage}" data-alt-damage="${weapon.altDamage}" data-concealable="${weapon.concealable}" data-hands="${weapon.hands}" data-stealth="${weapon.stealth}" data-magazine="${weapon.magazine}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
+                                    <button class="pill-button success-button ranged-weapon-gear-button" onclick="if(typeof buyRangedWeaponToGear === 'function') { buyRangedWeaponToGear('${weapon.type.replace(/'/g, "\\'")}', ${weapon.price}, ${weapon.load}, '${weapon.primaryDamage}', '${weapon.altDamage}', '${weapon.concealable}', '${weapon.hands}', ${weapon.stealth}, '${weapon.magazine}'); }" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-load="${weapon.load}" data-primary-damage="${weapon.primaryDamage}" data-alt-damage="${weapon.altDamage}" data-concealable="${weapon.concealable}" data-hands="${weapon.hands}" data-stealth="${weapon.stealth}" data-magazine="${weapon.magazine}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">В сумку</button>
                                 </div>
                             </div>
                             <div class="property-description">
@@ -4880,9 +4880,56 @@ function buyRangedWeaponToGear(type, price, load, primaryDamage, altDamage, conc
     showModal('Оружие куплено', `&#x2705; ${type} добавлено в Снаряжение!`);
 }
 
-function getRangedWeaponFree(type, load, primaryDamage, altDamage, concealable, hands, stealth, magazine) {
- 
+function getRangedWeaponFreeToWeapons(type, load, primaryDamage, altDamage, concealable, hands, stealth, magazine) {
+    // Уменьшаем доступную нагрузку
+    state.load.current -= load;
     
+    // Определяем количество слотов для модулей
+    const slots = getRangedWeaponSlots(type);
+    
+    // Добавляем оружие в блок "Оружие" бесплатно
+    const newWeapon = {
+        id: generateId('weapon'),
+        name: type,
+        customName: '',
+        type: 'ranged',
+        primaryDamage: primaryDamage,
+        altDamage: altDamage,
+        concealable: concealable,
+        hands: hands,
+        stealth: stealth,
+        magazine: magazine,
+        price: 0,
+        load: load,
+        modules: [],
+        slots: slots,
+        // Система магазина
+        maxAmmo: magazine,
+        currentAmmo: 0,
+        loadedAmmoType: null,
+        // Не дробовик
+        isShotgun: false,
+        shotgunAmmo1: { type: null, count: 0 },
+        shotgunAmmo2: { type: null, count: 0 },
+        canRemove: true
+    };
+    
+    state.weapons.push(newWeapon);
+    renderWeapons();
+    updateLoadDisplay();
+    scheduleSave();
+    
+    // Добавляем в лог
+    addToRollLog('purchase', {
+        item: type,
+        price: 0,
+        category: 'Оружие дальнего боя (бесплатно)'
+    });
+    
+    showModal('Оружие получено', `&#x2705; ${type} добавлено в блок Оружие бесплатно!`);
+}
+
+function getRangedWeaponFreeToGear(type, load, primaryDamage, altDamage, concealable, hands, stealth, magazine) {
     // Уменьшаем доступную нагрузку
     state.load.current -= load;
     
@@ -4909,6 +4956,13 @@ function getRangedWeaponFree(type, load, primaryDamage, altDamage, concealable, 
     renderGear();
     updateLoadDisplay();
     scheduleSave();
+    
+    // Добавляем в лог
+    addToRollLog('purchase', {
+        item: type,
+        price: 0,
+        category: 'Оружие дальнего боя (в сумку, бесплатно)'
+    });
     
     showModal('Оружие получено', `&#x2705; ${type} добавлено в Снаряжение бесплатно!`);
 }
@@ -5014,7 +5068,7 @@ function toggleRangedWeaponsFreeMode() {
             const hands = btn.getAttribute('data-hands');
             const stealth = btn.getAttribute('data-stealth');
             const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `buyRangedWeapon(${JSON.stringify(type)}, ${price}, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)})`);
+            btn.setAttribute('onclick', `if(typeof buyRangedWeapon === 'function') { buyRangedWeapon('${type.replace(/'/g, "\\'")}', ${price}, ${load}, '${primaryDamage}', '${altDamage}', '${concealable}', '${hands}', ${stealth}, '${magazine}'); }`);
         });
         
         gearButtons.forEach(btn => {
@@ -5027,7 +5081,7 @@ function toggleRangedWeaponsFreeMode() {
             const hands = btn.getAttribute('data-hands');
             const stealth = btn.getAttribute('data-stealth');
             const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `buyRangedWeaponToGear(${JSON.stringify(type)}, ${price}, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)})`);
+            btn.setAttribute('onclick', `if(typeof buyRangedWeaponToGear === 'function') { buyRangedWeaponToGear('${type.replace(/'/g, "\\'")}', ${price}, ${load}, '${primaryDamage}', '${altDamage}', '${concealable}', '${hands}', ${stealth}, '${magazine}'); }`);
         });
         
         // Обновляем отображение цен
@@ -5054,7 +5108,7 @@ function toggleRangedWeaponsFreeMode() {
             const hands = btn.getAttribute('data-hands');
             const stealth = btn.getAttribute('data-stealth');
             const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `buyRangedWeapon(${JSON.stringify(type)}, 0, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)})`);
+            btn.setAttribute('onclick', `if(typeof getRangedWeaponFreeToWeapons === 'function') { getRangedWeaponFreeToWeapons('${type.replace(/'/g, "\\'")}', ${load}, '${primaryDamage}', '${altDamage}', '${concealable}', '${hands}', ${stealth}, '${magazine}'); }`);
         });
         
         gearButtons.forEach(btn => {
@@ -5066,7 +5120,7 @@ function toggleRangedWeaponsFreeMode() {
             const hands = btn.getAttribute('data-hands');
             const stealth = btn.getAttribute('data-stealth');
             const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `buyRangedWeaponToGear(${JSON.stringify(type)}, 0, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)})`);
+            btn.setAttribute('onclick', `if(typeof getRangedWeaponFreeToGear === 'function') { getRangedWeaponFreeToGear('${type.replace(/'/g, "\\'")}', ${load}, '${primaryDamage}', '${altDamage}', '${concealable}', '${hands}', ${stealth}, '${magazine}'); }`);
         });
         
         // Обновляем отображение цен
