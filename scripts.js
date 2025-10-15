@@ -385,6 +385,15 @@ function renderRollLog() {
                 text = `<img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"> Зачислено <strong style="color: #00ff88; font-weight: bold;">${entry.amount} уе</strong> (${entry.source})${entry.taxPaid > 0 ? ` [Налог: ${entry.taxPaid} уе]` : ''}`;
                 break;
             
+            case 'fence_sale':
+                text = `<img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"> Продано: <strong>${entry.item}</strong> за <strong style="color: var(--success);">${entry.price} уе</strong>`;
+                break;
+            
+            case 'initiative':
+                const d4Str = entry.d4Value ? (entry.d4Type === 'penalty' ? ` - d4(${entry.d4Value})` : ` + d4(${entry.d4Value})`) : '';
+                text = `<img src="https://static.tildacdn.com/tild3765-3433-4435-b435-636665663530/target_1.png" alt="🎯" style="width: 16px; height: 16px; vertical-align: middle;"> Бросок инициативы: <strong style="color: var(--accent);">${entry.total}</strong> (2d6: ${entry.dice1}+${entry.dice2} + РЕА: ${entry.reaction} + Мод: ${entry.modifier}${d4Str})`;
+                break;
+            
             default:
                 text = entry.text || JSON.stringify(entry);
         }
@@ -630,7 +639,59 @@ function closeModal(button) {
     }
 }
 
-function showModal(title, content) {
+// Универсальная функция для добавления обработчиков клавиш к модалу
+function addModalKeyboardHandlers(modal) {
+    const keyHandler = function(e) {
+        // Escape всегда закрывает модал (нажимает кнопку ×)
+        if (e.key === 'Escape' || e.key === 'Esc') {
+            e.preventDefault();
+            e.stopPropagation();
+            const closeButton = modal.querySelector('.icon-button');
+            if (closeButton) {
+                closeButton.click();
+            }
+            document.removeEventListener('keydown', keyHandler);
+            return;
+        }
+        
+        // Enter нажимает кнопки подтверждения, но только если не в поле ввода
+        if (e.key === 'Enter') {
+            // Не обрабатываем Enter в полях ввода
+            if (e.target.matches('select') || e.target.matches('textarea') || e.target.matches('input[type="text"]') || e.target.matches('input[type="number"]') || e.target.matches('input[type="email"]') || e.target.matches('input[type="password"]')) {
+                return;
+            }
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Находим все кнопки в модале (кроме кнопки закрытия ×)
+            const allButtons = modal.querySelectorAll('button:not(.icon-button)');
+            
+            // Если есть только одна кнопка (кроме ×), нажимаем её
+            if (allButtons.length === 1) {
+                allButtons[0].click();
+            }
+            // Если есть несколько кнопок, ищем кнопку подтверждения
+            else if (allButtons.length > 1) {
+                const confirmButton = modal.querySelector('.primary-button, .success-button, .danger-button');
+                if (confirmButton) {
+                    confirmButton.click();
+                }
+            }
+        }
+    };
+    
+    document.addEventListener('keydown', keyHandler);
+    
+    // Удаляем обработчик при удалении модала
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.removeEventListener('keydown', keyHandler);
+        originalRemove();
+    };
+}
+
+function showModal(title, content, buttons = []) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     
@@ -638,6 +699,18 @@ function showModal(title, content) {
     const existingModals = document.querySelectorAll('.modal-overlay');
     const baseZIndex = 1000;
     modal.style.zIndex = baseZIndex + (existingModals.length * 100);
+    
+    // Создаем HTML для кнопок
+    let buttonsHTML = '';
+    if (buttons && buttons.length > 0) {
+        buttonsHTML = `
+            <div class="modal-footer">
+                ${buttons.map(button => 
+                    `<button class="pill-button ${button.class}" onclick="${button.onclick}">${button.text}</button>`
+                ).join('')}
+            </div>
+        `;
+    }
     
     modal.innerHTML = `
         <div class="modal" style="max-width: 500px;">
@@ -648,6 +721,7 @@ function showModal(title, content) {
             <div class="modal-body">
                 ${content}
             </div>
+            ${buttonsHTML}
         </div>
     `;
     
@@ -658,6 +732,9 @@ function showModal(title, content) {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
 }
 
 // Функции для работы с деньгами
@@ -736,11 +813,9 @@ function expandSection(sectionId) {
 }
 
 function clearRollLog() {
-    showConfirmModal('Подтверждение', 'Вы уверены, что хотите очистить лог бросков?', () => {
         state.rollLog = [];
         renderRollLog();
         scheduleSave();
-    });
 }
 
 // Универсальная бросалка
@@ -809,6 +884,9 @@ function showUniversalDiceModal() {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
 }
 
 function rollUniversalDice() {
@@ -1359,11 +1437,22 @@ function renderSkills() {
     
     container.innerHTML = `
         <div class="skills-grid-compact">
-            ${sortedSkills.map(skill => `
+            ${sortedSkills.map(skill => {
+                const isBargainSkill = skill.name === 'Торг' || (skill.customName && skill.customName === 'Торг');
+                return `
                 <div class="skill-item-compact">
                     <button class="skill-remove-btn-compact" onclick="removeSkill('${skill.id}')">×</button>
                     
-                    <div class="skill-name-compact">${skill.customName || skill.name}</div>
+                    <div class="skill-name-compact">
+                        ${skill.customName || skill.name}
+                        ${isBargainSkill ? `
+                            <div style="margin-top: 0.25rem;">
+                                <span style="font-size: 0.7rem; color: var(--muted); font-style: italic;">
+                                    Только для Решалы!
+                                </span>
+                            </div>
+                        ` : ''}
+                    </div>
                     
                     <div class="integrated-numeric-input">
                         <button class="integrated-numeric-btn" onclick="decreaseSkillLevel('${skill.id}')">-</button>
@@ -1376,7 +1465,7 @@ function renderSkills() {
                         <button class="skill-dice-btn-compact" onclick="showSkillCheckModal(${state.skills.indexOf(skill)})">🎲</button>
                     </div>
                 </div>
-            `).join('')}
+            `}).join('')}
         </div>
     `;
     
@@ -1466,8 +1555,31 @@ function showAddSkillModal() {
 
 // Функции для работы с секцией "Дека"
 function toggleDeckSection(sectionType) {
-    const container = document.getElementById(sectionType === 'programs' ? 'deckProgramsContainer' : 'deckChipsContainer');
-    const toggle = document.getElementById(sectionType === 'programs' ? 'deckProgramsToggle' : 'deckChipsToggle');
+    let containerId, toggleId;
+    
+    switch(sectionType) {
+        case 'programs':
+            containerId = 'deckProgramsContainer';
+            toggleId = 'deckProgramsToggle';
+            break;
+        case 'chips':
+            containerId = 'deckChipsContainer';
+            toggleId = 'deckChipsToggle';
+            break;
+        case 'upgrades':
+            containerId = 'deckUpgradesContainer';
+            toggleId = 'deckUpgradesToggle';
+            break;
+        case 'installedChips':
+            containerId = 'deckInstalledChipsContainer';
+            toggleId = 'deckInstalledChipsToggle';
+            break;
+        default:
+            return;
+    }
+    
+    const container = document.getElementById(containerId);
+    const toggle = document.getElementById(toggleId);
     
     if (!container || !toggle) return;
     
@@ -1488,6 +1600,14 @@ function renderDeckPrograms() {
     const container = document.getElementById('deckProgramsContainer');
     if (!container) return;
     
+    // Подсчитываем используемую память
+    const usedMemory = state.deckPrograms.reduce((total, program) => total + (program.memory || 1), 0);
+    const maxMemory = parseInt(state.deck.memory) + state.deckGear.filter(item => 
+        item.deckGearType === 'upgrade' && 
+        item.stat === 'memory' && 
+        item.installedDeckId === 'main'
+    ).length;
+    
     if (state.deckPrograms.length === 0) {
         container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem; font-size: 0.8rem;">Программы не установлены</p>';
         updateDeckCounters();
@@ -1496,11 +1616,11 @@ function renderDeckPrograms() {
     
     container.innerHTML = state.deckPrograms.map((program, index) => `
         <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative;">
-            <button onclick="removeDeckProgram(${index})" style="position: absolute; top: 0.5rem; right: 0.5rem; font-size: 1rem; background: transparent; border: none; color: var(--text); cursor: pointer;">×</button>
+            <button onclick="removeDeckProgramWithChoice(${index})" style="position: absolute; top: 0.5rem; right: 0.5rem; font-size: 1rem; background: transparent; border: none; color: var(--text); cursor: pointer;">×</button>
             <div style="padding-right: 1.5rem;">
                 <div style="color: var(--success); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">${program.name}</div>
                 <div style="color: var(--muted); font-size: 0.75rem; margin-bottom: 0.25rem;">
-                    Цена: ${program.price} уе | ОЗУ: ${program.ram} | ${program.lethal ? 'Смертельная' : 'Несмертельная'}
+                    Цена: ${program.price} уе | ОЗУ: ${program.ram} | Память: ${program.memory || 1} | ${program.lethal ? 'Смертельная' : 'Несмертельная'}
                 </div>
                 <div style="color: var(--muted); font-size: 0.7rem; line-height: 1.3;">
                     ${program.description}
@@ -1509,8 +1629,125 @@ function renderDeckPrograms() {
         </div>
     `).join('');
     
+    // Добавляем информацию об использовании памяти
+    const memoryInfo = document.createElement('div');
+    memoryInfo.style.cssText = 'margin-top: 0.5rem; padding: 0.75rem; background: rgba(91, 155, 255, 0.1); border: 1px solid #5b9bff; border-radius: 6px; text-align: center;';
+    memoryInfo.innerHTML = `
+        <div style="color: var(--accent); font-size: 0.8rem;">
+            Использовано памяти: <strong>${usedMemory}/${maxMemory}</strong>
+            ${usedMemory > maxMemory ? '<span style="color: var(--danger);"> (ПРЕВЫШЕНО!)</span>' : ''}
+        </div>
+    `;
+    container.appendChild(memoryInfo);
+    
     // Обновляем счетчик в заголовке
     updateDeckCounters();
+}
+
+// Функция обновления отображения характеристик деки
+function updateDeckDisplay() {
+    // Блок Деки теперь содержит только кнопки и щепки памяти
+    // Все управление деками происходит через поп-ап "Мои Деки"
+    
+    // Обновляем только щепки памяти
+    renderDeckChips();
+}
+
+// Функция отображения улучшений деки
+function renderDeckUpgrades() {
+    const container = document.getElementById('deckUpgradesContainer');
+    if (!container) return;
+    
+    const upgrades = [
+        { name: 'Улучшение памяти', stat: 'memory', maxUpgrades: 5, priceMultiplier: 200 },
+        { name: 'Улучшение ОЗУ', stat: 'ram', maxUpgrades: 5, priceMultiplier: 1000 },
+        { name: 'Улучшение Видимости', stat: 'grid', maxUpgrades: 5, priceMultiplier: 100 }
+    ];
+    
+    container.innerHTML = upgrades.map(upgrade => {
+        const installedUpgrades = state.deckGear.filter(item => 
+            item.deckGearType === 'upgrade' && 
+            item.stat === upgrade.stat && 
+            item.installedDeckId === 'main'
+        );
+        
+        const upgradeCount = installedUpgrades.length;
+        const canInstall = upgradeCount < upgrade.maxUpgrades;
+        
+        // Рассчитываем стоимость для следующего уровня
+        let nextPrice = 0;
+        if (canInstall) {
+            if (upgrade.stat === 'memory') {
+                const currentMemory = parseInt(state.deck.memory) + upgradeCount;
+                nextPrice = (currentMemory + 1) * upgrade.priceMultiplier;
+            } else if (upgrade.stat === 'ram') {
+                const currentRam = parseInt(state.deckRam.current) + upgradeCount;
+                nextPrice = (currentRam + 1) * upgrade.priceMultiplier;
+            } else if (upgrade.stat === 'grid') {
+                const currentGrid = parseInt(state.deck.grid) + upgradeCount;
+                nextPrice = (currentGrid + 1) * upgrade.priceMultiplier;
+            }
+        }
+        
+        return `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 193, 7, 0.1); border: 1px solid var(--warning); border-radius: 6px;">
+                <div>
+                    <div style="font-weight: 600; font-size: 0.9rem;">${upgrade.name}</div>
+                    <div style="color: var(--muted); font-size: 0.8rem;">Улучшений: ${upgradeCount}/${upgrade.maxUpgrades}</div>
+                </div>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    ${canInstall ? `
+                        <span style="color: var(--accent); font-size: 0.8rem;">${nextPrice} уе</span>
+                        <button class="pill-button primary-button" onclick="installDeckUpgrade('${upgrade.stat}', ${nextPrice})" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Улучшить</button>
+                    ` : `
+                        <span style="color: var(--muted); font-size: 0.8rem;">Максимум улучшений</span>
+                    `}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Функция отображения установленных щепок
+function renderDeckInstalledChips() {
+    const container = document.getElementById('deckInstalledChipsContainer');
+    const countElement = document.getElementById('deckInstalledChipsCount');
+    
+    if (!container) return;
+    
+    // Подсчитываем слоты для щепок
+    const chipSlotModules = state.deckGear.filter(item => 
+        item.deckGearType === 'module' && 
+        item.name === 'Дополнительный слот для Щепки' && 
+        item.installedDeckId === 'main'
+    );
+    const chipSlots = 1 + chipSlotModules.length;
+    
+    // Подсчитываем установленные щепки
+    const installedChips = state.deckChips.filter(chip => chip.installedDeckId === 'main');
+    
+    if (countElement) {
+        countElement.textContent = `(${installedChips.length}/${chipSlots})`;
+    }
+    
+    if (installedChips.length === 0) {
+        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem; font-size: 0.8rem;">Щепки не установлены</p>';
+        return;
+    }
+    
+    container.innerHTML = `
+        <div style="display: grid; gap: 0.5rem;">
+            ${installedChips.map(chip => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 193, 7, 0.1); border: 1px solid var(--warning); border-radius: 6px;">
+                    <div>
+                        <div style="font-weight: 600; font-size: 0.9rem;">${chip.name}</div>
+                        <div style="color: var(--muted); font-size: 0.8rem;">${chip.description || 'Щепка памяти'}</div>
+                    </div>
+                    <button class="pill-button danger-button" onclick="removeChipFromDeck('${chip.id}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Удалить</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
 }
 
 function renderDeckChips() {
@@ -1531,8 +1768,25 @@ function renderDeckChips() {
             </div>
             <div>
                 <div style="color: var(--accent); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">${chip.name}</div>
-                <div style="color: var(--muted); font-size: 0.75rem;">
-                    ${chip.program ? `Программа: ${chip.program.name}` : chip.content ? `Содержимое: ${chip.content.substring(0, 50)}${chip.content.length > 50 ? '...' : ''}` : 'Пустая щепка'}
+                <div style="color: var(--muted); font-size: 0.75rem; margin-bottom: 0.5rem;">
+                    ${chip.programs && chip.programs.length > 0 ? `
+                        <div style="margin-bottom: 0.5rem;">
+                            <div style="color: var(--accent); font-weight: 600; margin-bottom: 0.25rem;">Программы:</div>
+                            ${chip.programs.map(program => `
+                                <div style="margin-bottom: 0.3rem; padding-left: 0.5rem;">
+                                    <div style="font-weight: 600; color: var(--text);">• ${program.name}</div>
+                                    ${program.description ? `<div style="color: var(--muted); font-size: 0.7rem; margin-top: 0.1rem; line-height: 1.3;">${program.description}</div>` : ''}
+                </div>
+                            `).join('')}
+                        </div>
+                    ` : chip.content ? `Содержимое: ${chip.content.substring(0, 50)}${chip.content.length > 50 ? '...' : ''}` : 'Пустая щепка'}
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    ${chip.installedDeckId ? `
+                        <span style="color: var(--success); font-size: 0.8rem;">Установлена на деку</span>
+                    ` : `
+                        <button class="pill-button primary-button" onclick="installChipOnDeck('${chip.id}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Установить на деку</button>
+                    `}
                 </div>
             </div>
         </div>
@@ -1668,7 +1922,7 @@ function toggleProgramsFreeMode() {
     }
 }
 
-function buyProgram(name, price, ram, lethal, description) {
+function buyProgram(name, price, ram, lethal, description, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -1692,8 +1946,8 @@ function buyProgram(name, price, ram, lethal, description) {
     state.money = currentMoney - price;
     updateMoneyDisplay();
     
-    // Показываем модал выбора установки
-    showProgramInstallModal(name, price, ram, lethal, description);
+    // Показываем модал установки программы с выбором деки
+    showProgramInstallModal(name, price, ram, lethal, description, catalogPrice);
 }
 
 function showCustomPriceModal(name, originalPrice, ram, lethal, description) {
@@ -1742,7 +1996,7 @@ function showCustomPriceModal(name, originalPrice, ram, lethal, description) {
     }, 100);
 }
 
-function buyProgramWithCustomPrice(name, ram, lethal, description) {
+function buyProgramWithCustomPrice(name, ram, lethal, description, catalogPrice = null) {
     const customPrice = parseInt(document.getElementById('customProgramPrice').value) || 0;
     const currentMoney = parseInt(state.money) || 0;
     
@@ -1762,21 +2016,11 @@ function buyProgramWithCustomPrice(name, ram, lethal, description) {
     closeModal(document.querySelector('.modal-overlay .icon-button'));
     
     // Показываем модал установки
-    showProgramInstallModal(name, customPrice, ram, lethal, description);
+    showProgramInstallModal(name, customPrice, ram, lethal, description, catalogPrice);
 }
 
-function showProgramInstallModal(name, price, ram, lethal, description) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>Установка программы: ${name}</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
+function showProgramInstallModal(name, price, ram, lethal, description, catalogPrice = null) {
+    const content = `
                 <div style="margin-bottom: 1rem;">
                     <p><strong>${name}</strong></p>
                     <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
@@ -1792,91 +2036,104 @@ function showProgramInstallModal(name, price, ram, lethal, description) {
                 <div style="display: grid; gap: 0.75rem;">
                     <label class="field">
                         Установить на
-                        <select id="programInstallTarget" style="width: 100%;">
+                <select id="programInstallTarget" style="width: 100%;" onchange="toggleProgramInstallOptions()">
                             <option value="deck">Дека</option>
                             <option value="chip">Щепку памяти</option>
+                </select>
+            </label>
+            
+            <div id="deckSelectionContainer" style="display: none;">
+                <label class="field">
+                    Выберите деку
+                    <select id="programDeckSelect" style="width: 100%;">
+                        ${state.deck ? `<option value="main">Основная дека (${state.deck.name})</option>` : ''}
+                        ${state.decks.map(deck => `<option value="${deck.id}">${deck.name}</option>`).join('')}
                         </select>
                     </label>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="installProgram('${name}', ${price}, ${ram}, ${lethal}, '${description.replace(/'/g, "\\'")}')">
-                    Установить
-                </button>
             </div>
         </div>
     `;
     
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
+    const buttons = [
+        {
+            text: 'Установить',
+            class: 'primary-button',
+            onclick: `installProgram('${name}', ${price}, ${ram}, ${lethal}, '${description.replace(/'/g, "\\'")}', ${catalogPrice || 'null'})`
         }
-    });
+    ];
+    
+    showModal(`Установка программы: ${name}`, content, buttons);
+    
+    // Показываем выбор деки, так как по умолчанию выбрана "Дека"
+    setTimeout(() => {
+        toggleProgramInstallOptions();
+    }, 100);
 }
 
-function installProgram(name, price, ram, lethal, description) {
+// Функция переключения опций установки программы
+function toggleProgramInstallOptions() {
+    const target = document.getElementById('programInstallTarget').value;
+    const deckContainer = document.getElementById('deckSelectionContainer');
+    
+    if (deckContainer) {
+    if (target === 'deck') {
+            deckContainer.style.display = 'block';
+        } else {
+            deckContainer.style.display = 'none';
+        }
+    }
+}
+
+function installProgram(name, price, ram, lethal, description, catalogPrice = null) {
     const target = document.getElementById('programInstallTarget').value;
     
     if (target === 'deck') {
-        const newProgram = {
-            id: generateId('program'),
-            name: name,
-            price: price,
-            ram: ram,
-            lethal: lethal,
-            description: description,
-            installedOn: 'deck'
-        };
+        // Получаем выбранную деку из окна установки
+        const selectedDeckId = document.getElementById('programDeckSelect').value;
         
-        state.deckPrograms.push(newProgram);
-        renderDeckPrograms();
-        
-        // Добавляем в лог (только если программа была куплена за деньги)
-        if (price > 0) {
-            addToRollLog('purchase', {
-                item: name,
-                price: price,
-                category: 'Программа (на Деку)'
-            });
+        // Закрываем только окно установки программы, а не весь магазин
+        const installModal = document.querySelector('.modal-overlay:last-child');
+        if (installModal) {
+            installModal.remove();
         }
         
-        closeModal(document.querySelector('.modal-overlay .icon-button'));
-        scheduleSave();
-        
-        showModal('Программа установлена', `&#x2705; ${name} установлена на Деку!`);
+        // Устанавливаем программу на деку (это покажет уведомление об успешной установке)
+        installProgramOnDeck(name, price, ram, lethal, description, catalogPrice, selectedDeckId);
     } else {
         // Установка на щепку - создаем новую щепку
         const currentMoney = parseInt(state.money) || 0;
         const chipCost = 10; // Стоимость создания щепки
+        const totalCost = price + chipCost; // Общая стоимость программы + щепки
         
-        if (currentMoney < chipCost) {
+        if (currentMoney < totalCost) {
             showModal('Недостаточно денег', `
                 <div style="text-align: center; padding: 1rem;">
-                    <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Не хватает Еши для создания щепки!</p>
-                    <p style="color: var(--muted); margin-bottom: 1rem;">Создание щепки стоит ${chipCost} уе</p>
+                    <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Недостаточно денег для покупки!</p>
+                    <p style="color: var(--muted); margin-bottom: 1rem;">Программа: ${price} уе + Щепка: ${chipCost} уе = ${totalCost} уе</p>
+                    <p style="color: var(--muted); margin-bottom: 1rem;">Доступно: ${currentMoney} уе</p>
                     <button class="pill-button" onclick="closeModal(this)">Понятно</button>
                 </div>
             `);
             return;
         }
         
-        // Списываем деньги за щепку
-        state.money = currentMoney - chipCost;
+        // Списываем деньги за программу и щепку
+        state.money = currentMoney - totalCost;
         updateMoneyDisplay();
         
         // Создаем новую щепку с программой
         const newChip = {
             id: generateId('chip'),
             name: 'Сам купил',
-            program: {
+            programs: [{
                 name: name,
                 price: price,
                 ram: ram,
                 lethal: lethal,
                 description: description
-            }
+            }],
+            content: '',
+            installedDeckId: null
         };
         
         state.deckChips.push(newChip);
@@ -1894,16 +2151,96 @@ function installProgram(name, price, ram, lethal, description) {
         closeModal(document.querySelector('.modal-overlay .icon-button'));
         scheduleSave();
         
-        showModal('Щепка создана', `&#x2705; Создана щепка "Сам купил" с программой ${name}!<br>Списано ${chipCost} уе за создание щепки.`);
+        showModal('Щепка создана', `&#x2705; Создана щепка "Сам купил" с программой ${name}!<br>Списано ${totalCost} уе (программа: ${price} уе + щепка: ${chipCost} уе).`);
     }
 }
 
+// Функция установки программы на конкретную деку
+function installProgramOnDeck(name, price, ram, lethal, description, catalogPrice, deckId) {
+    // Проверяем лимит памяти для выбранной деки
+    const usedMemory = state.deckPrograms.reduce((total, program) => {
+        if (program.installedDeckId == deckId) {
+            return total + (program.memory || 1);
+        }
+        return total;
+    }, 0);
+    
+    // Находим деку по ID (стартовая дека или купленная)
+    let targetDeck = null;
+    if (deckId === 'main' && state.deck) {
+        targetDeck = state.deck;
+    } else {
+        console.log('Поиск деки с ID:', deckId, 'тип:', typeof deckId);
+        console.log('Доступные деки:', state.decks.map(d => ({id: d.id, name: d.name, type: typeof d.id})));
+        targetDeck = state.decks.find(d => d.id == deckId); // Используем == для сравнения строки и числа
+    }
+    
+    if (!targetDeck) {
+        showModal('Ошибка', 'Дека не найдена!');
+        return;
+    }
+    
+    const baseMemory = parseInt(targetDeck.memory);
+    const memoryUpgrades = state.deckGear.filter(item => 
+        item.deckGearType === 'upgrade' && 
+        item.stat === 'memory' && 
+        item.installedDeckId == deckId
+    ).length;
+    const maxMemory = baseMemory + memoryUpgrades;
+    
+    const programMemory = 1; // По умолчанию программа занимает 1 единицу памяти
+    if (usedMemory + programMemory > maxMemory) {
+        showModal('Недостаточно памяти', `Недостаточно памяти на деке. Использовано: ${usedMemory}/${maxMemory}`);
+        return;
+    }
+    
+    const newProgram = {
+        id: generateId('program'),
+        name: name,
+        price: price,
+        ram: ram,
+        lethal: lethal,
+        description: description,
+        memory: programMemory,
+        installedOn: 'deck',
+        installedDeckId: deckId,
+        catalogPrice: catalogPrice,
+        purchasePrice: price,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
+    };
+    
+    state.deckPrograms.push(newProgram);
+    
+    // Обновляем отображение программ (если это основная дека)
+    if (deckId === 'main') {
+        renderDeckPrograms();
+    }
+    
+    // Обновляем отображение коллекции дек (если окно открыто)
+    const deckCollectionModal = document.querySelector('.modal-overlay');
+    if (deckCollectionModal && document.getElementById('deckCollectionContainer')) {
+        renderDeckCollection();
+    }
+    
+    // Добавляем в лог (только если программа была куплена за деньги)
+    if (price > 0) {
+        addToRollLog('purchase', {
+            item: name,
+            price: price,
+            category: 'Программа (на Деку)'
+        });
+    }
+    
+    scheduleSave();
+    
+    const deckName = deckId === 'main' ? state.deck.name : state.decks.find(d => d.id == deckId)?.name || 'Неизвестная дека';
+    showModal('Программа установлена', `&#x2705; ${name} установлена на ${deckName}!`);
+}
+
 function removeDeckProgram(index) {
-    showConfirmModal('Подтверждение', 'Удалить программу?', () => {
         state.deckPrograms.splice(index, 1);
         renderDeckPrograms();
         scheduleSave();
-    });
 }
 
 function addMemoryChip() {
@@ -2017,12 +2354,17 @@ function editMemoryChip(index) {
                 <div style="margin-top: 1.5rem;">
                     <h4 style="color: var(--accent); margin-bottom: 1rem;">Содержимое щепки</h4>
                     
-                    ${chip.program ? `
+                    ${chip.programs && chip.programs.length > 0 ? `
                         <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                            <div style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">📀 Программа: ${chip.program.name}</div>
-                            <div style="color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem;">ОЗУ: ${chip.program.ram} | ${chip.program.lethal ? 'Смертельная' : 'Несмертельная'}</div>
-                            <div style="color: var(--muted); font-size: 0.8rem;">${chip.program.description}</div>
-                            <button class="pill-button danger-button" onclick="removeProgramFromChip(${index})" style="margin-top: 0.5rem; font-size: 0.8rem;">Удалить программу</button>
+                            <div style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">📀 Программы:</div>
+                            ${chip.programs.map((program, progIndex) => `
+                                <div style="margin-bottom: 0.5rem; padding: 0.5rem; background: rgba(125, 244, 198, 0.2); border-radius: 4px;">
+                                    <div style="font-weight: 600;">${program.name}</div>
+                                    <div style="color: var(--muted); font-size: 0.8rem;">ОЗУ: ${program.ram} | ${program.lethal ? 'Смертельная' : 'Несмертельная'}</div>
+                                    <div style="color: var(--muted); font-size: 0.7rem;">${program.description}</div>
+                                    <button class="pill-button danger-button" onclick="removeProgramFromChip(${index}, ${progIndex})" style="margin-top: 0.25rem; font-size: 0.7rem;">Удалить</button>
+                                </div>
+                            `).join('')}
                         </div>
                     ` : `
                         <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
@@ -2083,18 +2425,26 @@ function saveEditedChip(index) {
     if (content) {
         state.deckChips[index].content = content;
     }
+    
+    // Обновляем отображение щепок и блока Дека
     renderDeckChips();
+    updateDeckDisplay();
+    
+    // Если открыт поп-ап коллекции дек, обновляем его
+    const collectionModal = document.querySelector('.modal-overlay');
+    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
+        renderDeckCollection();
+    }
+    
     scheduleSave();
     
     closeModal(document.querySelector('.modal-overlay .icon-button'));
 }
 
 function removeMemoryChip(index) {
-    showConfirmModal('Подтверждение', 'Удалить щепку памяти?', () => {
         state.deckChips.splice(index, 1);
         renderDeckChips();
         scheduleSave();
-    });
 }
 
 function showProgramInstallModalForChip(chipIndex) {
@@ -2159,15 +2509,28 @@ function installProgramOnChip(chipIndex, name, price, ram, lethal, description) 
     updateMoneyDisplay();
     
     // Записываем программу на щепку
-    state.deckChips[chipIndex].program = {
+    if (!state.deckChips[chipIndex].programs) {
+        state.deckChips[chipIndex].programs = [];
+    }
+    
+    state.deckChips[chipIndex].programs.push({
         name: name,
         price: price,
         ram: ram,
         lethal: lethal,
         description: description
-    };
+    });
     
+    // Обновляем отображение щепок и блока Дека
     renderDeckChips();
+    updateDeckDisplay();
+    
+    // Если открыт поп-ап коллекции дек, обновляем его
+    const collectionModal = document.querySelector('.modal-overlay');
+    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
+        renderDeckCollection();
+    }
+    
     scheduleSave();
     
     // Добавляем в лог
@@ -2181,15 +2544,26 @@ function installProgramOnChip(chipIndex, name, price, ram, lethal, description) 
     showModal('Программа записана', `&#x2705; ${name} записана на щепку!`);
 }
 
-function removeProgramFromChip(chipIndex) {
-    showConfirmModal('Подтверждение', 'Удалить программу с щепки?', () => {
-        delete state.deckChips[chipIndex].program;
+function removeProgramFromChip(chipIndex, programIndex) {
+    const chip = state.deckChips[chipIndex];
+    if (!chip || !chip.programs || !chip.programs[programIndex]) return;
+    
+    chip.programs.splice(programIndex, 1);
+    
+    // Обновляем отображение щепок и блока Дека
         renderDeckChips();
+    updateDeckDisplay();
+    
+    // Если открыт поп-ап коллекции дек, обновляем его
+    const collectionModal = document.querySelector('.modal-overlay');
+    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
+        renderDeckCollection();
+    }
+    
         scheduleSave();
         
         closeModal(document.querySelector('.modal-overlay .icon-button'));
         showModal('Программа удалена', `&#x2705; Программа удалена с щепки!`);
-    });
 }
 
 // Функции для работы с киберимплантами
@@ -2354,7 +2728,7 @@ function filterImplants(searchTerm) {
     });
 }
 
-function buyAndInstallImplant(category, name, price, awarenessLoss, description) {
+function buyAndInstallImplant(category, name, price, awarenessLoss, description, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -2384,6 +2758,7 @@ function buyAndInstallImplant(category, name, price, awarenessLoss, description)
     
     // Добавляем модуль в снаряжение
     const newGear = {
+        id: generateId('gear'),
         name: name,
         description: `${description} | Потеря осознанности: ${awarenessLoss}`,
         price: price,
@@ -2395,7 +2770,10 @@ function buyAndInstallImplant(category, name, price, awarenessLoss, description)
             price: price,
             awarenessLoss: awarenessLoss,
             description: description
-        }
+        },
+        catalogPrice: catalogPrice,
+        purchasePrice: price,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
     };
     
     state.gear.push(newGear);
@@ -2906,7 +3284,7 @@ function selectImplant(implantType, partName = null) {
                     <div style="margin-top: 0.5rem;">
                         <h7 style="color: var(--success); font-size: 0.8rem;">Установленные модули:</h7>
                         ${partData.modules.map((module, i) => module ? `
-                            <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 6px; padding: 0.5rem; margin-top: 0.25rem;">
+                            <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 6px; padding: 0.75rem; margin-top: 0.25rem;">
                                 <div style="color: var(--success); font-weight: bold; font-size: 0.8rem;">${module.name}</div>
                                 <div style="color: var(--muted); font-size: 0.7rem;">${module.description}</div>
                             </div>
@@ -2936,7 +3314,7 @@ function selectImplant(implantType, partName = null) {
                         <div style="margin-top: 0.5rem;">
                             <h7 style="color: var(--success); font-size: 0.8rem;">Установленные модули:</h7>
                             ${partData.modules.map((module, i) => module ? `
-                                <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 6px; padding: 0.5rem; margin-top: 0.25rem;">
+                                <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 6px; padding: 0.75rem; margin-top: 0.25rem;">
                                     <div style="color: var(--success); font-weight: bold; font-size: 0.8rem;">${module.name}</div>
                                     <div style="color: var(--muted); font-size: 0.7rem;">${module.description}</div>
                                 </div>
@@ -3344,7 +3722,7 @@ function showImplantPartsShop() {
             const purchasedText = isPurchased ? ' (куплена)' : '';
             
             shopHTML += `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: rgba(0, 0, 0, 0.2); border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(0, 0, 0, 0.2); border-radius: 8px;">
                     <div>
                         <strong>${part.displayName}${purchasedText}</strong>
                         <div class="implant-part-price-display" style="color: var(--muted); font-size: 0.8rem;" data-original-price="${implant.price}" data-slots="${part.slots}" data-awareness="${implant.awarenessLoss}">
@@ -3386,7 +3764,7 @@ function showImplantPartsShop() {
     });
 }
 
-function buyImplantPart(category, partName, implantName, partDisplayName, price, awarenessLoss, description, slots) {
+function buyImplantPart(category, partName, implantName, partDisplayName, price, awarenessLoss, description, slots, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -3429,7 +3807,10 @@ function buyImplantPart(category, partName, implantName, partDisplayName, price,
     state.implants[category].installed = true;
     state.implants[category].parts[partName] = {
         slots: slots,
-        modules: new Array(slots).fill(null)
+        modules: new Array(slots).fill(null),
+        catalogPrice: catalogPrice,
+        purchasePrice: price,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
     };
     
     scheduleSave();
@@ -3626,26 +4007,7 @@ function toggleImplantPartsFreeMode() {
 // Функции для работы с оружием удалены - используется версия ниже
 
 // Функции для работы с собственностью
-function renderHousing() {
-    const container = document.getElementById('housingContainer');
-    if (!container) return;
-    
-    if (state.property.housing.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem;">Жилье не добавлено</p>';
-        return;
-    }
-    
-    container.innerHTML = state.property.housing.map((house, index) => `
-        <div class="property-item">
-            <div class="property-header">
-                <div class="property-name">${house.name}</div>
-                <button class="pill-button danger-button" onclick="removeHousing(${index})" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Удалить</button>
-            </div>
-            ${house.description ? `<div class="property-description">${house.description}</div>` : ''}
-        </div>
-    `).join('');
-}
-
+// Функции для работы с транспортом
 function renderVehicles() {
     const container = document.getElementById('vehiclesContainer');
     if (!container) return;
@@ -3725,6 +4087,8 @@ function addHousing() {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    addModalKeyboardHandlers(modal);
 }
 
 function saveHousing() {
@@ -3740,10 +4104,23 @@ function saveHousing() {
         return;
     }
     
+    // Проверяем и инициализируем state.property если нужно
+    if (!state.property) {
+        state.property = {
+            housing: [],
+            vehicles: []
+        };
+    }
+    
+    if (!state.property.housing) {
+        state.property.housing = [];
+    }
+    
     const newHousing = {
         id: generateId('housing'),
         name: name,
-        description: description
+        description: description,
+        addedDate: new Date().toLocaleDateString('ru-RU')
     };
     
     state.property.housing.push(newHousing);
@@ -3751,14 +4128,16 @@ function saveHousing() {
     scheduleSave();
     
     closeModal(document.querySelector('.modal-overlay .icon-button'));
+    showModal('Жилье добавлено', `✅ ${name} добавлено в собственность!`);
 }
 
-function removeHousing(index) {
-    showConfirmModal('Подтверждение', 'Удалить жилье?', () => {
+function removeHousing(housingId) {
+    const index = state.property.housing.findIndex(h => h.id === housingId);
+    if (index !== -1) {
         state.property.housing.splice(index, 1);
         renderHousing();
         scheduleSave();
-    });
+    }
 }
 
 function addVehicle() {
@@ -3828,11 +4207,9 @@ function saveVehicle() {
 }
 
 function removeVehicle(index) {
-    showConfirmModal('Подтверждение', 'Удалить транспорт?', () => {
         state.property.vehicles.splice(index, 1);
         renderVehicles();
         scheduleSave();
-    });
 }
 
 function uploadVehicleImage(index, input) {
@@ -3849,11 +4226,9 @@ function uploadVehicleImage(index, input) {
 }
 
 function removeVehicleImage(index) {
-    showConfirmModal('Подтверждение', 'Удалить изображение транспорта?', () => {
         state.property.vehicles[index].image = null;
         renderVehicles();
         scheduleSave();
-    });
 }
 
 // Функции для работы со снаряжением
@@ -4066,6 +4441,9 @@ function showGearShop() {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
 }
 
 function filterGear(searchTerm) {
@@ -4084,7 +4462,7 @@ function filterGear(searchTerm) {
     });
 }
 
-function buyGear(name, price, load, description) {
+function buyGear(name, price, load, description, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -4109,7 +4487,10 @@ function buyGear(name, price, load, description) {
         name: name,
         description: description,
         price: price,
-        load: load
+        load: load,
+        catalogPrice: catalogPrice,
+        purchasePrice: price,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
     };
     
     state.gear.push(newGear);
@@ -4123,8 +4504,6 @@ function buyGear(name, price, load, description) {
         price: price,
         category: 'Снаряжение'
     });
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
     
     showModal('Снаряжение куплено', `
         <div style="text-align: center; padding: 1rem;">
@@ -4234,6 +4613,10 @@ function pickupGear() {
                         <input type="text" class="input-field" id="pickedGearName" placeholder="Например: «Старый фонарик»">
                     </div>
                     <div class="input-group">
+                        <label class="input-label">Цена (для скупщика)</label>
+                        <input type="number" class="input-field" id="pickedGearPrice" value="0" min="0" placeholder="Цена предмета в уе">
+                    </div>
+                    <div class="input-group">
                         <label class="input-label">Нагрузка</label>
                         <input type="number" class="input-field" id="pickedGearLoad" value="1" min="0">
                     </div>
@@ -4261,6 +4644,7 @@ function pickupGear() {
 
 function savePickedGear() {
     const name = document.getElementById('pickedGearName').value;
+    const price = parseInt(document.getElementById('pickedGearPrice').value) || 0;
     const load = parseInt(document.getElementById('pickedGearLoad').value) || 0;
     const description = document.getElementById('pickedGearDescription').value;
     
@@ -4281,8 +4665,9 @@ function savePickedGear() {
         id: generateId('gear'),
         name: name,
         description: description,
-        price: 0,
-        load: load
+        price: price,
+        load: load,
+        type: 'custom' // Маркер для скупщика
     };
     
     state.gear.push(newGear);
@@ -4294,7 +4679,6 @@ function savePickedGear() {
 }
 
 function removeGear(index) {
-    showConfirmModal('Подтверждение', 'Удалить снаряжение?', () => {
         const item = state.gear[index];
         if (item) {
             // Возвращаем нагрузку
@@ -4308,7 +4692,6 @@ function removeGear(index) {
             updateLoadDisplay();
             scheduleSave();
         }
-    });
 }
 
 // Функции для работы с оружием
@@ -4396,6 +4779,9 @@ function showMeleeWeaponsShop() {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
 }
 
 function showRangedWeaponsShop() {
@@ -4406,7 +4792,7 @@ function showRangedWeaponsShop() {
     modal.innerHTML = `
         <div class="modal" style="max-width: 800px; max-height: 90vh; display: flex; flex-direction: column;">
             <div class="modal-header">
-                <h3>🔫 Оружие дальнего боя</h3>
+                <h3><img src="https://static.tildacdn.com/tild6332-3731-4662-b731-326433633632/assault-rifle.png" alt="🔫" style="width: 24px; height: 24px; margin-right: 0.5rem; vertical-align: middle;"> Оружие дальнего боя</h3>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                     <button onclick="toggleRangedWeaponsFreeMode()" id="rangedWeaponsFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
                     <button class="icon-button" onclick="closeModal(this)">×</button>
@@ -4420,8 +4806,8 @@ function showRangedWeaponsShop() {
                                 <div class="property-name">${weapon.type}</div>
                                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                                     <span class="ranged-weapon-price" style="color: var(--muted); font-size: 0.9rem;" data-original-price="${weapon.price}" data-load="${weapon.load}">Цена: ${weapon.price} уе | Нагрузка: ${weapon.load}</span>
-                                    <button class="pill-button primary-button ranged-weapon-buy-button" onclick="if(typeof buyRangedWeapon === 'function') { buyRangedWeapon('${weapon.type.replace(/'/g, "\\'")}', ${weapon.price}, ${weapon.load}, '${weapon.primaryDamage}', '${weapon.altDamage}', '${weapon.concealable}', '${weapon.hands}', ${weapon.stealth}, '${weapon.magazine}'); }" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-load="${weapon.load}" data-primary-damage="${weapon.primaryDamage}" data-alt-damage="${weapon.altDamage}" data-concealable="${weapon.concealable}" data-hands="${weapon.hands}" data-stealth="${weapon.stealth}" data-magazine="${weapon.magazine}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                                    <button class="pill-button success-button ranged-weapon-gear-button" onclick="if(typeof buyRangedWeaponToGear === 'function') { buyRangedWeaponToGear('${weapon.type.replace(/'/g, "\\'")}', ${weapon.price}, ${weapon.load}, '${weapon.primaryDamage}', '${weapon.altDamage}', '${weapon.concealable}', '${weapon.hands}', ${weapon.stealth}, '${weapon.magazine}'); }" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-load="${weapon.load}" data-primary-damage="${weapon.primaryDamage}" data-alt-damage="${weapon.altDamage}" data-concealable="${weapon.concealable}" data-hands="${weapon.hands}" data-stealth="${weapon.stealth}" data-magazine="${weapon.magazine}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">В сумку</button>
+                                    <button class="pill-button primary-button ranged-weapon-buy-button" onclick="buyRangedWeapon(${JSON.stringify(weapon.type)}, ${weapon.price}, ${weapon.load}, ${JSON.stringify(weapon.primaryDamage)}, ${JSON.stringify(weapon.altDamage)}, ${JSON.stringify(weapon.concealable)}, ${JSON.stringify(weapon.hands)}, ${weapon.stealth}, ${JSON.stringify(weapon.magazine)}, null)" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-original-price="${weapon.price}" data-load="${weapon.load}" data-primary-damage="${weapon.primaryDamage}" data-alt-damage="${weapon.altDamage}" data-concealable="${weapon.concealable}" data-hands="${weapon.hands}" data-stealth="${weapon.stealth}" data-magazine="${weapon.magazine}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
+                                    <button class="pill-button success-button ranged-weapon-gear-button" onclick="buyRangedWeaponToGear(${JSON.stringify(weapon.type)}, ${weapon.price}, ${weapon.load}, ${JSON.stringify(weapon.primaryDamage)}, ${JSON.stringify(weapon.altDamage)}, ${JSON.stringify(weapon.concealable)}, ${JSON.stringify(weapon.hands)}, ${weapon.stealth}, ${JSON.stringify(weapon.magazine)}, null)" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-original-price="${weapon.price}" data-load="${weapon.load}" data-primary-damage="${weapon.primaryDamage}" data-alt-damage="${weapon.altDamage}" data-concealable="${weapon.concealable}" data-hands="${weapon.hands}" data-stealth="${weapon.stealth}" data-magazine="${weapon.magazine}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">В сумку</button>
                                 </div>
                             </div>
                             <div class="property-description">
@@ -4443,6 +4829,1140 @@ function showRangedWeaponsShop() {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
+    
+    // Принудительно обновляем onclick атрибуты кнопок после применения обёрток
+    setTimeout(() => {
+        initializeRangedWeaponButtons();
+    }, 100);
+}
+
+// Магазин Дек
+function showDeckShop() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3>💻 Магазин Дек</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto; flex: 1;">
+                <div style="display: grid; gap: 1rem;">
+                    ${DECK_CATALOG.map((deck) => `
+                        <div class="property-item">
+                            <div class="property-header">
+                                <div class="property-name">${deck.name}</div>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <span style="color: var(--muted); font-size: 0.9rem;">Цена: ${deck.price.toLocaleString()} уе</span>
+                                    <button class="pill-button primary-button" onclick="buyDeck('${deck.name}', ${deck.memory}, ${deck.ram}, ${deck.grid}, ${deck.price})" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
+                                </div>
+                            </div>
+                            <div class="property-description">
+                                <div style="font-family: monospace; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem;">
+                                    Память: ${deck.memory} | ОЗУ: ${deck.ram} | Сетка: ${deck.grid}
+                                </div>
+                                <div style="font-size: 0.9rem; line-height: 1.4;">
+                                    ${deck.description}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
+}
+
+// Функция покупки деки
+function buyDeck(name, memory, ram, grid, price, catalogPrice = null) {
+    if (state.money < price) {
+        showModal('Недостаточно средств', `У вас ${state.money.toLocaleString()} уе, а нужно ${price.toLocaleString()} уе.`);
+        return;
+    }
+    
+    const newDeck = {
+        id: Date.now(),
+        name: name,
+        memory: memory,
+        ram: ram,
+        grid: grid,
+        version: '10',
+        osVersion: '',
+        programs: [],
+        chips: [],
+        modules: [],
+        catalogPrice: catalogPrice || price,
+        purchasePrice: price,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
+    };
+    
+    state.decks.push(newDeck);
+    state.money -= price;
+    
+    // Добавляем в лог
+    addToRollLog('purchase', {
+        item: name,
+        price: price,
+        category: 'Дека'
+    });
+    
+    showModal('Дека куплена', `${name} добавлена в коллекцию! Теперь вы можете переключиться на неё в магазине дек.`);
+    scheduleSave();
+    updateAllDisplays();
+}
+
+// Магазин снаряжения для Дек
+function showDeckGearShop() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3>🔧 Снаряжение для Дек</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto; flex: 1;">
+                <div style="display: grid; gap: 1rem;">
+                    ${DECK_GEAR_CATALOG.map((item) => `
+                        <div class="property-item">
+                            <div class="property-header">
+                                <div class="property-name">${item.name}</div>
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <span style="color: var(--muted); font-size: 0.9rem;">Цена: ${item.price}</span>
+                                    <button class="pill-button primary-button" onclick="buyDeckGear('${item.name}', '${item.price}', '${item.type}', '${item.stat || ''}', ${item.maxValue || 0}, ${item.unique || false}, ${item.maxQuantity || 0})" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
+                                </div>
+                            </div>
+                            <div class="property-description">
+                                <div style="font-size: 0.9rem; line-height: 1.4;">
+                                    ${item.description}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
+}
+
+// Функция покупки снаряжения для деки
+function buyDeckGear(name, priceStr, type, stat, maxValue, unique, maxQuantity, catalogPrice = null) {
+    let price = 0;
+    
+    // Обработка цен типа "ур*200"
+    if (priceStr.includes('ур*')) {
+        const multiplier = parseInt(priceStr.replace('ур*', ''));
+        price = state.reputation * multiplier;
+    } else {
+        price = parseInt(priceStr.replace(/\s/g, ''));
+    }
+    
+    if (state.money < price) {
+        showModal('Недостаточно средств', `У вас ${state.money.toLocaleString()} уе, а нужно ${price.toLocaleString()} уе.`);
+        return;
+    }
+    
+    // Проверка уникальности (только для не-модулей)
+    if (unique && type !== 'module') {
+        const existingItem = state.deckGear.find(item => item.name === name);
+        if (existingItem) {
+            showModal('Уже куплено', `${name} уже есть в вашем снаряжении для дек.`);
+            return;
+        }
+    }
+    
+    // Проверка максимального количества
+    if (maxQuantity > 0) {
+        const existingItems = state.deckGear.filter(item => item.name === name);
+        if (existingItems.length >= maxQuantity) {
+            showModal('Достигнут лимит', `Максимальное количество "${name}" - ${maxQuantity}.`);
+            return;
+        }
+    }
+    
+    const newGear = {
+        id: Date.now(),
+        name: name,
+        type: 'deck_gear',
+        deckGearType: type,
+        stat: stat,
+        maxValue: maxValue,
+        unique: unique,
+        maxQuantity: maxQuantity,
+        installedDeckId: null,
+        catalogPrice: catalogPrice || price,
+        purchasePrice: price,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
+    };
+    
+    state.deckGear.push(newGear);
+    // НЕ списываем деньги сразу для модулей - только при установке
+    
+    // Для модулей сразу предлагаем установку
+    if (type === 'module') {
+        // Создаем модал с выбором деки для модуля
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        const existingModals = document.querySelectorAll('.modal-overlay');
+        modal.style.zIndex = 1000 + (existingModals.length * 100);
+        modal.innerHTML = `
+            <div class="modal" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>ВЫБОР ДЕКИ</h3>
+                    <button class="icon-button" onclick="closeModal(this)">×</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin-bottom: 1rem;">Необходимо выбрать деку, на которую установить "${name}"!</p>
+                    <div style="margin-bottom: 1rem;">
+                        <div style="margin-bottom: 0.5rem; color: var(--accent); font-weight: 600;">Выберите деку:</div>
+                        <select id="deckSelect" style="width: 100%; padding: 0.75rem; background: var(--bg-primary); border: 2px solid var(--accent); border-radius: 8px; color: var(--text); font-size: 1rem; box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);">
+                            ${state.deck ? `<option value="main">Основная дека (${state.deck.name})</option>` : ''}
+                            ${state.decks.map(deck => `<option value="${deck.id}">${deck.name}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="pill-button muted-button" onclick="closeModal(this)">Отменить</button>
+                    <button class="pill-button primary-button" onclick="installDeckModuleOnDeck(${newGear.id}, document.getElementById('deckSelect').value); closeModal(this)">Установить</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal(modal.querySelector('.icon-button'));
+            }
+        });
+        
+        addModalKeyboardHandlers(modal);
+    } else {
+        state.money -= price; // Для не-модулей списываем деньги сразу
+        showModal('Снаряжение куплено', `${name} добавлено в снаряжение для дек!`);
+    }
+    
+    scheduleSave();
+    updateAllDisplays();
+}
+
+// Функция установки модуля на конкретную деку
+function installDeckModuleOnDeck(moduleId, deckId) {
+    console.log('installDeckModuleOnDeck called with:', moduleId, deckId);
+    const module = state.deckGear.find(item => item.id == moduleId);
+    console.log('Found module:', module);
+    if (!module) return false;
+    
+    // Списываем деньги при установке
+    if (state.money < module.purchasePrice) {
+        showModal('Недостаточно средств', `У вас ${state.money.toLocaleString()} уе, а нужно ${module.purchasePrice.toLocaleString()} уе.`);
+        return false;
+    }
+    
+    // Проверяем уникальность для уникальных модулей
+    if (module.unique) {
+        console.log('Checking uniqueness for module:', module.name);
+        const existingModule = state.deckGear.find(item => 
+            item.name === module.name && 
+            item.installedDeckId == deckId
+        );
+        if (existingModule) {
+            console.log('Module already installed on this deck');
+            showModal('Модуль уже установлен', `${module.name} уже установлен на эту деку.`);
+            return false;
+        }
+    }
+    
+    // Проверяем максимальное количество
+    if (module.maxQuantity > 0) {
+        console.log('Checking max quantity for module:', module.name, 'max:', module.maxQuantity);
+        const existingModules = state.deckGear.filter(item => 
+            item.name === module.name && 
+            item.installedDeckId == deckId
+        );
+        if (existingModules.length >= module.maxQuantity) {
+            console.log('Max quantity reached for module');
+            showModal('Достигнут лимит', `Максимальное количество "${module.name}" - ${module.maxQuantity}.`);
+            return false;
+        }
+    }
+    
+    // Устанавливаем модуль и списываем деньги
+    module.installedDeckId = deckId;
+    state.money -= module.purchasePrice;
+    
+    const deckName = deckId === 'main' ? state.deck.name : state.decks.find(d => d.id == deckId)?.name || 'Неизвестная дека';
+    console.log('Installing module on deck:', deckName);
+    showModal('Модуль установлен', `${module.name} установлен на ${deckName} за ${module.purchasePrice.toLocaleString()} уе!`);
+    scheduleSave();
+    updateAllDisplays();
+    console.log('Module installation completed successfully');
+    return true;
+}
+
+// Функция установки модуля на деку
+function installDeckModule(moduleId) {
+    const module = state.deckGear.find(item => item.id === moduleId);
+    if (!module) return;
+    
+    // Проверяем уникальность для уникальных модулей
+    if (module.unique) {
+        const existingModule = state.deckGear.find(item => 
+            item.name === module.name && 
+            item.installedDeckId === 'main'
+        );
+        if (existingModule) {
+            showModal('Модуль уже установлен', `${module.name} уже установлен на деку.`);
+            return;
+        }
+    }
+    
+    // Проверяем максимальное количество
+    if (module.maxQuantity > 0) {
+        const existingModules = state.deckGear.filter(item => 
+            item.name === module.name && 
+            item.installedDeckId === 'main'
+        );
+        if (existingModules.length >= module.maxQuantity) {
+            showModal('Достигнут лимит', `Максимальное количество "${module.name}" - ${module.maxQuantity}.`);
+            return;
+        }
+    }
+    
+    // Устанавливаем модуль
+    module.installedDeckId = 'main';
+    
+    showModal('Модуль установлен', `${module.name} установлен на деку!`);
+    scheduleSave();
+    updateAllDisplays();
+    closeModal(document.querySelector('.modal-overlay .icon-button'));
+}
+
+// Функция показа коллекции дек
+function showDeckCollection() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 1200px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3><img src="https://static.tildacdn.com/tild3633-6632-4463-a435-353036636235/live-streaming.png" alt="💾" style="width: 24px; height: 24px; margin-right: 0.5rem;"> Мои Деки</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto; flex: 1;">
+                <div id="deckCollectionContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1rem;">
+                    <!-- Деки будут добавлены через JavaScript -->
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Рендерим коллекцию дек после добавления в DOM
+    setTimeout(() => {
+        renderDeckCollection();
+    }, 0);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
+}
+
+// Функция отображения коллекции дек
+function renderDeckCollection() {
+    const container = document.getElementById('deckCollectionContainer');
+    if (!container) return;
+    
+    // Добавляем основную деку в коллекцию только если она существует
+    const allDecks = [];
+    
+    if (state.deck) {
+        allDecks.push({
+            id: 'main',
+            name: state.deck.name,
+            memory: parseInt(state.deck.memory),
+            ram: parseInt(state.deckRam.max),
+            grid: parseInt(state.deck.grid),
+            version: state.deck.version,
+            osVersion: state.deck.osVersion || '',
+            isMain: true
+        });
+    }
+    
+    // Добавляем купленные деки
+    allDecks.push(...state.decks.map(deck => ({
+        ...deck,
+        isMain: false
+    })));
+    
+    if (allDecks.length === 0) {
+        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 2rem;">У вас нет дек. Купите деку в магазине!</p>';
+        return;
+    }
+    
+    container.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+            ${allDecks.map(deck => {
+        // Подсчитываем улучшения
+        const upgrades = state.deckGear.filter(item => 
+            item.deckGearType === 'upgrade' && 
+            item.installedDeckId == deck.id // Используем == для сравнения строки и числа
+        );
+        
+        const memoryUpgrades = upgrades.filter(u => u.stat === 'memory').length;
+        const ramUpgrades = upgrades.filter(u => u.stat === 'ram').length;
+        const gridUpgrades = upgrades.filter(u => u.stat === 'grid').length;
+        
+        // Финальные характеристики
+        const finalMemory = deck.memory + memoryUpgrades;
+        const finalRam = deck.ram + ramUpgrades;
+        const finalGrid = deck.grid + gridUpgrades;
+        
+        // Подсчитываем модули
+        const modules = state.deckGear.filter(item => 
+            item.deckGearType === 'module' && 
+            item.installedDeckId == deck.id
+        );
+        
+        // Подсчитываем щепки
+        const chips = state.deckChips.filter(chip => chip.installedDeckId == deck.id);
+        const chipSlots = 1 + modules.filter(m => m.name === 'Дополнительный слот для Щепки').length;
+        
+        return `
+            <div style="background: linear-gradient(135deg, rgba(138, 43, 226, 0.1), rgba(75, 0, 130, 0.1)); border: 2px solid var(--accent); border-radius: 12px; padding: 1rem; position: relative; overflow: hidden;">
+                <!-- Декоративные элементы -->
+                <div style="position: absolute; top: -20px; right: -20px; width: 60px; height: 60px; background: radial-gradient(circle, rgba(138, 43, 226, 0.2), transparent); border-radius: 50%;"></div>
+                <div style="position: absolute; bottom: -30px; left: -30px; width: 80px; height: 80px; background: radial-gradient(circle, rgba(75, 0, 130, 0.15), transparent); border-radius: 50%;"></div>
+                
+                <!-- Заголовок -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; position: relative; z-index: 1;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--accent); display: flex; align-items: center; gap: 0.5rem;">
+                            ${deck.isMain ? '🏠' : '💾'} ${deck.name}
+                        </h3>
+                        ${deck.isMain ? '' : ''}
+                    </div>
+                    <button class="pill-button primary-button" onclick="renameDeck('${deck.id}')" style="font-size: 0.7rem; padding: 0.3rem 0.6rem; background: linear-gradient(45deg, var(--accent), #9d4edd);">✏️</button>
+                </div>
+                
+                <!-- Статистики -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; position: relative; z-index: 1;">
+                    <div style="background: rgba(138, 43, 226, 0.2); border: 1px solid var(--accent); border-radius: 8px; padding: 0.5rem; text-align: center;">
+                        <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">ПАМЯТЬ</div>
+                        <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);">${finalMemory}</div>
+                        ${memoryUpgrades > 0 ? `<div style="color: var(--success); font-size: 0.6rem;">+${memoryUpgrades}</div>` : ''}
+                    </div>
+                    <div style="background: rgba(138, 43, 226, 0.2); border: 1px solid var(--accent); border-radius: 8px; padding: 0.5rem; text-align: center;">
+                        <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">ОЗУ</div>
+                        <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);">${finalRam}</div>
+                        ${ramUpgrades > 0 ? `<div style="color: var(--success); font-size: 0.6rem;">+${ramUpgrades}</div>` : ''}
+                    </div>
+                    <div style="background: rgba(138, 43, 226, 0.2); border: 1px solid var(--accent); border-radius: 8px; padding: 0.5rem; text-align: center;">
+                        <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">СЕТКА</div>
+                        <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);">${finalGrid}</div>
+                        ${gridUpgrades > 0 ? `<div style="color: var(--success); font-size: 0.6rem;">+${gridUpgrades}</div>` : ''}
+                    </div>
+                    <div style="background: rgba(138, 43, 226, 0.2); border: 1px solid var(--accent); border-radius: 8px; padding: 0.5rem; text-align: center;">
+                        <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">OS ВЕРСИЯ</div>
+                        <input type="text" 
+                               value="${deck.osVersion || ''}" 
+                               placeholder="Введите версию"
+                               onchange="updateDeckOsVersion('${deck.id}', this.value)"
+                               style="width: 100%; background: transparent; border: none; color: var(--text); font-size: 0.8rem; font-weight: 600; text-align: center; outline: none;"
+                               maxlength="20">
+                    </div>
+                </div>
+                
+                <!-- Кнопки улучшений -->
+                <div style="margin-bottom: 1rem; position: relative; z-index: 1;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.3rem;">
+                        ${memoryUpgrades < 5 ? `
+                            <button class="pill-button" onclick="installDeckUpgradeOnDeck('memory', ${(finalMemory + 1) * 200}, '${deck.id}')" style="font-size: 0.6rem; padding: 0.2rem 0.3rem; background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2)); border: 1px solid var(--accent); color: var(--accent); transition: all 0.2s ease;" onmouseover="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(75, 0, 130, 0.3))'" onmouseout="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2))'">
+                                Память<br><small style="color: var(--text);">${(finalMemory + 1) * 200}уе</small>
+                            </button>
+                        ` : `
+                            <div style="background: rgba(108, 117, 125, 0.3); border-radius: 6px; padding: 0.2rem; text-align: center; font-size: 0.6rem; color: var(--muted);">Макс</div>
+                        `}
+                        ${ramUpgrades < 5 ? `
+                            <button class="pill-button" onclick="installDeckUpgradeOnDeck('ram', ${(finalRam + 1) * 1000}, '${deck.id}')" style="font-size: 0.6rem; padding: 0.2rem 0.3rem; background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2)); border: 1px solid var(--accent); color: var(--accent); transition: all 0.2s ease;" onmouseover="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(75, 0, 130, 0.3))'" onmouseout="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2))'">
+                                ОЗУ<br><small style="color: var(--text);">${(finalRam + 1) * 1000}уе</small>
+                            </button>
+                        ` : `
+                            <div style="background: rgba(108, 117, 125, 0.3); border-radius: 6px; padding: 0.2rem; text-align: center; font-size: 0.6rem; color: var(--muted);">Макс</div>
+                        `}
+                        ${gridUpgrades < 5 ? `
+                            <button class="pill-button" onclick="installDeckUpgradeOnDeck('grid', ${(finalGrid + 1) * 100}, '${deck.id}')" style="font-size: 0.6rem; padding: 0.2rem 0.3rem; background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2)); border: 1px solid var(--accent); color: var(--accent); transition: all 0.2s ease;" onmouseover="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(75, 0, 130, 0.3))'" onmouseout="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2))'">
+                                Сетка<br><small style="color: var(--text);">${(finalGrid + 1) * 100}уе</small>
+                            </button>
+                        ` : `
+                            <div style="background: rgba(108, 117, 125, 0.3); border-radius: 6px; padding: 0.2rem; text-align: center; font-size: 0.6rem; color: var(--muted);">Макс</div>
+                        `}
+                    </div>
+                </div>
+                
+                <!-- Модули -->
+                ${modules.length > 0 ? `
+                    <div style="margin-bottom: 0.5rem; position: relative; z-index: 1;">
+                        <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">МОДУЛИ</div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.2rem;">
+                            ${modules.map(module => `
+                                <span style="background: rgba(125, 244, 198, 0.3); border: 1px solid #7DF4C6; border-radius: 4px; padding: 0.1rem 0.3rem; font-size: 0.6rem; color: var(--text);">${module.name}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Щепки -->
+                <div style="margin-bottom: 0.5rem; position: relative; z-index: 1;">
+                    <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">ЩЕПКИ (${chips.length}/${chipSlots})</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.2rem;">
+                        ${Array.from({length: chipSlots}, (_, i) => {
+                            const chip = chips[i];
+                            return chip ? `
+                                <div style="background: rgba(9, 7, 255, 0.3); border: 1px solid #FFC107; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.6rem; max-width: 200px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.1rem;">
+                                        <div style="font-weight: 600;">${chip.name}</div>
+                                        <button onclick="removeChipFromDeck('${chip.id}')" style="background: rgba(220, 53, 69, 0.3); border: 1px solid #DC3545; border-radius: 3px; color: #DC3545; font-size: 0.5rem; padding: 0.1rem 0.2rem; cursor: pointer;" title="Вытащить щепку">×</button>
+                                    </div>
+                                    ${chip.programs && chip.programs.length > 0 ? `
+                                        <div style="color: var(--text); font-size: 0.7rem;">
+                                            ${chip.programs.map(program => `
+                                                <div style="margin-bottom: 0.3rem;">
+                                                    <div style="font-weight: 600; color: var(--accent);">• ${program.name}</div>
+                                                    ${program.description ? `<div style="color: var(--muted); font-size: 0.7rem; margin-top: 0.1rem; line-height: 1.2;">${program.description}</div>` : ''}
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    ` : `
+                                        <div style="color: var(--muted); font-size: 0.5rem;">Пустая</div>
+                                    `}
+                                </div>
+                            ` : `
+                                <div style="background: rgba(108, 117, 125, 0.2); border: 1px solid #6C757D; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.6rem; color: var(--muted); text-align: center; min-width: 60px;">
+                                    Пусто
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+                
+                <!-- Программы -->
+                ${(() => {
+                    const programs = state.deckPrograms.filter(program => program.installedDeckId == deck.id);
+                    const usedMemory = programs.reduce((sum, program) => sum + (program.memory || 1), 0);
+                    return programs.length > 0 ? `
+                        <div style="margin-bottom: 0.5rem; position: relative; z-index: 1;">
+                            <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">
+                                ПРОГРАММЫ (Память: ${usedMemory}/${finalMemory})
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                                ${programs.map((program, programIndex) => `
+                                    <div style="background: rgba(138, 43, 226, 0.3); border: 1px solid var(--accent); border-radius: 4px; padding: 0.3rem 0.4rem; font-size: 0.8rem; position: relative;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <div style="flex: 1;">
+                                                <div style="font-weight: 600; color: var(--accent);">${program.name}</div>
+                                                ${program.description ? `<div style="color: var(--muted); font-size: 0.7rem; margin-top: 0.1rem; line-height: 1.2;">${program.description}</div>` : ''}
+                                            </div>
+                                            <div style="text-align: right; margin-right: 2rem;">
+                                                <div style="color: var(--text); font-size: 0.7rem;">Память: ${program.memory || 1}</div>
+                                                <div style="color: var(--muted); font-size: 0.6rem;">ОЗУ: ${program.ram}</div>
+                                            </div>
+                                        </div>
+                                        <button onclick="removeProgramFromDeck('${deck.id.toString().replace(/'/g, "\\'")}', ${programIndex})" style="position: absolute; top: 0.3rem; right: 0.3rem; background: rgba(255, 91, 135, 0.2); border: 1px solid var(--danger); border-radius: 4px; color: var(--danger); padding: 0.2rem 0.4rem; font-size: 0.6rem; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.background='rgba(255, 91, 135, 0.3)'" onmouseout="this.style.background='rgba(255, 91, 135, 0.2)'" title="Удалить программу безвозвратно">
+                                            ✖
+                                        </button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : '';
+                })()}
+                
+                <!-- Информация -->
+                <div style="border-top: 1px solid rgba(138, 43, 226, 0.3); padding-top: 0.5rem; position: relative; z-index: 1;">
+                    ${!deck.isMain ? `
+                        <div style="color: var(--muted); font-size: 0.6rem;">
+                            Куплена: ${deck.purchasePrice.toLocaleString()} уе
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('')}
+        </div>
+    `;
+}
+
+// Функция переименования деки
+function renameDeck(deckId) {
+    const deck = deckId === 'main' ? state.deck : state.decks.find(d => d.id == deckId);
+    if (!deck) return;
+    
+    // Создаем модальное окно для переименования
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Подтвердите действие</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem;">Введите новое название для деки "${deck.name}":</p>
+                <div class="input-group">
+                    <input type="text" class="input-field" id="newDeckName" value="${deck.name}" placeholder="Введите название деки" style="width: 100%;">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="pill-button muted-button" onclick="closeModal(this)">Отмена</button>
+                <button class="pill-button primary-button" onclick="confirmRenameDeck('${deckId}')">OK</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
+    
+    // Добавляем универсальные обработчики клавиш
+    if (typeof addModalKeyboardHandlers === 'function') {
+        addModalKeyboardHandlers(modal);
+    }
+    
+    // Фокусируемся на поле ввода
+    setTimeout(() => {
+        const input = document.getElementById('newDeckName');
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    }, 100);
+}
+
+// Функция подтверждения переименования деки
+function confirmRenameDeck(deckId) {
+    const newName = document.getElementById('newDeckName').value.trim();
+    if (!newName) {
+        showModal('Ошибка', 'Введите название деки!');
+        return;
+    }
+    
+    const deck = deckId === 'main' ? state.deck : state.decks.find(d => d.id == deckId);
+    if (!deck) return;
+    
+    if (newName === deck.name) {
+        closeModal(document.querySelector('.modal-overlay .icon-button'));
+        return;
+    }
+    
+    deck.name = newName;
+    scheduleSave();
+    updateAllDisplays();
+    
+    // Если это основная дека, обновляем отображение
+    if (deckId === 'main') {
+        updateDeckDisplay();
+    }
+    
+    // Если открыт поп-ап коллекции дек, обновляем его
+    const collectionModal = document.querySelector('.modal-overlay');
+    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
+        renderDeckCollection();
+    }
+    
+    closeModal(document.querySelector('.modal-overlay .icon-button'));
+    showModal('Дека переименована', `Дека переименована в "${deck.name}"!`);
+}
+
+// Функция продажи деки
+function sellDeck(deckId) {
+    const deck = state.decks.find(d => d.id === deckId);
+    if (!deck) return;
+    
+    // Проверяем, что на деке нет программ
+    const programsOnDeck = state.deckPrograms.filter(p => p.installedDeckId === deckId);
+    if (programsOnDeck.length > 0) {
+        showModal('Нельзя продать', 'Сначала удалите все программы с деки перед продажей.');
+        return;
+    }
+    
+    // Проверяем, что на деке нет щепок
+    const chipsOnDeck = state.deckChips.filter(c => c.installedDeckId === deckId);
+    if (chipsOnDeck.length > 0) {
+        showModal('Нельзя продать', 'Сначала удалите все щепки с деки перед продажей.');
+        return;
+    }
+    
+    // Удаляем улучшения с деки
+    const upgradesOnDeck = state.deckGear.filter(item => 
+        item.installedDeckId === deckId
+    );
+    upgradesOnDeck.forEach(upgrade => {
+        upgrade.installedDeckId = null;
+    });
+    
+    // Используем скупщика для продажи
+    if (typeof initiateSale === 'function') {
+        initiateSale(deckId, 'deck');
+    } else {
+        // Fallback - прямая продажа за половину цены
+        const sellPrice = Math.floor(deck.purchasePrice / 2);
+        state.money += sellPrice;
+        
+        // Удаляем деку
+        state.decks = state.decks.filter(d => d.id !== deckId);
+        
+        showModal('Дека продана', `${deck.name} продана за ${sellPrice.toLocaleString()} уе!`);
+        scheduleSave();
+        updateAllDisplays();
+    }
+}
+
+// Функция показа улучшений для деки
+function showDeckUpgrades(deckId) {
+    const deck = state.decks.find(d => d.id === deckId);
+    if (!deck) return;
+    
+    // Получаем доступные улучшения
+    const availableUpgrades = state.gear.filter(item => 
+        item.type === 'deck_gear' && 
+        item.deckGearType === 'upgrade' && 
+        !item.installedDeckId
+    );
+    
+    if (availableUpgrades.length === 0) {
+        showModal('Нет улучшений', 'У вас нет доступных улучшений для установки.');
+        return;
+    }
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>🔧 Улучшения для ${deck.name}</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; gap: 0.5rem;">
+                    ${availableUpgrades.map(upgrade => {
+                        // Проверяем лимиты
+                        const installedUpgrades = state.gear.filter(item => 
+                            item.type === 'deck_gear' && 
+                            item.deckGearType === 'upgrade' && 
+                            item.stat === upgrade.stat && 
+                            item.installedDeckId === deckId
+                        );
+                        
+                        const currentValue = deck[upgrade.stat] + installedUpgrades.length;
+                        const canInstall = currentValue < upgrade.maxValue;
+                        
+                        return `
+                            <div class="property-item">
+                                <div class="property-header">
+                                    <div class="property-name">${upgrade.name}</div>
+                                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                        <span style="color: var(--muted); font-size: 0.8rem;">Текущее: ${currentValue}/${upgrade.maxValue}</span>
+                                        <button class="pill-button primary-button" onclick="installDeckUpgrade(${upgrade.id}, ${deckId})" ${!canInstall ? 'disabled' : ''} style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Установить</button>
+                                    </div>
+                                </div>
+                                <div class="property-description">
+                                    <div style="font-size: 0.9rem; line-height: 1.4;">
+                                        ${upgrade.description}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
+}
+
+// Функция установки улучшения на деку
+function installDeckUpgrade(upgradeId, deckId) {
+    const upgrade = state.gear.find(item => item.id === upgradeId);
+    const deck = state.decks.find(d => d.id === deckId);
+    
+    if (!upgrade || !deck) return;
+    
+    // Проверяем лимиты
+    const installedUpgrades = state.gear.filter(item => 
+        item.type === 'deck_gear' && 
+        item.deckGearType === 'upgrade' && 
+        item.stat === upgrade.stat && 
+        item.installedDeckId === deckId
+    );
+    
+    const currentValue = deck[upgrade.stat] + installedUpgrades.length;
+    if (currentValue >= upgrade.maxValue) {
+        showModal('Достигнут лимит', `Максимальное значение ${upgrade.stat} для этой деки: ${upgrade.maxValue}`);
+        return;
+    }
+    
+    // Устанавливаем улучшение
+    upgrade.installedDeckId = deckId;
+    
+    showModal('Улучшение установлено', `${upgrade.name} установлено на ${deck.name}!`);
+    scheduleSave();
+    updateAllDisplays();
+    closeModal(document.querySelector('.modal-overlay .icon-button'));
+}
+
+// Функция удаления щепки с деки
+function removeChipFromDeck(chipId, deckId) {
+    const chip = state.deckChips.find(c => c.id === chipId);
+    if (!chip) return;
+    
+    chip.installedDeckId = null;
+    
+    showModal('Щепка удалена', 'Щепка памяти удалена с деки.');
+    scheduleSave();
+    updateAllDisplays();
+}
+
+// Функция удаления программы с выбором действий
+function removeDeckProgramWithChoice(programIndex) {
+    const program = state.deckPrograms[programIndex];
+    if (!program) return;
+    
+    showModal('Удаление программы', `Что делать с программой "${program.name}"?`, [
+        { 
+            text: 'Удалить', 
+            class: 'danger-button', 
+            onclick: `removeDeckProgram(${programIndex}); closeModal(this)` 
+        },
+        { 
+            text: 'Создать щепку (10 уе)', 
+            class: 'primary-button', 
+            onclick: `createChipFromProgram(${programIndex}); closeModal(this)` 
+        },
+        { 
+            text: 'Отмена', 
+            class: 'muted-button', 
+            onclick: 'closeModal(this)' 
+        }
+    ]);
+}
+
+// Функция создания щепки из программы
+function createChipFromProgram(programIndex) {
+    const program = state.deckPrograms[programIndex];
+    if (!program) return;
+    
+    if (state.money < 10) {
+        showModal('Недостаточно средств', 'Нужно 10 уе для создания щепки.');
+        return;
+    }
+    
+    // Создаем щепку
+    const newChip = {
+        id: Date.now(),
+        name: `${program.name} (щепка)`,
+        programs: [{
+            name: program.name,
+            ram: program.ram,
+            lethal: program.lethal,
+            description: program.description
+        }],
+        content: '',
+        installedDeckId: null
+    };
+    
+    state.deckChips.push(newChip);
+    state.money -= 10;
+    
+    // Удаляем программу
+    state.deckPrograms.splice(programIndex, 1);
+    
+    showModal('Щепка создана', `Программа "${program.name}" перенесена на щепку за 10 уе.`);
+    scheduleSave();
+    updateAllDisplays();
+}
+
+// Функция установки улучшения деки
+function installDeckUpgrade(stat, price) {
+    if (state.money < price) {
+        showModal('Недостаточно средств', `У вас ${state.money.toLocaleString()} уе, а нужно ${price.toLocaleString()} уе.`);
+        return;
+    }
+    
+    // Создаем модал с выбором деки для улучшения
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>ВЫБОР ДЕКИ</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem;">Необходимо выбрать деку, на которую установить улучшение!</p>
+                <div style="margin-bottom: 1rem;">
+                    <div style="margin-bottom: 0.5rem; color: var(--accent); font-weight: 600;">Выберите деку:</div>
+                    <select id="deckSelect" style="width: 100%; padding: 0.75rem; background: var(--bg-primary); border: 2px solid var(--accent); border-radius: 8px; color: var(--text); font-size: 1rem; box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);">
+                        <option value="main">Основная дека (${state.deck.name})</option>
+                        ${state.decks.map(deck => `<option value="${deck.id}">${deck.name}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="pill-button muted-button" onclick="closeModal(this)">Отменить</button>
+                <button class="pill-button primary-button" onclick="installDeckUpgradeOnDeck('${stat}', ${price}, document.getElementById('deckSelect').value); closeModal(this)">Установить</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
+    
+    addModalKeyboardHandlers(modal);
+}
+
+// Функция установки улучшения на конкретную деку
+function installDeckUpgradeOnDeck(stat, price, deckId) {
+    // Проверяем лимиты улучшений для выбранной деки
+    const installedUpgrades = state.deckGear.filter(item => 
+        item.deckGearType === 'upgrade' && 
+        item.stat === stat && 
+        item.installedDeckId == deckId // Используем == для сравнения строки и числа
+    );
+    
+    const maxUpgrades = 5; // Максимум 5 улучшений каждого типа на деку
+    if (installedUpgrades.length >= maxUpgrades) {
+        showModal('Достигнут лимит', `Максимальное количество улучшений ${stat} для деки: ${maxUpgrades}`);
+        return;
+    }
+    
+    // Создаем улучшение
+    const newUpgrade = {
+        id: Date.now(),
+        name: `Улучшение ${stat === 'memory' ? 'памяти' : stat === 'ram' ? 'ОЗУ' : 'Видимости'}`,
+        type: 'deck_gear',
+        deckGearType: 'upgrade',
+        stat: stat,
+        maxUpgrades: maxUpgrades,
+        installedDeckId: deckId,
+        catalogPrice: price,
+        purchasePrice: price,
+        itemType: 'purchased'
+    };
+    
+    // Проверяем, что у нас достаточно денег
+    if (state.money < price) {
+        showModal('Недостаточно денег', `Не хватает ${price - state.money} уе для покупки улучшения.`);
+        return;
+    }
+    
+    // Списываем деньги
+    state.money -= price;
+    
+    // Обновляем отображение денег
+    updateMoneyDisplay();
+    
+    // Добавляем улучшение
+    state.deckGear.push(newUpgrade);
+    
+    // Добавляем в лог
+    addToRollLog('purchase', {
+        item: newUpgrade.name,
+        price: price,
+        category: 'Улучшение деки'
+    });
+    
+    // Находим название деки
+    let deckName = 'Неизвестная дека';
+    if (deckId === 'main') {
+        deckName = state.deck ? state.deck.name : 'Основная дека';
+    } else {
+        const deck = state.decks.find(d => d.id == deckId); // Используем == для сравнения строки и числа
+        if (deck) {
+            deckName = deck.name;
+        }
+    }
+    
+    showModal('Улучшение установлено', `${newUpgrade.name} установлено на ${deckName}!`);
+    
+    // Обновляем коллекцию дек если она открыта
+    const collectionModal = document.querySelector('.modal-overlay');
+    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
+        renderDeckCollection();
+    }
+    
+    scheduleSave();
+    updateAllDisplays();
+    
+    // Обновляем отображение деки
+    updateDeckDisplay();
+}
+
+// Функция удаления щепки с деки
+function removeChipFromDeck(chipId) {
+    const chip = state.deckChips.find(c => c.id === chipId);
+    if (!chip) return;
+    
+    chip.installedDeckId = null;
+    
+    // Обновляем отображение
+    updateDeckDisplay();
+    
+    // Если открыт поп-ап коллекции дек, обновляем его
+    const collectionModal = document.querySelector('.modal-overlay');
+    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
+        renderDeckCollection();
+    }
+    
+    scheduleSave();
+    showModal('Щепка извлечена', `&#x2705; Щепка "${chip.name}" извлечена из деки!`);
+}
+
+// Функция установки щепки на деку
+function installChipOnDeck(chipId) {
+    const chip = state.deckChips.find(c => c.id === chipId);
+    if (!chip) return;
+    
+    // Проверяем, есть ли доступные деки
+    if (!state.deck && state.decks.length === 0) {
+        showModal('Нет дек', 'Купите деку в магазине дек, чтобы установить щепку!');
+        return;
+    }
+    
+    // Создаем модал с выбором деки для щепки
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Формируем список дек
+    let deckOptions = '';
+    if (state.deck) {
+        deckOptions += `<option value="main">Основная дека (${state.deck.name})</option>`;
+    }
+    deckOptions += state.decks.map(deck => `<option value="${deck.id}">${deck.name}</option>`).join('');
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>ВЫБОР ДЕКИ</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem;">Необходимо выбрать деку, на которую установить щепку!</p>
+                <div style="margin-bottom: 1rem;">
+                    <div style="margin-bottom: 0.5rem; color: var(--accent); font-weight: 600;">Выберите деку:</div>
+                    <select id="deckSelect" style="width: 100%; padding: 0.75rem; background: var(--bg-primary); border: 2px solid var(--accent); border-radius: 8px; color: var(--text); font-size: 1rem; box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);">
+                        ${deckOptions}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="pill-button muted-button" onclick="closeModal(this)">Отменить</button>
+                <button class="pill-button primary-button" onclick="installChipOnDeckTarget('${chipId}', document.getElementById('deckSelect').value); closeModal(this)">Установить</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
+    
+    addModalKeyboardHandlers(modal);
+}
+
+// Функция установки щепки на конкретную деку
+function installChipOnDeckTarget(chipId, deckId) {
+    const chip = state.deckChips.find(c => c.id === chipId);
+    if (!chip) return;
+    
+    // Проверяем свободные слоты для выбранной деки
+    const chipSlotModules = state.deckGear.filter(item => 
+        item.deckGearType === 'module' && 
+        item.name === 'Дополнительный слот для Щепки' && 
+        item.installedDeckId === deckId
+    );
+    const chipSlots = 1 + chipSlotModules.length;
+    
+    const installedChips = state.deckChips.filter(c => c.installedDeckId === deckId);
+    if (installedChips.length >= chipSlots) {
+        showModal('Нет свободных слотов', `Максимальное количество щепок: ${chipSlots}`);
+        return;
+    }
+    
+    chip.installedDeckId = deckId;
+    
+    const deckName = deckId === 'main' ? (state.deck ? state.deck.name : 'Основная дека') : state.decks.find(d => d.id == deckId)?.name || 'Неизвестная дека';
+    showModal('Щепка установлена', `Щепка "${chip.name}" установлена на ${deckName}!`);
+    scheduleSave();
+    updateAllDisplays();
 }
 
 function showCustomWeaponCreator() {
@@ -4462,7 +5982,7 @@ function showCustomWeaponCreator() {
                         ⚔️ Оружие ближнего боя
                     </button>
                     <button class="pill-button primary-button" onclick="showCustomRangedWeaponForm(); closeModal(this);" style="font-size: 1rem; padding: 1rem;">
-                        🔫 Оружие дальнего боя
+                        <img src="https://static.tildacdn.com/tild6332-3731-4662-b731-326433633632/assault-rifle.png" alt="🔫" style="width: 20px; height: 20px; margin-right: 0.5rem; vertical-align: middle;"> Оружие дальнего боя
                     </button>
                 </div>
             </div>
@@ -4476,6 +5996,9 @@ function showCustomWeaponCreator() {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
 }
 
 function showCustomMeleeWeaponForm() {
@@ -4619,7 +6142,7 @@ function showCustomRangedWeaponForm() {
 }
 
 // Функции покупки оружия ближнего боя
-function buyMeleeWeapon(type, price, load, damage, concealable, stealthPenalty, examples) {
+function buyMeleeWeapon(type, price, load, damage, concealable, stealthPenalty, examples, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -4654,7 +6177,10 @@ function buyMeleeWeapon(type, price, load, damage, concealable, stealthPenalty, 
         price: price,
         load: load,
         modules: [],
-        slots: 1 // У ОББ всегда 1 слот
+        slots: 1, // У ОББ всегда 1 слот
+        catalogPrice: catalogPrice,
+        purchasePrice: price,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
     };
     
     state.weapons.push(newWeapon);
@@ -4672,7 +6198,7 @@ function buyMeleeWeapon(type, price, load, damage, concealable, stealthPenalty, 
     showModal('Оружие куплено', `&#x2705; ${type} добавлено в блок Оружие!`);
 }
 
-function buyMeleeWeaponToGear(type, price, load, damage, concealable, stealthPenalty, examples) {
+function buyMeleeWeaponToGear(type, price, load, damage, concealable, stealthPenalty, examples, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -4708,7 +6234,10 @@ function buyMeleeWeaponToGear(type, price, load, damage, concealable, stealthPen
             concealable: concealable,
             stealthPenalty: stealthPenalty,
             examples: examples
-        }
+        },
+        catalogPrice: catalogPrice,
+        purchasePrice: price,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
     };
     
     state.gear.push(newGear);
@@ -4757,7 +6286,7 @@ function getMeleeWeaponFree(type, load, damage, concealable, stealthPenalty, exa
 }
 
 // Функции покупки оружия дальнего боя
-function buyRangedWeapon(type, price, load, primaryDamage, altDamage, concealable, hands, stealth, magazine) {
+function buyRangedWeapon(type, price, load, primaryDamage, altDamage, concealable, hands, stealth, magazine, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -4795,7 +6324,10 @@ function buyRangedWeapon(type, price, load, primaryDamage, altDamage, concealabl
         hands: hands,
         stealth: stealth,
         magazine: magazine,
-        price: price,
+        price: catalogPrice || price,  // Используем каталожную цену если есть
+        catalogPrice: catalogPrice,     // Сохраняем каталожную цену отдельно
+        purchasePrice: price,          // Сохраняем цену покупки (0 если бесплатно)
+        itemType: price === 0 && catalogPrice > 0 ? 'free_catalog' : 'catalog',  // Маркер для скупщика
         load: load,
         modules: [],
         slots: slots,
@@ -4803,6 +6335,8 @@ function buyRangedWeapon(type, price, load, primaryDamage, altDamage, concealabl
         maxAmmo: parseInt(magazine),
         currentAmmo: 0,
         loadedAmmoType: null,
+        // Тип оружия для боеприпасов
+        weaponTypeForAmmo: getWeaponTypeForAmmo(type),
         // Особая система для дробовиков
         isShotgun: type.includes('Дробовик'),
         shotgunAmmo1: { type: null, count: 0 }, // Первый тип патронов (до 3 шт)
@@ -4824,7 +6358,7 @@ function buyRangedWeapon(type, price, load, primaryDamage, altDamage, concealabl
     showModal('Оружие куплено', `&#x2705; ${type} добавлено в блок Оружие!`);
 }
 
-function buyRangedWeaponToGear(type, price, load, primaryDamage, altDamage, concealable, hands, stealth, magazine) {
+function buyRangedWeaponToGear(type, price, load, primaryDamage, altDamage, concealable, hands, stealth, magazine, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -4851,9 +6385,11 @@ function buyRangedWeaponToGear(type, price, load, primaryDamage, altDamage, conc
         id: generateId('gear'),
         name: type,
         description: `Урон основной: ${primaryDamage} | Урон альтернативный: ${altDamage} | Можно скрыть: ${concealable} | # рук: ${hands} | СКА: ${stealth} | Патронов в магазине: ${magazine}`,
-        price: price,
+        price: catalogPrice || price,  // Используем каталожную цену если есть
+        catalogPrice: catalogPrice,     // Сохраняем каталожную цену отдельно
+        purchasePrice: price,          // Сохраняем цену покупки (0 если бесплатно)
         load: load,
-        type: 'weapon',
+        type: price === 0 && catalogPrice > 0 ? 'free_catalog' : 'weapon',
         weaponData: {
             type: 'ranged',
             primaryDamage: primaryDamage,
@@ -4880,56 +6416,9 @@ function buyRangedWeaponToGear(type, price, load, primaryDamage, altDamage, conc
     showModal('Оружие куплено', `&#x2705; ${type} добавлено в Снаряжение!`);
 }
 
-function getRangedWeaponFreeToWeapons(type, load, primaryDamage, altDamage, concealable, hands, stealth, magazine) {
-    // Уменьшаем доступную нагрузку
-    state.load.current -= load;
+function getRangedWeaponFree(type, load, primaryDamage, altDamage, concealable, hands, stealth, magazine) {
+ 
     
-    // Определяем количество слотов для модулей
-    const slots = getRangedWeaponSlots(type);
-    
-    // Добавляем оружие в блок "Оружие" бесплатно
-    const newWeapon = {
-        id: generateId('weapon'),
-        name: type,
-        customName: '',
-        type: 'ranged',
-        primaryDamage: primaryDamage,
-        altDamage: altDamage,
-        concealable: concealable,
-        hands: hands,
-        stealth: stealth,
-        magazine: magazine,
-        price: 0,
-        load: load,
-        modules: [],
-        slots: slots,
-        // Система магазина
-        maxAmmo: magazine,
-        currentAmmo: 0,
-        loadedAmmoType: null,
-        // Не дробовик
-        isShotgun: false,
-        shotgunAmmo1: { type: null, count: 0 },
-        shotgunAmmo2: { type: null, count: 0 },
-        canRemove: true
-    };
-    
-    state.weapons.push(newWeapon);
-    renderWeapons();
-    updateLoadDisplay();
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: type,
-        price: 0,
-        category: 'Оружие дальнего боя (бесплатно)'
-    });
-    
-    showModal('Оружие получено', `&#x2705; ${type} добавлено в блок Оружие бесплатно!`);
-}
-
-function getRangedWeaponFreeToGear(type, load, primaryDamage, altDamage, concealable, hands, stealth, magazine) {
     // Уменьшаем доступную нагрузку
     state.load.current -= load;
     
@@ -4956,13 +6445,6 @@ function getRangedWeaponFreeToGear(type, load, primaryDamage, altDamage, conceal
     renderGear();
     updateLoadDisplay();
     scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: type,
-        price: 0,
-        category: 'Оружие дальнего боя (в сумку, бесплатно)'
-    });
     
     showModal('Оружие получено', `&#x2705; ${type} добавлено в Снаряжение бесплатно!`);
 }
@@ -5049,6 +6531,38 @@ function toggleMeleeWeaponsFreeMode() {
     }
 }
 
+// Инициализация кнопок оружия дальнего боя без переключения режима
+function initializeRangedWeaponButtons() {
+    const buyButtons = document.querySelectorAll('.ranged-weapon-buy-button');
+    const gearButtons = document.querySelectorAll('.ranged-weapon-gear-button');
+    
+    buyButtons.forEach(btn => {
+        const originalPrice = btn.getAttribute('data-original-price');
+        const type = btn.getAttribute('data-weapon-type');
+        const load = btn.getAttribute('data-load');
+        const primaryDamage = btn.getAttribute('data-primary-damage');
+        const altDamage = btn.getAttribute('data-alt-damage');
+        const concealable = btn.getAttribute('data-concealable');
+        const hands = btn.getAttribute('data-hands');
+        const stealth = btn.getAttribute('data-stealth');
+        const magazine = btn.getAttribute('data-magazine');
+        btn.setAttribute('onclick', `buyRangedWeapon(${JSON.stringify(type)}, ${originalPrice}, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, null)`);
+    });
+    
+    gearButtons.forEach(btn => {
+        const originalPrice = btn.getAttribute('data-original-price');
+        const type = btn.getAttribute('data-weapon-type');
+        const load = btn.getAttribute('data-load');
+        const primaryDamage = btn.getAttribute('data-primary-damage');
+        const altDamage = btn.getAttribute('data-alt-damage');
+        const concealable = btn.getAttribute('data-concealable');
+        const hands = btn.getAttribute('data-hands');
+        const stealth = btn.getAttribute('data-stealth');
+        const magazine = btn.getAttribute('data-magazine');
+        btn.setAttribute('onclick', `buyRangedWeaponToGear(${JSON.stringify(type)}, ${originalPrice}, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, null)`);
+    });
+}
+
 function toggleRangedWeaponsFreeMode() {
     const buyButtons = document.querySelectorAll('.ranged-weapon-buy-button');
     const gearButtons = document.querySelectorAll('.ranged-weapon-gear-button');
@@ -5059,7 +6573,7 @@ function toggleRangedWeaponsFreeMode() {
     
     if (isFreeMode) {
         buyButtons.forEach(btn => {
-            const price = btn.getAttribute('data-price');
+            const originalPrice = btn.getAttribute('data-original-price');
             const type = btn.getAttribute('data-weapon-type');
             const load = btn.getAttribute('data-load');
             const primaryDamage = btn.getAttribute('data-primary-damage');
@@ -5068,11 +6582,11 @@ function toggleRangedWeaponsFreeMode() {
             const hands = btn.getAttribute('data-hands');
             const stealth = btn.getAttribute('data-stealth');
             const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `if(typeof buyRangedWeapon === 'function') { buyRangedWeapon('${type.replace(/'/g, "\\'")}', ${price}, ${load}, '${primaryDamage}', '${altDamage}', '${concealable}', '${hands}', ${stealth}, '${magazine}'); }`);
+            btn.setAttribute('onclick', `buyRangedWeapon(${JSON.stringify(type)}, ${originalPrice}, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, null)`);
         });
         
         gearButtons.forEach(btn => {
-            const price = btn.getAttribute('data-price');
+            const originalPrice = btn.getAttribute('data-original-price');
             const type = btn.getAttribute('data-weapon-type');
             const load = btn.getAttribute('data-load');
             const primaryDamage = btn.getAttribute('data-primary-damage');
@@ -5081,7 +6595,7 @@ function toggleRangedWeaponsFreeMode() {
             const hands = btn.getAttribute('data-hands');
             const stealth = btn.getAttribute('data-stealth');
             const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `if(typeof buyRangedWeaponToGear === 'function') { buyRangedWeaponToGear('${type.replace(/'/g, "\\'")}', ${price}, ${load}, '${primaryDamage}', '${altDamage}', '${concealable}', '${hands}', ${stealth}, '${magazine}'); }`);
+            btn.setAttribute('onclick', `buyRangedWeaponToGear(${JSON.stringify(type)}, ${originalPrice}, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, null)`);
         });
         
         // Обновляем отображение цен
@@ -5100,6 +6614,7 @@ function toggleRangedWeaponsFreeMode() {
         }
     } else {
         buyButtons.forEach(btn => {
+            const catalogPrice = btn.getAttribute('data-price'); // Каталожная цена
             const type = btn.getAttribute('data-weapon-type');
             const load = btn.getAttribute('data-load');
             const primaryDamage = btn.getAttribute('data-primary-damage');
@@ -5108,10 +6623,11 @@ function toggleRangedWeaponsFreeMode() {
             const hands = btn.getAttribute('data-hands');
             const stealth = btn.getAttribute('data-stealth');
             const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `if(typeof getRangedWeaponFreeToWeapons === 'function') { getRangedWeaponFreeToWeapons('${type.replace(/'/g, "\\'")}', ${load}, '${primaryDamage}', '${altDamage}', '${concealable}', '${hands}', ${stealth}, '${magazine}'); }`);
+            btn.setAttribute('onclick', `buyRangedWeapon(${JSON.stringify(type)}, 0, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, ${catalogPrice})`);
         });
         
         gearButtons.forEach(btn => {
+            const catalogPrice = btn.getAttribute('data-price'); // Каталожная цена
             const type = btn.getAttribute('data-weapon-type');
             const load = btn.getAttribute('data-load');
             const primaryDamage = btn.getAttribute('data-primary-damage');
@@ -5120,7 +6636,7 @@ function toggleRangedWeaponsFreeMode() {
             const hands = btn.getAttribute('data-hands');
             const stealth = btn.getAttribute('data-stealth');
             const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `if(typeof getRangedWeaponFreeToGear === 'function') { getRangedWeaponFreeToGear('${type.replace(/'/g, "\\'")}', ${load}, '${primaryDamage}', '${altDamage}', '${concealable}', '${hands}', ${stealth}, '${magazine}'); }`);
+            btn.setAttribute('onclick', `buyRangedWeaponToGear(${JSON.stringify(type)}, 0, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, ${catalogPrice})`);
         });
         
         // Обновляем отображение цен
@@ -5646,24 +7162,43 @@ function showAmmoSelectionModal(damageFormula, weaponName, weaponId, damageType)
 function getWeaponTypeForAmmo(weaponName) {
     // Определяем тип оружия по названию для поиска боеприпасов
     const weaponTypeMappings = {
+        // Пистолеты
         'Лёгкий пистолет': 'Лёгкий пистолет',
         'Обычный пистолет': 'Обычный пистолет',
         'Крупнокалиберный пистолет': 'Крупнокалиберный пистолет',
+        
+        // Пистолеты-пулемёты
         'Пистолет-пулемёт': 'Пистолет-пулемёт',
         'Тяжёлый пистолет-пулемёт': 'Тяжёлый пистолет-пулемёт',
+        
+        // Винтовки
         'Штурмовая винтовка': 'Штурмовая винтовка',
-        'Пулемёт': 'Пулемёт',
         'Снайперская винтовка': 'Снайперская винтовка',
+        
+        // Пулемёты
+        'Пулемёт': 'Пулемёт',
+        
+        // Дробовики
         'Дробовик': 'Дробовик',
+        
+        // Специальное оружие
         'Оружие с самонаведением': 'Оружие с самонаведением',
         'Гранатомёт': 'Гранаты',
         'Ракетомёт': 'Ракеты',
+        
+        // Активная броня
         'Активная броня (Микроракета)': 'Микроракета',
         'Активная броня (Микроракеты)': 'Микроракета',
         'Активная броня (Дробовая)': 'Пиропатрон',
         'Активная броня (Лазерная)': 'Высоковольтная мини-батарея'
     };
     
+    // Сначала ищем точное совпадение
+    if (weaponTypeMappings[weaponName]) {
+        return weaponTypeMappings[weaponName];
+    }
+    
+    // Затем ищем частичное совпадение
     for (const [key, value] of Object.entries(weaponTypeMappings)) {
         if (weaponName.includes(key)) {
             return value;
@@ -6386,7 +7921,7 @@ function showWeaponModulesShop() {
 }
 
 // Функции покупки модулей оружия
-function buyWeaponModule(category, name, price, load, compatible, description, slotsRequired = 1) {
+function buyWeaponModule(category, name, price, load, compatible, description, slotsRequired = 1, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -6419,7 +7954,10 @@ function buyWeaponModule(category, name, price, load, compatible, description, s
             compatible: compatible,
             category: category,
             slotsRequired: slotsRequired
-        }
+        },
+        catalogPrice: catalogPrice,
+        purchasePrice: price,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
     };
     
     state.gear.push(newModule);
@@ -6628,7 +8166,6 @@ function installImplantFromGear(gearIndex) {
 }
 
 function removeGear(index) {
-    showConfirmModal('Подтверждение', 'Удалить предмет из снаряжения?', () => {
         const item = state.gear[index];
         if (item) {
             // Возвращаем нагрузку
@@ -6640,7 +8177,6 @@ function removeGear(index) {
             updateLoadDisplay();
             scheduleSave();
         }
-    });
 }
 
 function takeWeaponFromGear(gearIndex) {
@@ -6876,7 +8412,7 @@ function showAmmoShop() {
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
                         <div>
                             <span style="color: var(--text); font-weight: 600;">Пиропатрон</span>
-                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для дробовой Активной защиты</div>
+                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для дробовой активной защиты (урон 4d4)</div>
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
                             <span class="ammo-price" style="color: var(--accent); font-size: 0.9rem;" data-original-price="50">50 уе</span>
@@ -6887,7 +8423,7 @@ function showAmmoShop() {
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
                         <div>
                             <span style="color: var(--text); font-weight: 600;">Высоковольтная мини-батарея</span>
-                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для лазерной Активной защиты</div>
+                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для лазерной активной защиты (без урона)</div>
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
                             <span class="ammo-price" style="color: var(--accent); font-size: 0.9rem;" data-original-price="250">250 уе</span>
@@ -6898,7 +8434,7 @@ function showAmmoShop() {
                     <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
                         <div>
                             <span style="color: var(--text); font-weight: 600;">Микроракета</span>
-                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для Активной защита с Микроракетами</div>
+                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для микроракетной активной защиты (урон 6d6)</div>
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
                             <span class="ammo-price" style="color: var(--accent); font-size: 0.9rem;" data-original-price="500">500 уе</span>
@@ -6917,6 +8453,9 @@ function showAmmoShop() {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
 }
 
 function toggleAmmoFreeMode() {
@@ -7025,21 +8564,14 @@ function showAmmoQuantityModal(ammoType, weaponType, price) {
         }
     });
     
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
+    
     // Фокусируемся на поле количества
     setTimeout(() => {
         const input = document.getElementById('ammoQuantity');
         if (input) input.focus();
     }, 100);
-    
-    // Обработка клавиши Enter для покупки
-    modal.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            buyAmmoWithQuantity(ammoType, weaponType, price);
-        } else if (e.key === 'Escape') {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
 }
 
 function updateAmmoTotal(pricePerUnit) {
@@ -7058,7 +8590,7 @@ function updateAmmoTotal(pricePerUnit) {
     }
 }
 
-function buyAmmoWithQuantity(ammoType, weaponType, pricePerUnit) {
+function buyAmmoWithQuantity(ammoType, weaponType, pricePerUnit, catalogPrice = null) {
     const quantity = parseInt(document.getElementById('ammoQuantity').value) || 1;
     const totalPrice = quantity * pricePerUnit;
     const currentMoney = parseInt(state.money) || 0;
@@ -7095,7 +8627,7 @@ function buyAmmoWithQuantity(ammoType, weaponType, pricePerUnit) {
     const ammoName = isActiveDefense ? 'Активная защита' : ammoType;
     
     // Проверяем, есть ли уже такой тип боеприпасов
-    // Ищем по типу и weaponType для всех боеприпасов
+    // Ищем по типу И weaponType для всех боеприпасов
     const existingAmmoIndex = state.ammo.findIndex(a => {
         return a.type === ammoName && a.weaponType === weaponType;
     });
@@ -7110,7 +8642,10 @@ function buyAmmoWithQuantity(ammoType, weaponType, pricePerUnit) {
             type: ammoName,
             weaponType: weaponType,
             quantity: addQuantity,
-            price: pricePerUnit
+            price: pricePerUnit,
+            catalogPrice: catalogPrice,
+            purchasePrice: pricePerUnit,
+            itemType: catalogPrice ? 'free_catalog' : 'purchased'
         };
         state.ammo.push(newAmmo);
     }
@@ -7122,15 +8657,7 @@ function buyAmmoWithQuantity(ammoType, weaponType, pricePerUnit) {
         ? `${quantity} шт.` 
         : `${addQuantity} патронов (${quantity} пачек)`;
     
-    // Закрываем окно покупки (самый верхний модал с заголовком "🛒 Покупка боеприпасов")
-    const allModals = document.querySelectorAll('.modal-overlay');
-    for (const modal of allModals) {
-        const modalTitle = modal.querySelector('h3');
-        if (modalTitle && modalTitle.textContent.includes('🛒 Покупка боеприпасов')) {
-            modal.remove();
-            break;
-        }
-    }
+    // НЕ закрываем модал покупки - пользователь может продолжить покупки
     
     showModal('Боеприпасы куплены', `
         <div style="text-align: center; padding: 1rem;">
@@ -7143,7 +8670,7 @@ function buyAmmoWithQuantity(ammoType, weaponType, pricePerUnit) {
     `);
 }
 
-function buyAmmo(ammoType, weaponType, price) {
+function buyAmmo(ammoType, weaponType, price, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -7176,7 +8703,10 @@ function buyAmmo(ammoType, weaponType, price) {
             type: ammoType,
             weaponType: weaponType,
             quantity: addQuantity,
-            price: price
+            price: price,
+            catalogPrice: catalogPrice,
+            purchasePrice: price,
+            itemType: catalogPrice ? 'free_catalog' : 'purchased'
         };
         state.ammo.push(newAmmo);
     }
@@ -7236,7 +8766,6 @@ function changeAmmoQuantity(index, delta) {
 }
 
 function removeAmmo(index) {
-    showConfirmModal('Подтверждение', 'Удалить этот тип боеприпасов?', () => {
         const ammo = state.ammo[index];
         if (ammo) {
             // Возвращаем нагрузку
@@ -7250,7 +8779,6 @@ function removeAmmo(index) {
         state.ammo.splice(index, 1);
         renderAmmo();
         scheduleSave();
-    });
 }
 
 // Функция перезарядки оружия
@@ -7351,6 +8879,9 @@ function reloadWeapon(weaponId) {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
 }
 
 function executeReload(weaponId) {
@@ -7501,6 +9032,9 @@ function reloadShotgun(weaponId) {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем универсальные обработчики клавиш
+    addModalKeyboardHandlers(modal);
 }
 
 function executeShotgunReload(weaponId) {
@@ -7735,13 +9269,13 @@ function executeShotgunShoot(weaponId) {
 
 // Функции для работы с профессиональными навыками
 function addProfessionalSkill() {
-    showPromptModal('Добавить профессиональный навык', 'Введите название профессионального навыка:', '', (name) => {
+    const name = prompt('Введите название профессионального навыка:');
         if (!name) return;
         
-        showPromptModal('Добавить профессиональный навык', 'Введите описание навыка:', '', (description) => {
+    const description = prompt('Введите описание навыка:');
             if (!description) return;
             
-            showPromptModal('Добавить профессиональный навык', 'Введите уровень навыка (0-10):', '1', (level) => {
+    const level = prompt('Введите уровень навыка (0-10):');
                 const skillLevel = Math.max(0, Math.min(10, parseInt(level) || 0));
                 
                 // Проверяем, не добавлен ли уже этот навык
@@ -7760,9 +9294,6 @@ function addProfessionalSkill() {
                 state.professionalSkills.push(newSkill);
                 renderProfessionalSkills();
                 scheduleSave();
-            });
-        });
-    });
 }
 
 function updateProfessionalSkillLevel(skillId, newLevel) {
@@ -7968,7 +9499,7 @@ function renderCriticalInjuries() {
     }
     
     container.innerHTML = state.criticalInjuries.map(injury => `
-        <div class="injury-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: rgba(0,0,0,0.2); border: 1px solid rgba(182, 103, 255, 0.2); border-radius: 6px; margin-bottom: 0.5rem;">
+        <div class="injury-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(0,0,0,0.2); border: 1px solid rgba(182, 103, 255, 0.2); border-radius: 6px; margin-bottom: 0.5rem;">
             <div style="flex: 1;">
                 <div style="color: var(--text); font-size: 0.9rem;">${injury.description}</div>
                 <div style="color: var(--muted); font-size: 0.8rem;">${injury.date}</div>
@@ -8044,7 +9575,7 @@ function showDrugsShop() {
     });
 }
 
-function buyDrug(name, price, description, effect, category, difficulty, secondaryEffect) {
+function buyDrug(name, price, description, effect, category, difficulty, secondaryEffect, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -8070,7 +9601,10 @@ function buyDrug(name, price, description, effect, category, difficulty, seconda
         difficulty: difficulty,
         secondaryEffect: secondaryEffect,
         price: price,
-        purchaseDate: new Date().toLocaleDateString('ru-RU')
+        purchaseDate: new Date().toLocaleDateString('ru-RU'),
+        catalogPrice: catalogPrice,
+        purchasePrice: price,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
     };
     
     state.drugs.push(newDrug);
@@ -8366,7 +9900,7 @@ function showVehicleShop() {
                             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                                 <div style="flex: 1;">
                                     <div style="color: var(--accent); font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem;">${vehicle.name}</div>
-                                    <div style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.75rem;">${vehicle.description}</div>
+                                    <div style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.75rem;">${vehicle.description.replace(/"/g, '&quot;')}</div>
                                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; font-size: 0.8rem; color: var(--text); margin-bottom: 0.75rem;">
                                         <div><strong>ПЗ:</strong> ${vehicle.hp}</div>
                                         <div><strong>Места:</strong> ${vehicle.seats}</div>
@@ -8376,7 +9910,7 @@ function showVehicleShop() {
                                     <div class="vehicle-price-display" style="color: var(--success); font-weight: 600; font-size: 1rem;" data-original-price="${vehicle.price}">Цена: ${vehicle.price} уе</div>
                                 </div>
                                 <div style="margin-left: 1rem;">
-                                    <button class="pill-button primary-button vehicle-buy-button" onclick="buyVehicle('${vehicle.name.replace(/'/g, "\\'")}', '${vehicle.description.replace(/'/g, "\\'")}', ${vehicle.hp}, ${vehicle.seats}, ${vehicle.mechanicalSpeed}, '${vehicle.narrativeSpeed}', ${vehicle.price}, '${vehicle.category}')" data-vehicle-name="${vehicle.name.replace(/'/g, "\\'")}" data-description="${vehicle.description.replace(/'/g, "\\'")}" data-hp="${vehicle.hp}" data-seats="${vehicle.seats}" data-mechanical-speed="${vehicle.mechanicalSpeed}" data-narrative-speed="${vehicle.narrativeSpeed}" data-price="${vehicle.price}" data-category="${vehicle.category}" style="font-size: 0.85rem; padding: 0.5rem 1rem;">Купить</button>
+                                    <button class="pill-button primary-button vehicle-buy-button" onclick="buyVehicle('${vehicle.name.replace(/'/g, "\\'")}', '${vehicle.description.replace(/'/g, "\\'")}', ${vehicle.hp}, ${vehicle.seats}, ${vehicle.mechanicalSpeed}, '${vehicle.narrativeSpeed}', ${vehicle.price}, '${vehicle.category}', null)" data-vehicle-name="${vehicle.name.replace(/'/g, "\\'")}" data-description="${vehicle.description.replace(/'/g, "\\'")}" data-hp="${vehicle.hp}" data-seats="${vehicle.seats}" data-mechanical-speed="${vehicle.mechanicalSpeed}" data-narrative-speed="${vehicle.narrativeSpeed}" data-price="${vehicle.price}" data-category="${vehicle.category}" style="font-size: 0.85rem; padding: 0.5rem 1rem;">Купить</button>
                                 </div>
                             </div>
                         </div>
@@ -8401,7 +9935,7 @@ function showVehicleShop() {
     });
 }
 
-function buyVehicle(name, description, hp, seats, mechanicalSpeed, narrativeSpeed, price, category) {
+function buyVehicle(name, description, hp, seats, mechanicalSpeed, narrativeSpeed, price, category, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     // Проверяем навык "Транспорт" для скидки
@@ -8435,7 +9969,10 @@ function buyVehicle(name, description, hp, seats, mechanicalSpeed, narrativeSpee
         seats: seats,
         mechanicalSpeed: mechanicalSpeed,
         narrativeSpeed: narrativeSpeed,
-        price: price,
+        price: catalogPrice || price,  // Используем каталожную цену если есть
+        catalogPrice: catalogPrice,     // Сохраняем каталожную цену отдельно
+        purchasePrice: finalPrice,      // Сохраняем цену покупки (с учётом скидки)
+        itemType: finalPrice === 0 && catalogPrice > 0 ? 'free_catalog' : 'catalog',  // Маркер для скупщика
         category: category,
         modules: [],
         isDefault: false
@@ -8483,7 +10020,7 @@ function toggleVehiclesFreeMode() {
             const narrativeSpeed = btn.getAttribute('data-narrative-speed');
             const price = btn.getAttribute('data-price');
             const category = btn.getAttribute('data-category');
-            btn.setAttribute('onclick', `buyVehicle('${name}', '${description}', ${hp}, ${seats}, ${mechanicalSpeed}, '${narrativeSpeed}', ${price}, '${category}')`);
+            btn.setAttribute('onclick', `buyVehicle('${name}', '${description}', ${hp}, ${seats}, ${mechanicalSpeed}, '${narrativeSpeed}', ${price}, '${category}', null)`);
         });
         
         // Возвращаем обычные цены визуально
@@ -8508,7 +10045,7 @@ function toggleVehiclesFreeMode() {
             const mechanicalSpeed = btn.getAttribute('data-mechanical-speed');
             const narrativeSpeed = btn.getAttribute('data-narrative-speed');
             const category = btn.getAttribute('data-category');
-            btn.setAttribute('onclick', `buyVehicle('${name}', '${description}', ${hp}, ${seats}, ${mechanicalSpeed}, '${narrativeSpeed}', 0, '${category}')`);
+            btn.setAttribute('onclick', `buyVehicle('${name}', '${description}', ${hp}, ${seats}, ${mechanicalSpeed}, '${narrativeSpeed}', 0, '${category}', ${btn.getAttribute('data-price')})`);
         });
         
         // Меняем цены визуально на 0
@@ -8750,7 +10287,7 @@ function toggleVehicleModulesFreeMode() {
     }
 }
 
-function buyVehicleModule(name, description, price, category, requirementsStr) {
+function buyVehicleModule(name, description, price, category, requirementsStr, catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     const requirements = JSON.parse(requirementsStr);
     
@@ -8780,7 +10317,10 @@ function buyVehicleModule(name, description, price, category, requirementsStr) {
         moduleData: {
             category: category,
             requirements: requirements
-        }
+        },
+        catalogPrice: catalogPrice,
+        purchasePrice: price,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
     };
     
     state.gear.push(newGear);
@@ -9740,7 +11280,6 @@ function updateNoteContent(noteId, content) {
 }
 
 function deleteNote(noteIndex) {
-    showConfirmModal('Подтверждение', 'Удалить эту заметку навсегда?', () => {
         const note = notes[noteIndex];
         if (!note) return;
         
@@ -9767,7 +11306,6 @@ function deleteNote(noteIndex) {
             modal.remove();
             showNotesModal();
         }
-    });
 }
 
 function closeNoteWindow(noteWindow) {
@@ -10285,7 +11823,7 @@ function toggleArmorShopFreeMode() {
     }
 }
 
-function buyArmor(name, price, os, type) {
+function buyArmor(name, price, os, type, catalogPrice = null) {
     const isFreeMode = window.armorShopFreeMode || false;
     const actualPrice = isFreeMode ? 0 : price;
     
@@ -10326,7 +11864,7 @@ function buyArmor(name, price, os, type) {
     scheduleSave();
 }
 
-function buyActiveArmor() {
+function buyActiveArmor(catalogPrice = null) {
     const isFreeMode = window.armorShopFreeMode || false;
     const actualPrice = isFreeMode ? 0 : 500;
     
@@ -10453,7 +11991,7 @@ function createActiveArmor(rocketType) {
     scheduleSave();
 }
 
-function buyBallisticShield() {
+function buyBallisticShield(catalogPrice = null) {
     const isFreeMode = window.armorShopFreeMode || false;
     const actualPrice = isFreeMode ? 0 : 100;
     
@@ -10491,7 +12029,10 @@ function buyBallisticShield() {
         type: 'gear',
         hp: 20,
         currentHp: 20,
-        isShield: true
+        isShield: true,
+        catalogPrice: catalogPrice,
+        purchasePrice: actualPrice,
+        itemType: catalogPrice ? 'free_catalog' : 'purchased'
     };
     
     state.gear.push(shield);
@@ -10716,7 +12257,7 @@ function showTaxModal() {
                     <button class="atm-button" onclick="processDeposit(false)" style="flex: 1; background: #CC0000; border: none; color: #ffffff; padding: 0.75rem; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600;">Нет</button>
                 </div>
                 <div style="margin-top: 0.5rem;">
-                    <button class="atm-button" onclick="showExitConfirmation()" style="width: 100%; background: #666666; border: none; color: #ffffff; padding: 0.5rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">Отмена</button>
+                    <button class="atm-button" onclick="showExitConfirmation()" style="width: 100%; background: #666666; border: none; color: #ffffff; padding: 0.75rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">Отмена</button>
                 </div>
             </div>
         </div>
@@ -10974,73 +12515,11 @@ function exitAtmTransaction() {
 }
 
 // Функции для работы с недвижимостью (жильем)
-function addHousing() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>Добавить жилье</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="input-group">
-                    <label class="input-label">Название</label>
-                    <input type="text" class="input-field" id="housingName" placeholder="Например: Квартира в Мегаполисе">
-                </div>
-                <div class="input-group">
-                    <label class="input-label">Описание</label>
-                    <textarea class="input-field" id="housingDescription" rows="3" placeholder="Опишите жилье..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="confirmAddHousing()">Добавить</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function confirmAddHousing() {
-    const name = document.getElementById('housingName').value.trim();
-    const description = document.getElementById('housingDescription').value.trim();
-    
-    if (!name) {
-        showModal('Ошибка', 'Укажите название жилья!');
-        return;
-    }
-    
-    const newHousing = {
-        id: generateId('housing'),
-        name: name,
-        description: description,
-        addedDate: new Date().toLocaleDateString('ru-RU')
-    };
-    
-    state.property.housing.push(newHousing);
-    renderHousing();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    showModal('Жилье добавлено', `✅ ${name} добавлено в собственность!`);
-}
-
 function renderHousing() {
     const container = document.getElementById('housingContainer');
     if (!container) return;
     
-    if (state.property.housing.length === 0) {
+    if (!state.property || !state.property.housing || state.property.housing.length === 0) {
         container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem;">Жилье не добавлено</p>';
         return;
     }
@@ -11171,11 +12650,9 @@ function removeHousing(housingId) {
     const housing = state.property.housing.find(h => h.id === housingId);
     if (!housing) return;
     
-    showConfirmModal('Подтверждение', `Удалить жилье "${housing.name}"?`, () => {
         state.property.housing = state.property.housing.filter(h => h.id !== housingId);
         renderHousing();
         scheduleSave();
-    });
 }
 
 // Функции для управления характеристиками с кнопками +/-
@@ -11329,166 +12806,808 @@ function renderAmmo() {
     `).join('');
 }
 
-// Универсальные функции для модальных окон (замена alert/confirm/prompt)
+// ============================================================================
+// НОВЫЕ ФУНКЦИИ - ДОБАВЛЕНО СЕГОДНЯ
+// ============================================================================
 
-function showConfirmModal(title, message, onConfirm, onCancel = null) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.tabIndex = -1; // Позволяет модальному окну получать фокус
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
+// Функция переключения торга
+function toggleBargainEnabled(enabled) {
+    state.bargainEnabled = enabled;
+    scheduleSave();
     
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>${title}</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
+    const statusText = enabled ? 'включён' : 'отключён';
+    showModal('Торг ' + statusText, `
+        <div style="text-align: center; padding: 1rem;">
+            <p style="color: var(--text); font-size: 1rem; margin-bottom: 0.5rem;">
+                Навык "Торг" ${statusText} для покупок и продаж.
+            </p>
+            ${!enabled ? '<p style="color: var(--muted); font-size: 0.85rem;">Вы можете использовать торг только 1 раз за сцену.</p>' : ''}
             </div>
-            <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1.5rem;">${message}</p>
-                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                    <button class="pill-button secondary-button" onclick="closeConfirmModal(false, this.closest('.modal-overlay'))">Отмена</button>
-                    <button class="pill-button danger-button" onclick="closeConfirmModal(true, this.closest('.modal-overlay'))">Да</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Сохраняем функции обратного вызова
-    modal.onConfirm = onConfirm;
-    modal.onCancel = onCancel;
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeConfirmModal(false, modal);
-        }
-    });
-    
-    // Обработка клавиши Enter для подтверждения
-    modal.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            e.stopPropagation();
-            closeConfirmModal(true, modal);
-        } else if (e.key === 'Escape') {
-            e.preventDefault();
-            e.stopPropagation();
-            closeConfirmModal(false, modal);
-        }
-    });
-    
-    // Фокусируемся на модальном окне для обработки клавиш
-    setTimeout(() => {
-        modal.focus();
-    }, 100);
+    `);
 }
 
-function closeConfirmModal(result, modalElement = null) {
-    const modal = modalElement || document.querySelector('.modal-overlay:last-child');
-    if (modal) {
-        modal.remove();
-        if (result && modal.onConfirm) {
-            modal.onConfirm();
-        } else if (!result && modal.onCancel) {
-            modal.onCancel();
-        }
+// Экспорт всех данных персонажа в JSON
+function exportData() {
+    try {
+        // Собираем ВСЕ данные персонажа
+        const exportData = {
+            // Основная информация
+            characterName: state.characterName,
+            characterClass: state.characterClass,
+            characterLevel: state.characterLevel,
+            experiencePoints: state.experiencePoints,
+            roleplayPoints: state.roleplayPoints,
+            avatar: state.avatar,
+            
+            // Характеристики
+            stats: { ...state.stats },
+            
+            // Удача
+            luck: { ...state.luck },
+            
+            // Производные характеристики
+            awareness: { ...state.awareness },
+            reputation: state.reputation,
+            
+            // Здоровье и ресурсы
+            health: { ...state.health },
+            money: state.money,
+            
+            // Предыстория
+            backstory: state.backstory,
+            
+            // Навыки
+            skills: [...state.skills],
+            professionalSkills: [...state.professionalSkills],
+            bargainEnabled: state.bargainEnabled,
+            
+            // Дека
+            deck: { ...state.deck },
+            
+            // ОЗУ деки
+            deckRam: { ...state.deckRam },
+            
+            // Снаряжение
+            gear: [...state.gear],
+            
+            // Оружие
+            weapons: [...state.weapons],
+            
+            // Боеприпасы
+            ammo: [...state.ammo],
+            
+            // Программы деки
+            deckPrograms: [...state.deckPrograms],
+            
+            // Модули оружия
+            weaponModules: [...state.weaponModules],
+            
+            // Имущество
+            property: {
+                vehicles: [...state.property.vehicles],
+                realEstate: [...state.property.realEstate]
+            },
+            
+            // Препараты
+            drugs: [...state.drugs],
+            
+            // Нагрузка
+            load: { ...state.load },
+            
+            // Скупщик
+            fenceShop: { ...state.fenceShop },
+            
+            // Лог бросков
+            rollLog: [...state.rollLog],
+            
+            // Заметки
+            notes: state.notes || '',
+            
+            // Критические травмы
+            criticalInjuries: [...state.criticalInjuries],
+            
+            // Щепки памяти
+            deckChips: [...state.deckChips],
+            
+            // Имплантаты
+            implants: [...state.implants],
+            
+            // Недвижимость
+            housing: [...state.housing],
+            
+            // Версия экспорта
+            exportVersion: '1.0',
+            exportDate: new Date().toISOString()
+        };
+        
+        // Создаём JSON строку
+        const jsonString = JSON.stringify(exportData, null, 2);
+        
+        // Создаём и скачиваем файл
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ezy-cyber-character-${state.characterName || 'unnamed'}-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showModal('Персонаж сохранён', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 0.5rem;">✓ Персонаж успешно сохранён!</p>
+                <p style="color: var(--text); font-size: 0.9rem;">
+                    Файл: <strong>${a.download}</strong>
+                </p>
+                <p style="color: var(--muted); font-size: 0.8rem; margin-top: 0.5rem;">
+                    Все данные персонажа экспортированы в JSON файл.
+                </p>
+                </div>
+        `);
+        
+    } catch (error) {
+        console.error('Ошибка при экспорте данных:', error);
+        showModal('Ошибка экспорта', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при сохранении!</p>
+                <p style="color: var(--text); font-size: 0.9rem;">
+                    Не удалось сохранить персонажа. Попробуйте ещё раз.
+                </p>
+            </div>
+        `);
     }
 }
 
-function showPromptModal(title, message, defaultValue = '', onConfirm, onCancel = null) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
+// Импорт данных персонажа из JSON
+function importData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
     
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>${title}</h3>
-                <button class="icon-button" onclick="closePromptModal(null)">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1rem;">${message}</p>
-                <input type="text" id="promptInput" value="${defaultValue}" style="width: 100%; padding: 0.5rem; margin-bottom: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
-                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                    <button class="pill-button secondary-button" onclick="closePromptModal(null)">Отмена</button>
-                    <button class="pill-button primary-button" onclick="closePromptModal(document.getElementById('promptInput').value)">ОК</button>
+    input.onchange = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                
+                // Проверяем версию экспорта
+                if (!importedData.exportVersion) {
+                    showModal('Ошибка импорта', `
+                        <div style="text-align: center; padding: 1rem;">
+                            <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Неверный формат файла!</p>
+                            <p style="color: var(--text); font-size: 0.9rem;">
+                                Файл не является сохранением персонажа EZY Cyber.
+                            </p>
+        </div>
+                    `);
+                    return;
+                }
+                
+                // Подтверждение импорта
+                showModal('Подтверждение импорта', `
+                    <div style="text-align: center; padding: 1rem;">
+                        <p style="color: var(--text); font-size: 1rem; margin-bottom: 1rem;">
+                            Загрузить персонажа <strong>${importedData.characterName || 'Без имени'}</strong>?
+                        </p>
+                        <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem;">
+                            Все текущие данные будут заменены!
+                        </p>
+                        <div style="display: flex; gap: 1rem;">
+                            <button class="pill-button" onclick="closeModal(this)" style="flex: 1;">Отмена</button>
+                            <button class="pill-button success-button" onclick="confirmImport()" style="flex: 1;">Загрузить</button>
                 </div>
             </div>
-        </div>
-    `;
+                `);
+                
+                // Сохраняем данные для импорта
+                window.pendingImportData = importedData;
+                
+            } catch (error) {
+                console.error('Ошибка при импорте данных:', error);
+                showModal('Ошибка импорта', `
+                    <div style="text-align: center; padding: 1rem;">
+                        <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при загрузке!</p>
+                        <p style="color: var(--text); font-size: 0.9rem;">
+                            Файл повреждён или имеет неверный формат.
+                        </p>
+                    </div>
+                `);
+            }
+        };
+        
+        reader.readAsText(file);
+    };
     
-    document.body.appendChild(modal);
-    
-    // Фокусируемся на поле ввода
-    setTimeout(() => {
-        const input = document.getElementById('promptInput');
-        if (input) {
-            input.focus();
-            input.select();
-        }
-    }, 100);
-    
-    // Обработка Enter и Escape
-    modal.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            closePromptModal(document.getElementById('promptInput').value);
-        } else if (e.key === 'Escape') {
-            closePromptModal(null);
-        }
-    });
-    
-    // Сохраняем функции обратного вызова
-    modal.onConfirm = onConfirm;
-    modal.onCancel = onCancel;
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closePromptModal(null);
-        }
-    });
+    input.click();
 }
 
-function closePromptModal(result) {
-    const modal = document.querySelector('.modal-overlay:last-child');
-    if (modal) {
-        modal.remove();
-        if (result !== null && modal.onConfirm) {
-            modal.onConfirm(result);
-        } else if (result === null && modal.onCancel) {
-            modal.onCancel();
-        }
+// Подтверждение импорта
+function confirmImport() {
+    if (!window.pendingImportData) return;
+    
+    try {
+        const importedData = window.pendingImportData;
+        
+        // Очищаем текущие данные
+        clearAllData(true); // true = без подтверждения
+        
+        // Загружаем импортированные данные
+        Object.assign(state, importedData);
+        
+        // Обновляем отображение
+        updateAllDisplays();
+        
+        // Сохраняем
+        scheduleSave();
+        
+        closeModal(document.querySelector('.modal-overlay:last-child .icon-button'));
+        
+        showModal('Персонаж загружен', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 0.5rem;">✓ Персонаж успешно загружен!</p>
+                <p style="color: var(--text); font-size: 0.9rem;">
+                    Все данные персонажа восстановлены.
+                </p>
+            </div>
+        `);
+        
+        // Очищаем временные данные
+        window.pendingImportData = null;
+        
+    } catch (error) {
+        console.error('Ошибка при подтверждении импорта:', error);
+        showModal('Ошибка импорта', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при загрузке!</p>
+                <p style="color: var(--text); font-size: 0.9rem;">
+                    Не удалось загрузить персонажа.
+                </p>
+            </div>
+        `);
     }
 }
 
-function showAlertModal(title, message) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>${title}</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1.5rem;">${message}</p>
-                <div style="display: flex; justify-content: flex-end;">
-                    <button class="pill-button primary-button" onclick="closeModal(this.parentElement.parentElement.parentElement)">ОК</button>
+// Полная очистка всех данных персонажа
+function clearAllData(skipConfirmation = false) {
+    if (!skipConfirmation) {
+        showModal('Подтверждение очистки', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">⚠️ ВНИМАНИЕ!</p>
+                <p style="color: var(--text); font-size: 1rem; margin-bottom: 1rem;">
+                    Вы действительно хотите удалить <strong>ВСЕ</strong> данные персонажа?
+                </p>
+                <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem;">
+                    Это действие нельзя отменить!
+                </p>
+                <div style="display: flex; gap: 1rem;">
+                    <button class="pill-button" onclick="closeModal(this)" style="flex: 1;">Отмена</button>
+                    <button class="pill-button danger-button" onclick="confirmClearAllData()" style="flex: 1;">Удалить всё</button>
                 </div>
             </div>
+        `);
+        return;
+    }
+    
+    // Выполняем очистку
+    performClearAllData();
+}
+
+// Подтверждение очистки
+function confirmClearAllData() {
+    closeModal(document.querySelector('.modal-overlay:last-child .icon-button'));
+    performClearAllData();
+}
+
+// Выполнение очистки всех данных
+function performClearAllData() {
+    try {
+        // Сбрасываем ВСЕ данные к начальным значениям
+        state.characterName = '';
+        state.characterClass = '';
+        state.characterLevel = 1;
+        state.experiencePoints = 0;
+        state.roleplayPoints = 0;
+        state.avatar = '';
+        
+        // Характеристики (1-20)
+        state.stats = {
+            WILL: 5,    // Воля
+            INT: 5,     // Ум
+            DEX: 5,     // Ловкость
+            BODY: 5,    // Телосложение
+            REA: 5,     // Реакция
+            TECH: 5,    // Техника
+            CHA: 5      // Харизма
+        };
+        
+        // Удача
+        state.luck = {
+            current: 1,
+            max: 1
+        };
+        
+        // Производные характеристики
+        state.awareness = {
+            current: 50,
+            max: 50
+        };
+        state.reputation = 0;
+        
+        // Здоровье и ресурсы
+        state.health = {
+            current: 25,
+            max: 25
+        };
+        state.money = 3500; // НОВОЕ: стартовые деньги 3500 уе
+        
+        // Предыстория
+        state.backstory = '';
+        
+        // Навыки
+        state.skills = [];
+        state.professionalSkills = [];
+        state.bargainEnabled = true;
+        
+        // Дека с новыми характеристиками
+        state.deck = {
+            name: 'Newby-серия',
+            operative: '',
+            grid: '4',        // НОВОЕ: Сетка 4
+            memory: '4',      // НОВОЕ: Память 4
+            version: '10',    // НОВОЕ: Версия ПО 10
+            osVersion: ''     // НОВОЕ: Версия OS
+        };
+        
+        // ОЗУ деки
+        state.deckRam = {
+            current: 3,       // НОВОЕ: ОЗУ 3
+            max: 3
+        };
+        
+        // Снаряжение
+        state.gear = [];
+        
+        // Оружие
+        state.weapons = [];
+        
+        // Боеприпасы
+        state.ammo = [];
+        
+        // Программы деки
+        state.deckPrograms = [];
+        
+        // Коллекция дек
+        state.decks = [];
+        
+        // Снаряжение для дек
+        state.deckGear = [];
+        
+        // Модули оружия
+        state.weaponModules = [];
+        
+        // Имущество
+        state.property = {
+            vehicles: [],
+            realEstate: []
+        };
+        
+        // Добавляем стартовый транспорт - Компактный Микромобиль
+        state.property.vehicles.push({
+            id: 'default-vehicle',
+            name: "Компактный Микромобиль",
+            description: "Обычный городской автомобиль для одинокого человека на обычном двигателе.",
+            hp: 50,
+            currentHp: 50,
+            seats: 1,
+            mechanicalSpeed: 20,
+            narrativeSpeed: "160 км/ч",
+            price: 15000,
+            catalogPrice: 15000,
+            purchasePrice: 0, // Бесплатно для пользователя
+            category: "ground",
+            modules: [],
+            isDefault: true,
+            itemType: 'free_default'
+        });
+        
+        // Препараты
+        state.drugs = [];
+        
+        // Нагрузка
+        state.load = {
+            current: 0,
+            max: 25
+        };
+        
+        // Скупщик
+        state.fenceShop = {
+            itemPrices: {}
+        };
+        
+        // Лог бросков
+        state.rollLog = [];
+        
+        // Заметки
+        state.notes = '';
+        
+        // Критические травмы
+        state.criticalInjuries = [];
+        
+        // Щепки памяти
+        state.deckChips = [];
+        
+        // Имплантаты
+        state.implants = [];
+        
+        // Недвижимость
+        state.housing = [];
+        
+        // Обновляем отображение
+        updateAllDisplays();
+        
+        // Сохраняем
+        scheduleSave();
+        
+        showModal('Данные очищены', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 0.5rem;">✓ Все данные очищены!</p>
+                <p style="color: var(--text); font-size: 0.9rem;">
+                    Персонаж сброшен к начальным значениям.
+                </p>
+                <p style="color: var(--muted); font-size: 0.8rem; margin-top: 0.5rem;">
+                    Стартовые деньги: <strong>3500 уе</strong><br>
+                    Дека: ОЗУ 3, Память 4, Сетка 4, версия ПО 10<br>
+                    Характеристики равны <strong>5</strong><br>
+                    Транспорт: <strong>Компактный Микромобиль</strong>
+                </p>
+            </div>
+        `);
+        
+    } catch (error) {
+        console.error('Ошибка при очистке данных:', error);
+        showModal('Ошибка очистки', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при очистке!</p>
+                <p style="color: var(--text); font-size: 0.9rem;">
+                    Не удалось очистить данные. Попробуйте ещё раз.
+                </p>
+                </div>
+        `);
+    }
+}
+
+// Обновление всех отображений
+function updateAllDisplays() {
+    // Обновляем основные характеристики
+    updateDerivedStats();
+    calculateAndUpdateHealth();
+    updateAwarenessMax();
+    
+    // Обновляем снаряжение и оружие
+    renderGear();
+    renderWeapons();
+    renderAmmo();
+    renderDeckPrograms();
+    renderDeckChips();
+    updateDeckDisplay();
+    renderVehicles();
+    renderDrugs();
+    renderHousing();
+    renderImplants();
+    renderCriticalInjuries();
+    
+    // Обновляем навыки
+    renderSkills();
+    renderProfessionalSkills();
+    
+    // Обновляем деньги и нагрузку
+    updateMoneyDisplay();
+    updateLoadDisplay();
+    
+    // Обновляем лог
+    renderRollLog();
+}
+
+// Функция обновления OS версии деки
+function updateDeckOsVersion(deckId, osVersion) {
+    if (deckId === 'main') {
+        state.deck.osVersion = osVersion;
+    } else {
+        const deck = state.decks.find(d => d.id == deckId);
+        if (deck) {
+            deck.osVersion = osVersion;
+        }
+    }
+    
+    scheduleSave();
+}
+
+// Функция броска инициативы
+function rollInitiative() {
+    // Получаем значение характеристики РЕА
+    const reactionValue = parseInt(document.getElementById('statREA').value) || 0;
+    
+    // Получаем модификатор от пользователя
+    const modifierValue = document.getElementById('initiativeModifier').value || '0';
+    const modifier = parseInt(modifierValue) || 0;
+    
+    // Показываем модальное окно с броском
+    showModal('Бросок Инициативы', 
+        `<div style="text-align: center; padding: 1rem;">
+            <div style="font-size: 1.2rem; margin-bottom: 1rem; color: var(--accent);">🎯 Бросок Инициативы</div>
+            <div id="initiativeDiceAnimation" style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <div id="initiativeDice1" class="dice rolling" style="animation: roll 1.5s ease-in-out;">?</div>
+                <div id="initiativeDice2" class="dice rolling" style="animation: roll 1.5s ease-in-out;">?</div>
+                <div id="initiativeD4" class="d4-triangle" style="display: none;"></div>
+            </div>
+            <div id="initiativeFormula" style="color: var(--muted); font-size: 0.9rem; text-align: center; margin-bottom: 0.5rem; display: none;"></div>
+            <div id="initiativeDiceRoll" style="font-size: 1rem; margin-bottom: 1rem;">
+                Бросаем кубики...
+        </div>
+            <div style="font-size: 0.9rem; color: var(--muted);">
+                РЕА: ${reactionValue} + Модификатор: ${modifier}
+            </div>
+        </div>`,
+        [
+            {
+                text: 'Закрыть',
+                class: 'primary-button',
+                onclick: 'closeModal(this)'
+            }
+        ]
+    );
+    
+    // Анимация броска кубиков
+    setTimeout(() => {
+        // Бросаем 2d6
+        const dice = rollDice(2, 6);
+        const dice1 = dice[0];
+        const dice2 = dice[1];
+        const diceTotal = dice1 + dice2;
+        
+        // Рассчитываем итоговый результат
+        let totalResult = diceTotal + reactionValue + modifier;
+        let d4Value = null;
+        let d4Type = null; // 'penalty' или 'bonus'
+        
+        // Специальные правила для инициативы:
+        if (dice1 === 1 && dice2 === 1) {
+            // Двойные единицы - критический провал
+            totalResult = 'КРИТИЧЕСКИЙ ПРОВАЛ';
+        } else if (dice1 === 6 && dice2 === 6) {
+            // Двойные шестерки - критический успех
+            totalResult = 'КРИТИЧЕСКИЙ УСПЕХ';
+        } else if (dice1 === 1 || dice2 === 1) {
+            // Есть единица на одном из D6 - вычитаем 1d4
+            d4Value = rollDice(1, 4)[0];
+            d4Type = 'penalty';
+            totalResult -= d4Value;
+        } else if (dice1 === 6 || dice2 === 6) {
+            // Есть шестерка на одном из D6 - добавляем 1d4
+            d4Value = rollDice(1, 4)[0];
+            d4Type = 'bonus';
+            totalResult += d4Value;
+        }
+        
+        // Показываем анимацию кубиков
+        showInitiativeDiceAnimation(dice1, dice2, totalResult, reactionValue, modifier, d4Value, d4Type);
+        
+        // Обновляем отображение результата на кнопке
+        const resultElement = document.getElementById('initiativeResult');
+        resultElement.innerHTML = `${totalResult}`;
+        
+        // Добавляем запись в лог бросков
+        addToRollLog('initiative', {
+            dice1: dice1,
+            dice2: dice2,
+            reaction: reactionValue,
+            modifier: modifier,
+            d4Value: d4Value,
+            d4Type: d4Type,
+            total: totalResult
+        });
+        
+        // Добавляем визуальный эффект на кнопку
+        const button = document.querySelector('.initiative-compact');
+        button.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+            button.style.transform = '';
+        }, 150);
+        
+    }, 1000); // Задержка для анимации
+}
+
+// Функция анимации броска кубиков для инициативы
+function showInitiativeDiceAnimation(dice1, dice2, totalResult, reactionValue, modifier, d4Value, d4Type) {
+    const diceAnimation = document.getElementById('initiativeDiceAnimation');
+    const dice1Element = document.getElementById('initiativeDice1');
+    const dice2Element = document.getElementById('initiativeDice2');
+    const d4Element = document.getElementById('initiativeD4');
+    const resultElement = document.getElementById('initiativeDiceRoll');
+    const formulaElement = document.getElementById('initiativeFormula');
+    
+    if (diceAnimation) diceAnimation.style.display = 'flex';
+    if (resultElement) {
+        resultElement.textContent = 'Рассчитываем';
+        resultElement.classList.add('loading-dots');
+    }
+    
+    // Скрываем формулу сначала
+    if (formulaElement) {
+        formulaElement.style.display = 'none';
+    }
+    
+    // Скрываем d4 сначала
+    if (d4Element) {
+        d4Element.style.display = 'none';
+        d4Element.classList.remove('rolling');
+    }
+    
+    // Основная анимация d6 - 1.2 секунды
+    const mainDuration = 1200;
+    const interval = 80;
+    let currentTime = 0;
+    
+    const animateDice = () => {
+        if (currentTime < mainDuration) {
+            // Показываем случайные числа во время анимации
+            if (dice1Element) dice1Element.textContent = Math.floor(Math.random() * 6) + 1;
+            if (dice2Element) dice2Element.textContent = Math.floor(Math.random() * 6) + 1;
+            
+            currentTime += interval;
+            setTimeout(animateDice, interval);
+        } else {
+            // Показываем финальные результаты
+            if (dice1Element) {
+                dice1Element.textContent = dice1;
+                dice1Element.classList.remove('rolling');
+            }
+            if (dice2Element) {
+                dice2Element.textContent = dice2;
+                dice2Element.classList.remove('rolling');
+            }
+            
+            // Показываем d4 если нужно
+            if (d4Value && d4Element) {
+                setTimeout(() => {
+                    d4Element.style.display = 'block';
+                    d4Element.classList.add('rolling');
+                    d4Element.textContent = d4Value;
+                    
+                    // Устанавливаем правильный класс и позицию в зависимости от типа
+                    if (d4Type === 'penalty') {
+                        // Штраф (выпадение 1) - красный кубик слева
+                        d4Element.classList.remove('d4-bonus');
+                        d4Element.classList.add('d4-penalty');
+                        d4Element.style.order = '-1'; // Размещаем слева от d6 кубиков
+                    } else {
+                        // Бонус (выпадение 6) - зеленый кубик справа
+                        d4Element.classList.remove('d4-penalty');
+                        d4Element.classList.add('d4-bonus');
+                        d4Element.style.order = '1'; // Размещаем справа от d6 кубиков
+                    }
+                    
+                    // Анимация d4
+                    setTimeout(() => {
+                        d4Element.classList.remove('rolling');
+                    }, 800);
+                }, 200);
+            }
+            
+            // Показываем результат
+            setTimeout(() => {
+                if (resultElement) {
+                    resultElement.classList.remove('loading-dots');
+                    
+                    if (typeof totalResult === 'string') {
+                        // Критический результат
+                        resultElement.innerHTML = `
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--danger); margin-bottom: 0.5rem;">
+                                ${totalResult}
+            </div>
+                        `;
+                    } else {
+                        // Обычный результат
+                        const modifierStr = modifier >= 0 ? `+${modifier}` : `${modifier}`;
+                        const d4Str = d4Value ? (d4Type === 'penalty' ? `-${d4Value}` : `+${d4Value}`) : '';
+                        
+                        resultElement.innerHTML = `
+                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent); margin-bottom: 0.5rem;">
+                                Результат: ${totalResult}
+                </div>
+                            <div style="font-size: 0.9rem; color: var(--text);">
+                                2d6: ${dice1} + ${dice2} = ${dice1 + dice2}<br>
+                                + РЕА (${reactionValue}) + Мод (${modifier})${d4Str} = <strong>${totalResult}</strong>
         </div>
     `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
+                    }
+                }
+                
+                // Показываем формулу
+                if (formulaElement) {
+                    const modifierStr = modifier >= 0 ? `+${modifier}` : `${modifier}`;
+                    const d4Str = d4Value ? (d4Type === 'penalty' ? `-${d4Value}` : `+${d4Value}`) : '';
+                    const formula = `${reactionValue}${modifierStr}+${dice1}+${dice2}${d4Str} = ${totalResult}`;
+                    formulaElement.textContent = formula;
+                    formulaElement.style.display = 'block';
+                }
+            }, d4Value ? 1000 : 500);
         }
-    });
+    };
+    
+    animateDice();
+}
+
+// Функция удаления программы из деки безвозвратно
+function removeProgramFromDeck(deckId, programIndex) {
+    // Находим программы для конкретной деки
+    const programsOnDeck = state.deckPrograms.filter(program => program.installedDeckId == deckId);
+    
+    if (programIndex >= programsOnDeck.length) {
+        showModal('Ошибка', 'Программа не найдена!');
+        return;
+    }
+    
+    const programToRemove = programsOnDeck[programIndex];
+    
+    // Показываем подтверждение удаления
+    showModal('Подтвердите удаление', 
+        `Вы уверены, что хотите безвозвратно удалить программу "${programToRemove.name}"?<br><br>
+        <div style="color: var(--danger); font-size: 0.9rem; margin-top: 0.5rem;">
+            ⚠️ Программа будет удалена навсегда и не может быть восстановлена!
+        </div>`,
+        [
+            {
+                text: 'Отмена',
+                class: 'secondary-button',
+                onclick: 'closeModal(this)'
+            },
+            {
+                text: 'Удалить',
+                class: 'danger-button',
+                onclick: `confirmRemoveProgramFromDeck('${deckId}', ${programIndex})`
+            }
+        ]
+    );
+}
+
+// Функция подтверждения удаления программы
+function confirmRemoveProgramFromDeck(deckId, programIndex) {
+    // Находим программы для конкретной деки
+    const programsOnDeck = state.deckPrograms.filter(program => program.installedDeckId == deckId);
+    
+    if (programIndex >= programsOnDeck.length) {
+        showModal('Ошибка', 'Программа не найдена!');
+        return;
+    }
+    
+    const programToRemove = programsOnDeck[programIndex];
+    
+    // Удаляем программу из массива
+    const programIndexInGlobalArray = state.deckPrograms.findIndex(program => 
+        program.installedDeckId == deckId && 
+        program.name === programToRemove.name &&
+        program.description === programToRemove.description
+    );
+    
+    if (programIndexInGlobalArray !== -1) {
+        state.deckPrograms.splice(programIndexInGlobalArray, 1);
+        
+        // Закрываем модальное окно подтверждения
+        closeModal(document.querySelector('.modal-overlay:last-child'));
+        
+        // Показываем сообщение об успешном удалении
+        showModal('Программа удалена', `Программа "${programToRemove.name}" была безвозвратно удалена с деки.`);
+        
+        // Обновляем отображение
+        scheduleSave();
+        renderDeckCollection();
+        updateDeckDisplay();
+    } else {
+        showModal('Ошибка', 'Не удалось найти программу для удаления!');
+    }
 }

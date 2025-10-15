@@ -637,7 +637,7 @@ input[type="number"]::-moz-number-spin-down {
     font-size: 1.2rem;
 }
 
-/* Треугольники d4 */
+/* Общий класс для d4 треугольников */
 .d4-triangle {
     width: 40px;
     height: 40px;
@@ -647,8 +647,30 @@ input[type="number"]::-moz-number-spin-down {
     font-weight: bold;
     font-size: 1.2rem;
     position: relative;
-    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    clip-path: polygon(50% 10%, 10% 90%, 90% 90%);
     border-radius: 4px;
+    margin: 0 0.25rem;
+    text-align: center;
+    line-height: 1;
+}
+
+/* Специальный d4 треугольник для инициативы */
+#initiativeD4.d4-triangle {
+    width: 40px;
+    height: 40px;
+    display: flex !important; /* Принудительно устанавливаем flex */
+    align-items: flex-end !important; /* Выравниваем по нижнему краю */
+    justify-content: center !important;
+    font-weight: bold;
+    font-size: 1.2rem;
+    position: relative;
+    clip-path: polygon(50% 10%, 10% 90%, 90% 90%);
+    border-radius: 4px;
+    margin: 0 0.25rem;
+    text-align: center;
+    line-height: 1;
+    padding-top: 0;
+    padding-bottom: 8px; /* Отступ снизу для красивого позиционирования */
 }
 
 .d4-penalty {
@@ -3438,4 +3460,232 @@ select.input-field option:checked {
         grid-template-columns: repeat(2, 1fr);
         gap: 0.1rem;
     }
+}
+
+/* Стили для выпадающих списков */
+select {
+    background: var(--bg-primary) !important;
+    border: 2px solid var(--accent) !important;
+    border-radius: 8px !important;
+    color: var(--text) !important;
+    font-size: 1rem !important;
+    padding: 0.75rem !important;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+select:hover {
+    border-color: #9d4edd !important;
+    box-shadow: 0 0 15px rgba(138, 43, 226, 0.5) !important;
+}
+
+select:focus {
+    outline: none !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 20px rgba(138, 43, 226, 0.7) !important;
+}
+
+/* Стили для опций в выпадающих списках */
+select option {
+    background: #250f5c !important;
+    color: var(--text) !important;
+    padding: 0.5rem !important;
+    border: none !important;
+}
+
+select option:hover {
+    background: rgba(138, 43, 226, 0.4) !important;
+}
+
+select option:checked {
+    background: var(--accent) !important;
+    color: white !important;
+}
+
+/* Стили для выпадающих списков в модалах */
+.modal select {
+    background: var(--bg-primary) !important;
+    border: 2px solid var(--accent) !important;
+    border-radius: 8px !important;
+    color: var(--text) !important;
+    font-size: 1rem !important;
+    padding: 0.75rem !important;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.3) !important;
+    width: 100% !important;
+}
+
+.modal select option {
+    background: #250f5c!important;
+    color: var(--text) !important;
+    padding: 0.5rem !important;
+}
+
+/* Стили для выпадающих списков в полях */
+.field select {
+    background: var(--bg-primary) !important;
+    border: 2px solid var(--accent) !important;
+    border-radius: 8px !important;
+    color: var(--text) !important;
+    font-size: 1rem !important;
+    padding: 0.75rem !important;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.3) !important;
+    width: 100% !important;
+}
+
+.field select option {
+    background: #250f5c!important;
+    color: var(--text) !important;
+    padding: 0.5rem !important;
+}
+
+/* Стили для выпадающих списков в карточках */
+.property-item select {
+    background: var(--bg-primary) !important;
+    border: 2px solid var(--accent) !important;
+    border-radius: 8px !important;
+    color: var(--text) !important;
+    font-size: 1rem !important;
+    padding: 0.75rem !important;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.3) !important;
+    width: 100% !important;
+}
+
+.property-item select option {
+    background: #250f5c!important;
+    color: var(--text) !important;
+    padding: 0.5rem !important;
+}
+
+/* Стили для выпадающих списков в поп-апах выбора деки */
+.modal-overlay select {
+    background: var(--bg-primary) !important;
+    border: 2px solid var(--accent) !important;
+    border-radius: 8px !important;
+    color: var(--text) !important;
+    font-size: 1rem !important;
+    padding: 0.75rem !important;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.3) !important;
+    width: 100% !important;
+}
+
+.modal-overlay select option {
+    background: #250f5c!important;
+    color: var(--text) !important;
+    padding: 0.5rem !important;
+}
+
+/* Стили для выпадающих списков в магазинах */
+.modal-body select {
+    background: var(--bg-primary) !important;
+    border: 2px solid var(--accent) !important;
+    border-radius: 8px !important;
+    color: var(--text) !important;
+    font-size: 1rem !important;
+    padding: 0.75rem !important;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.3) !important;
+    width: 100% !important;
+}
+
+.modal-body select option {
+    background: #250f5c!important;
+    color: var(--text) !important;
+    padding: 0.5rem !important;
+}
+
+/* Стили для выпадающих списков в окнах установки */
+.modal select[id*="deckSelect"],
+.modal select[id*="programInstallTarget"],
+.modal select[id*="programDeckSelect"] {
+    background: var(--bg-primary) !important;
+    border: 2px solid var(--accent) !important;
+    border-radius: 8px !important;
+    color: var(--text) !important;
+    font-size: 1rem !important;
+    padding: 0.75rem !important;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.3) !important;
+    width: 100% !important;
+}
+
+.modal select[id*="deckSelect"] option,
+.modal select[id*="programInstallTarget"] option,
+.modal select[id*="programDeckSelect"] option {
+    background: #250f5c!important;
+    color: var(--text) !important;
+    padding: 0.5rem !important;
+}
+
+/* Стили для компактной кнопки "Бросок Инициативы" */
+.initiative-compact {
+    background: linear-gradient(135deg, rgba(58, 44, 247, 0.08), rgba(182, 103, 255, 0.05));
+    border: 1px solid rgba(58, 44, 247, 0.2);
+    border-radius: 8px;
+    padding: 0.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.initiative-compact:hover {
+    border-color: rgba(58, 44, 247, 0.4);
+    background: linear-gradient(135deg, rgba(58, 44, 247, 0.12), rgba(182, 103, 255, 0.08));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(58, 44, 247, 0.15);
+}
+
+.initiative-icon-compact {
+    width: 35px;
+    height: 35px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.initiative-text-compact {
+    flex: 1;
+    text-align: left;
+}
+
+.initiative-title-compact {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 0.1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.initiative-result-compact {
+    font-size: 0.6rem;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.initiative-modifier-compact {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    min-width: 50px;
+}
+
+.initiative-modifier-label {
+    font-size: 0.5rem;
+    color: var(--accent);
+    font-weight: 600;
+    text-align: center;
+}
+
+.initiative-modifier-input {
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--text);
+    padding: 0.2rem 0.3rem;
+    font-size: 0.7rem;
+    text-align: center;
+    width: 100%;
+    max-width: 40px;
 }

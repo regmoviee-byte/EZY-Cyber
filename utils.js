@@ -28,6 +28,38 @@ function loadState() {
                 console.log('No avatar found in localStorage');
             }
         }
+        
+        // Добавляем стартовый транспорт, если его нет
+        if (!state.property || !state.property.vehicles || state.property.vehicles.length === 0) {
+            if (!state.property) {
+                state.property = { vehicles: [], realEstate: [] };
+            }
+            if (!state.property.vehicles) {
+                state.property.vehicles = [];
+            }
+            
+            // Добавляем стартовый транспорт - Компактный Микромобиль
+            state.property.vehicles.push({
+                id: 'default-vehicle',
+                name: "Компактный Микромобиль",
+                description: "Обычный городской автомобиль для одинокого человека на обычном двигателе.",
+                hp: 50,
+                currentHp: 50,
+                seats: 1,
+                mechanicalSpeed: 20,
+                narrativeSpeed: "160 км/ч",
+                price: 15000,
+                catalogPrice: 15000,
+                purchasePrice: 0, // Бесплатно для пользователя
+                category: "ground",
+                modules: [],
+                isDefault: true,
+                itemType: 'free_default'
+            });
+            
+            console.log('Добавлен стартовый транспорт: Компактный Микромобиль');
+        }
+        
         updateUIFromState();
         
         // Загружаем профессиональные навыки и заметки
@@ -549,5 +581,24 @@ function showAlertModal(title, message) {
 
 // Алиас для showModal (используем window для глобальной области видимости)
 window.showModal = showAlertModal;
+
+// ============================================================================
+// СИСТЕМА ТОРГА ПРИ ПОКУПКЕ
+// ============================================================================
+
+// Проверяет, доступен ли торг (есть навык и он включён)
+function canBargain() {
+    // Проверяем наличие навыка "Торг"
+    const bargainSkill = state.skills.find(s => s.name === 'Торг' || (s.customName && s.customName === 'Торг'));
+    
+    // Торг доступен если: есть навык, уровень > 0, и торг включён
+    const result = bargainSkill && bargainSkill.level > 0 && state.bargainEnabled;
+    console.log('canBargain():', { 
+        bargainSkill: bargainSkill ? { name: bargainSkill.name, level: bargainSkill.level } : null,
+        bargainEnabled: state.bargainEnabled,
+        result 
+    });
+    return result;
+}
 
 console.log('Utils.js loaded - вспомогательные функции загружены');
