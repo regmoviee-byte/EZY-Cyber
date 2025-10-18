@@ -7,10 +7,19 @@ console.log('🚀 bargain-purchase.js загружается...');
 
 // Показывает выбор: поторговаться или купить сразу
 function showPurchaseBargainChoice(itemName, originalPrice, onBargain, onBuyNow) {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     
     modal.innerHTML = `
         <div class="modal" style="max-width: 500px;">
@@ -19,10 +28,10 @@ function showPurchaseBargainChoice(itemName, originalPrice, onBargain, onBuyNow)
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1rem;">
-                    Цена <strong>${itemName}</strong>: <strong style="color: var(--accent);">${originalPrice} уе</strong>
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">
+                    Цена <strong>${itemName}</strong>: <strong style="color: ${getThemeColors().accent};">${originalPrice} уе</strong>
                 </p>
-                <p style="color: var(--text); margin-bottom: 1.5rem;">
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1.5rem;">
                     У вас есть навык <strong>Торг</strong>. Хотите попробовать договориться о лучшей цене?
                 </p>
                 <div style="display: flex; gap: 1rem;">
@@ -55,10 +64,19 @@ function showPurchaseBargainChoice(itemName, originalPrice, onBargain, onBuyNow)
 
 // Начинает процесс торга (бросок СЛ мастером)
 function startPurchaseBargaining(itemName, originalPrice, onSuccess) {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     
     modal.innerHTML = `
         <div class="modal" style="max-width: 600px;">
@@ -67,7 +85,7 @@ function startPurchaseBargaining(itemName, originalPrice, onSuccess) {
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1rem;">
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">
                     Мастер должен бросить <strong>2d10</strong> для определения Сложности (СЛ) торга.
                 </p>
                 
@@ -75,7 +93,7 @@ function startPurchaseBargaining(itemName, originalPrice, onSuccess) {
                     <button class="pill-button primary-button" onclick="rollPurchaseDifficulty()" style="width: 100%;">
                         🎲 Бросить 2d10 для СЛ
                     </button>
-                    <div id="purchaseDifficultyResult" style="margin-top: 0.5rem; text-align: center; font-size: 1.2rem; font-weight: 600; color: var(--accent);"></div>
+                    <div id="purchaseDifficultyResult" style="margin-top: 0.5rem; text-align: center; font-size: 1.2rem; font-weight: 600; color: ${getThemeColors().accent};"></div>
                 </div>
                 
                 <div style="margin-bottom: 1.5rem;">
@@ -166,14 +184,23 @@ function performPurchaseBargainCheck(itemName, originalPrice, onSuccess) {
 function showPurchaseBargainResult(itemName, originalPrice, checkData, onSuccess) {
     const { bargainLevel, dice, diceTotal, checkResult, difficulty, success } = checkData;
     
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
     
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
+    
     const resultText = success 
-        ? `<div style="color: var(--success); font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">✓ УСПЕХ!</div>`
-        : `<div style="color: var(--danger); font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">✗ ПРОВАЛ</div>`;
+        ? `<div style="color: ${getThemeColors().success}; font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">✓ УСПЕХ!</div>`
+        : `<div style="color: ${getThemeColors().danger}; font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">✗ ПРОВАЛ</div>`;
     
     modal.innerHTML = `
         <div class="modal" style="max-width: 600px;">
@@ -183,16 +210,16 @@ function showPurchaseBargainResult(itemName, originalPrice, checkData, onSuccess
             </div>
             <div class="modal-body">
                 ${resultText}
-                <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-family: monospace;">
+                <div style="background: ${getThemeColors().bgLight}; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-family: monospace;">
                     <div>Торг (${bargainLevel}) + 2d6 (${dice[0]} + ${dice[1]} = ${diceTotal}) = <strong>${checkResult}</strong></div>
                     <div>СЛ: <strong>${difficulty}</strong></div>
-                    <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border);">
+                    <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid ${getThemeColors().border};">
                         Результат: ${checkResult} ${success ? '>' : '≤'} ${difficulty}
                     </div>
                 </div>
                 
                 ${success ? `
-                    <p style="color: var(--text); margin-bottom: 1rem;">
+                    <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">
                         Теперь укажите уровень вашего профессионального навыка <strong>Решала</strong>:
                     </p>
                     
@@ -201,7 +228,7 @@ function showPurchaseBargainResult(itemName, originalPrice, checkData, onSuccess
                         <input type="number" class="input-field" id="purchaseFixerLevel" placeholder="Уровень" min="1" max="10" value="1">
                     </div>
                     
-                    <div style="margin-bottom: 1rem; padding: 1rem; background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; font-size: 0.85rem;">
+                    <div style="margin-bottom: 1rem; padding: 1rem; background: ${getThemeColors().successLight}; border: 1px solid ${getThemeColors().success}; border-radius: 8px; font-size: 0.85rem;">
                         <strong>Скидка по уровню Решалы:</strong><br>
                         1-2: 10% | 3-4: 20% | 5-6: 30% | 7: 40% | 8-9: 50% | 10: 100% (бесплатно!)
                     </div>
@@ -210,7 +237,7 @@ function showPurchaseBargainResult(itemName, originalPrice, checkData, onSuccess
                         Рассчитать итоговую цену
                     </button>
                 ` : `
-                    <p style="color: var(--text); margin-bottom: 1.5rem;">
+                    <p style="color: ${getThemeColors().text}; margin-bottom: 1.5rem;">
                         Продавец отказывается снижать цену. Вы покупаете по полной стоимости: <strong>${originalPrice} уе</strong>
                     </p>
                     
@@ -275,10 +302,19 @@ function showPurchaseSuccess(itemName, originalPrice, finalPrice, discount, fixe
     const savedAmount = originalPrice - finalPrice;
     const discountPercent = (discount * 100).toFixed(0);
     
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     
     modal.innerHTML = `
         <div class="modal" style="max-width: 500px;">
@@ -287,21 +323,21 @@ function showPurchaseSuccess(itemName, originalPrice, finalPrice, discount, fixe
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body">
-                <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                    <p style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">✓ Вы успешно договорились о скидке!</p>
-                    <div style="color: var(--text); font-size: 0.9rem;">
+                <div style="background: ${getThemeColors().successLight}; border: 1px solid ${getThemeColors().success}; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                    <p style="color: ${getThemeColors().success}; font-weight: 600; margin-bottom: 0.5rem;">✓ Вы успешно договорились о скидке!</p>
+                    <div style="color: ${getThemeColors().text}; font-size: 0.9rem;">
                         <div>Исходная цена: ${originalPrice} уе</div>
                         <div>Уровень Решалы: ${fixerLevel}</div>
                         <div>Скидка: -${discountPercent}%</div>
-                        <div style="font-weight: 600; margin-top: 0.5rem; font-size: 1.1rem; color: var(--success);">
+                        <div style="font-weight: 600; margin-top: 0.5rem; font-size: 1.1rem; color: ${getThemeColors().success};">
                             Итоговая цена: ${finalPrice} уе
                         </div>
-                        ${savedAmount > 0 ? `<div style="color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem;">Вы сэкономили: ${savedAmount} уе</div>` : ''}
+                        ${savedAmount > 0 ? `<div style="color: ${getThemeColors().muted}; font-size: 0.85rem; margin-top: 0.25rem;">Вы сэкономили: ${savedAmount} уе</div>` : ''}
                     </div>
                 </div>
                 
-                <p style="color: var(--text); margin-bottom: 1.5rem;">
-                    Купить <strong>${itemName}</strong> за <strong style="color: var(--success);">${finalPrice} уе</strong>?
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1.5rem;">
+                    Купить <strong>${itemName}</strong> за <strong style="color: ${getThemeColors().success};">${finalPrice} уе</strong>?
                 </p>
                 
                 <div style="display: flex; gap: 1rem;">
@@ -331,9 +367,8 @@ function showPurchaseSuccess(itemName, originalPrice, finalPrice, discount, fixe
 // Применяем обёртки после полной загрузки DOM
 // ============================================================================
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Применяем обёртки сразу
-    (function applyWrappers() {
+// Функция для применения обёрток
+(function applyWrappers() {
     // Обёртка для buyGear
     if (typeof buyGear !== 'undefined') {
         const _originalBuyGear = buyGear;
@@ -679,7 +714,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 );
             };
         }
-    })(); // Применяем обёртки сразу
-});
+})(); // Применяем обёртки сразу
 
 console.log('✅ bargain-purchase.js загружен - система торга при покупке готова');

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EZY: Cyber — Идеальный чарник v2.1</title>
+    <title>EZY: Cyber — Дизайн персонажа</title>
     <meta name="description" content="Интерактивный лист персонажа для настольной ролевой игры EZY: Cyber">
     
     <!-- Иконка сайта -->
@@ -12,7 +12,7 @@
     <link rel="apple-touch-icon" href="https://static.tildacdn.com/tild3037-6565-4133-b430-363832636466/IMG_8068.PNG">
     
     <!-- Подключение CSS стилей -->
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=20250103&modules-redesign=1">
 </head>
 <body>
     <!-- Заглушка для мобильных устройств -->
@@ -34,7 +34,7 @@
 
     <!-- Загрузочный экран -->
     <div class="loading-screen" id="loadingScreen">
-        <div class="loading-logo">EZY: CYBER // HUMAN_DESIGN [БАРЫГА И ДЕКА v0.93.18764]</div>
+        <div class="loading-logo">EZY: CYBER // HUMAN_DESIGN [ПОЧТИRELEASE v0.99.999999]</div>
         <div class="loading-log" id="loadingLog">
             <div class="loading-log-item" id="logItem1"></div>
             <div class="loading-log-item" id="logItem2"></div>
@@ -55,6 +55,7 @@
             <div class="header-title"><img src="https://static.tildacdn.com/tild3037-6565-4133-b430-363832636466/IMG_8068.PNG" alt="🧬" style="width: 50px; height: 50px; margin-right: 0.5rem; vertical-align: middle;"> EZY: Cyber — Лист персонажа</div>
             <div class="header-controls">
                 <button class="pill-button primary-button" onclick="exportData()">💾 Сохранить персонажа</button>
+                <button class="pill-button muted-button" id="themeToggle" onclick="toggleTheme()" title="Переключить тему">🌙 СВЕТОВАЯ ПОШЛА</button>
                 <button class="pill-button muted-button" onclick="importData()">&#x27F2; Импорт JSON</button>
                 <button class="pill-button danger-button" onclick="clearAllData()">Очистить данные</button>
             </div>
@@ -70,11 +71,11 @@
                 </div>
                 <div class="section-content expanded">
                     <!-- Главная сетка: Аватар слева, информация в центре -->
-                    <div class="character-sheet-layout" style="display: grid; grid-template-columns: auto 1fr; gap: 2rem; margin-bottom: 1.5rem;">
+                    <div class="character-sheet-layout">
                         <!-- Аватар, кнопки, здоровье и деньги -->
                         <div class="avatar-section">
-                            <div id="avatarDisplay" class="avatar-placeholder" style="width: 100%; height: 400px;">
-                                &#x1F916;
+                            <div id="avatarDisplay" class="avatar-placeholder">
+                                <!-- Аватар будет загружен здесь -->
                             </div>
                             <div class="avatar-controls">
                                 <label class="pill-button muted-button avatar-button">
@@ -85,91 +86,57 @@
                             </div>
                             
                             <!-- Пункты здоровья -->
-                            <div class="health-box" style="margin-top: 1rem; width: 100%; display: flex; flex-direction: column; align-items: center;">
-                                <div class="health-icon"><img src="https://static.tildacdn.com/tild6361-6133-4534-b338-616664333865/heart.png" alt="❤️" style="width: 24px; height: 24px;"></div>
-                                <div class="health-label" style="font-size: 0.7rem; text-align: center;">ПУНКТЫ ЗДОРОВЬЯ</div>
-                                <div class="health-values" style="display: flex; align-items: center; gap: 0.5rem; justify-content: center;">
-                                    <input type="text" class="health-input" id="healthCurrent" value="25" min="0" onchange="state.health.current = parseInt(this.value); scheduleSave();" style="width: 60px; text-align: center; padding: 0.5rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 1rem; font-weight: 600;">
-                                    <span class="health-separator" style="color: var(--text); font-size: 1rem; font-weight: 600;">/</span>
-                                    <input type="text" class="health-input" id="healthMax" value="38" readonly style="width: 60px; text-align: center; padding: 0.5rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 1rem; font-weight: 600;">
+                            <div class="health-box">
+                                <div class="health-icon"><img src="https://static.tildacdn.com/tild6361-6133-4534-b338-616664333865/heart.png" alt="❤️"></div>
+                                <div class="health-label">ПУНКТЫ ЗДОРОВЬЯ</div>
+                                <div class="health-values">
+                                    <input type="text" class="health-input" id="healthCurrent" value="25" min="0" onchange="state.health.current = parseInt(this.value); scheduleSave();">
+                                    <span class="health-separator">/</span>
+                                    <input type="text" class="health-input" id="healthMax" value="38" readonly>
                                 </div>
                             </div>
                             
                             <!-- YenEuro -->
-                            <div class="money-box" style="margin-top: 0.75rem; width: 100%;">
-                                <div class="money-icon"><img src="https://static.tildacdn.com/tild3939-6162-4633-a238-623334613265/photo.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"></div>
-                                <div class="money-label" style="font-size: 0.7rem;">YenEuro</div>
-                                <input type="text" class="money-input" id="money" value="0" onchange="state.money = parseInt(this.value.replace(/\\s+/g, '')) || 0; this.value = formatMoney(state.money); scheduleSave();" style="width: 100%; font-size: 1rem; padding: 0.5rem; text-align: center;">
-                                <button class="deposit-button" onclick="showDepositModal()" style="background: transparent; border: none; color: var(--accent); text-decoration: underline; font-size: 0.7rem; cursor: pointer; margin-top: 0.25rem; padding: 0;">Внести уе</button>
+                            <div class="money-box">
+                                <div class="money-icon"><img src="https://static.tildacdn.com/tild3939-6162-4633-a238-623334613265/photo.png" alt="💰"></div>
+                                <div class="money-label">YenEuro</div>
+                                <input type="text" class="money-input" id="money" value="0" onchange="state.money = parseInt(this.value.replace(/\\s+/g, '')) || 0; this.value = formatMoney(state.money); scheduleSave();">
+                                <button class="deposit-button" onclick="showDepositModal()">Внести уе</button>
                             </div>
                             
                             <!-- Репутация -->
-                            <div class="reputation-section" style="margin-top: 0.75rem; width: 100%;">
-                                <div class="reputation-label" style="font-size: 0.7rem; color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; text-align: center;">РЕПУТАЦИЯ</div>
-                                <div class="reputation-controls" style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
-                                    <input type="range" class="reputation-slider" id="reputationSlider" min="-10" max="10" value="0" oninput="state.reputation = parseInt(this.value); document.getElementById('reputationValue').textContent = this.value; updateReputationColor(); scheduleSave();" style="width: 100%;">
-                                    <div class="reputation-value" id="reputationValue" style="text-align: center; font-weight: 600; font-size: 1.2rem; color: white;">0</div>
+                            <div class="reputation-section">
+                                <div class="reputation-label">РЕПУТАЦИЯ</div>
+                                <div class="reputation-controls">
+                                    <input type="range" class="reputation-slider" id="reputationSlider" min="-10" max="10" value="0" oninput="state.reputation = parseInt(this.value); document.getElementById('reputationValue').textContent = this.value; updateReputationColor(); scheduleSave();">
+                                    <div class="reputation-value" id="reputationValue">0</div>
                                 </div>
                             </div>
                             
                             <!-- Профессиональные навыки -->
-                            <div class="professional-skills-section" style="margin-top: 0.75rem; width: 100%;">
-                                <div class="professional-skills-label" style="font-size: 0.7rem; color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; text-transform: uppercase; text-align: center;">ПРОФЕССИОНАЛЬНЫЕ НАВЫКИ</div>
-                                <div class="professional-skills-content" style="background: rgba(0,0,0,0.2); border: 1px solid rgba(182, 103, 255, 0.2); border-radius: 8px; padding: 0.5rem;">
-                                    <div class="professional-skills-header" style="display: grid; grid-template-columns: 1fr 60px; gap: 0.5rem; margin-bottom: 0.5rem; font-size: 0.6rem; color: var(--muted); text-transform: uppercase; font-weight: 600;">
-                                        <div>НАЗВАНИЕ</div>
-                                        <div style="text-align: center;">УРОВЕНЬ</div>
+                            <div class="professional-skills-section">
+                                <div class="professional-skills-label">ПРОФЕССИОНАЛЬНЫЕ НАВЫКИ</div>
+                                <div class="professional-skills-content">
+                                    <div id="professionalSkillsContainer" class="professional-skills-rows">
+                                        <!-- Слоты будут заполняться динамически через JS -->
                                     </div>
-                                    <div class="professional-skills-rows">
-                                        <div class="professional-skill-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.25rem; align-items: flex-start;">
-                                            <textarea class="professional-skill-name" id="professionalSkillName0" placeholder="Название навыка" onchange="updateProfessionalSkill(0, this.value, document.getElementById('professionalSkillLevel0').value);" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 3px; padding: 0.25rem; color: var(--text); font-size: 0.7rem; height: 1.5rem; resize: none; overflow: hidden; font-family: inherit; flex: 1;"></textarea>
-                                            <div class="integrated-numeric-input" style="width: 60px;">
-                                                <button class="integrated-numeric-btn" onclick="decreaseProfessionalSkillLevel(0)">-</button>
-                                                <input type="text" class="integrated-numeric-field" id="professionalSkillLevel0" value="0" min="0" max="15" onchange="updateProfessionalSkill(0, document.getElementById('professionalSkillName0').value, this.value);" style="font-size: 0.7rem;">
-                                                <button class="integrated-numeric-btn" onclick="increaseProfessionalSkillLevel(0)">+</button>
-                                            </div>
-                                        </div>
-                                        <div class="professional-skill-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.25rem; align-items: flex-start;">
-                                            <textarea class="professional-skill-name" id="professionalSkillName1" placeholder="Название навыка" onchange="updateProfessionalSkill(1, this.value, document.getElementById('professionalSkillLevel1').value);" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 3px; padding: 0.25rem; color: var(--text); font-size: 0.7rem; height: 1.5rem; resize: none; overflow: hidden; font-family: inherit; flex: 1;"></textarea>
-                                            <div class="integrated-numeric-input" style="width: 60px;">
-                                                <button class="integrated-numeric-btn" onclick="decreaseProfessionalSkillLevel(1)">-</button>
-                                                <input type="text" class="integrated-numeric-field" id="professionalSkillLevel1" value="0" min="0" max="15" onchange="updateProfessionalSkill(1, document.getElementById('professionalSkillName1').value, this.value);" style="font-size: 0.7rem;">
-                                                <button class="integrated-numeric-btn" onclick="increaseProfessionalSkillLevel(1)">+</button>
-                                            </div>
-                                        </div>
-                                        <div class="professional-skill-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.25rem; align-items: flex-start;">
-                                            <textarea class="professional-skill-name" id="professionalSkillName2" placeholder="Название навыка" onchange="updateProfessionalSkill(2, this.value, document.getElementById('professionalSkillLevel2').value);" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 3px; padding: 0.25rem; color: var(--text); font-size: 0.7rem; height: 1.5rem; resize: none; overflow: hidden; font-family: inherit; flex: 1;"></textarea>
-                                            <div class="integrated-numeric-input" style="width: 60px;">
-                                                <button class="integrated-numeric-btn" onclick="decreaseProfessionalSkillLevel(2)">-</button>
-                                                <input type="text" class="integrated-numeric-field" id="professionalSkillLevel2" value="0" min="0" max="15" onchange="updateProfessionalSkill(2, document.getElementById('professionalSkillName2').value, this.value);" style="font-size: 0.7rem;">
-                                                <button class="integrated-numeric-btn" onclick="increaseProfessionalSkillLevel(2)">+</button>
-                                            </div>
-                                        </div>
-                                        <div class="professional-skill-row" style="display: flex; gap: 0.5rem; align-items: flex-start;">
-                                            <textarea class="professional-skill-name" id="professionalSkillName3" placeholder="Название навыка" onchange="updateProfessionalSkill(3, this.value, document.getElementById('professionalSkillLevel3').value);" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 3px; padding: 0.25rem; color: var(--text); font-size: 0.7rem; height: 1.5rem; resize: none; overflow: hidden; font-family: inherit; flex: 1;"></textarea>
-                                            <div class="integrated-numeric-input" style="width: 60px;">
-                                                <button class="integrated-numeric-btn" onclick="decreaseProfessionalSkillLevel(3)">-</button>
-                                                <input type="text" class="integrated-numeric-field" id="professionalSkillLevel3" value="0" min="0" max="15" onchange="updateProfessionalSkill(3, document.getElementById('professionalSkillName3').value, this.value);" style="font-size: 0.7rem;">
-                                                <button class="integrated-numeric-btn" onclick="increaseProfessionalSkillLevel(3)">+</button>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <button class="pill-button primary-button" onclick="showProfessionalSkillsModal()">+ Добавить навык</button>
                                 </div>
                             </div>
                         </div>
                         
                         <!-- Центральная секция с характеристиками -->
-                        <div class="character-stats-section" style="display: flex; flex-direction: column; gap: 1rem;">
+                        <div class="character-stats-section">
                             <!-- Имя персонажа -->
                             <div class="input-group">
                                 <label class="input-label">ИМЯ ПЕРСОНАЖА</label>
                                 <input type="text" class="input-field" id="characterName" placeholder="Введите имя" onchange="state.characterName = this.value; scheduleSave();">
                             </div>
                             
-                            <!-- Первая строка: ОЧКИ ОПЫТА, РОЛЕВЫЕ ОЧКИ, ОСОЗНАННОСТЬ, УМ, ЛВК -->
+                            <!-- ЕДИНЫЙ БЛОК: Все 15 характеристик -->
                             <div class="stats-grid-derived">
                                 <div class="input-group-compact">
-                                    <div class="input-label-compact">ОЧКИ ОПЫТА</div>
+                                    <div class="input-label-compact">Очки обучения</div>
                                     <input type="text" class="input-field-compact" id="experiencePoints" value="0" data-numeric="true" min="0" max="9999" onchange="state.experiencePoints = parseInt(this.value); scheduleSave();">
                                 </div>
                                 <div class="input-group-compact">
@@ -193,20 +160,17 @@
                                     <div class="stat-label-compact" title="Ловкость">ЛВК</div>
                                     <input type="text" class="stat-value-compact" id="statDEX" value="5" min="1" max="20" onchange="state.stats.DEX = parseInt(this.value); updateDerivedStats(); scheduleSave();">
                                 </div>
-                            </div>
-                            
-                            <!-- Вторая строка: ТЕЛО, ТЕХ, ХАР, РЕА, ВОЛЯ -->
-                            <div class="stats-grid-derived">
                                 <div class="stat-box-compact">
                                     <div class="stat-label-compact" title="Телосложение">ТЕЛО</div>
-                                    <input type="text" class="stat-value-compact" id="statBODY" value="5" min="1" max="20" onchange="state.stats.BODY = parseInt(this.value); calculateAndUpdateHealth(); updateDerivedStats(); scheduleSave();">
+                                    <input type="text" class="stat-value-compact" id="statBODY" value="5" min="1" max="20" onchange="state.stats.BODY = parseInt(this.value); calculateAndUpdateHealth(); updateDerivedStats(); if(typeof updateBikeDescription === 'function') updateBikeDescription(); scheduleSave();">
                                 </div>
                                 <div class="stat-box-compact">
                                     <div class="stat-label-compact" title="Техника">ТЕХ</div>
                                     <input type="text" class="stat-value-compact" id="statTECH" value="5" min="1" max="20" onchange="state.stats.TECH = parseInt(this.value); scheduleSave();">
+                                    <div id="techBonus" style="display: none;"></div>
                                 </div>
                                 <div class="stat-box-compact">
-                                    <div class="stat-label-compact" title="Харизма">ХАР</div>
+                                    <div class="stat-label-compact" title="Характер">ХАР</div>
                                     <input type="text" class="stat-value-compact" id="statCHA" value="5" min="1" max="20" onchange="state.stats.CHA = parseInt(this.value); scheduleSave();">
                                 </div>
                                 <div class="stat-box-compact">
@@ -216,13 +180,9 @@
                                 <div class="stat-dual-compact">
                                     <div class="stat-label-compact">ВОЛЯ</div>
                                     <div class="dual-values-compact">
-                                        <input type="text" class="dual-value-compact" id="statWILL" value="5" min="1" max="20" onchange="state.stats.WILL = parseInt(this.value); updateDerivedStats(); scheduleSave();">
+                                        <input type="text" class="dual-value-compact" id="statWILL" value="5" min="1" max="20" onchange="state.stats.WILL = parseInt(this.value); calculateAndUpdateHealth(); updateDerivedStats(); scheduleSave();">
                                     </div>
                                 </div>
-                            </div>
-                            
-                            <!-- Третья строка: ВОС, СКОРОСТЬ ПЕРЕМЕЩЕНИЯ, СКОРОСТЬ РУКОПАШНОЙ АТАКИ, УДАЧА -->
-                            <div class="stats-grid-derived">
                                 <div class="derived-stat-compact">
                                     <div class="derived-label-compact" title="Врождённая Останавливающая Сила (Броня)">ВОС</div>
                                     <div class="derived-value-compact" id="derivedArmor">2</div>
@@ -268,12 +228,35 @@
 
                             <!-- Предыстория -->
                             <div class="backstory-section" style="margin-top: 1rem;">
-                                <div class="backstory-header">
-                                    <div class="backstory-icon">&#x1F4C4;</div>
-                                    <div class="backstory-label">Предыстория персонажа</div>
-                                    <button class="pill-button primary-button" onclick="generateBackstory()">&#x1F3B2; Сгенерировать</button>
+                                <div class="backstory-header" style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div onclick="toggleBackstorySection()" style="cursor: pointer; user-select: none; display: flex; align-items: center;">
+                                        <div class="backstory-label">Предыстория персонажа</div>
+                                        <div id="backstoryToggleIcon" style="color: var(--muted); font-size: 0.8rem; margin-left: 0.3rem;">▼</div>
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        <button onclick="editAllBackstoryCards()" title="Редактировать все элементы" style="background: none; border: none; color: var(--text); padding: 0.25rem; cursor: pointer;">
+                                            <img src="https://static.tildacdn.com/tild3539-3065-4366-b139-656331356537/write.png" style="width: 16px; height: 16px;" alt="✏️">
+                                        </button>
+                                        <button class="pill-button primary-button" onclick="generateBackstory()">&#x1F3B2; Сгенерировать</button>
+                                        <button class="pill-button dark-blue-button" onclick="showManualBackstorySelection()"><img src="https://static.tildacdn.com/tild6233-3935-4063-b062-356337336561/pencil.png" alt="✏️" style="width: 16px; height: 16px; margin-right: 0.25rem; vertical-align: middle;"> Выбрать вручную</button>
+                                    </div>
                                 </div>
-                                <textarea class="backstory-textarea" id="backstoryText" placeholder="Ну и как ты сюда попал?" onchange="state.backstory = this.value; scheduleSave();" style="height: 200px;"></textarea>
+                                <!-- Сворачиваемое содержимое предыстории -->
+                                <div id="backstoryContentWrapper" style="display: block;">
+                                    <!-- Красивое отображение предыстории -->
+                                    <div class="backstory-display" id="backstoryDisplay" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; min-height: 120px;">
+                                        <div id="backstoryContent" style="display: grid; gap: 0.5rem;">
+                                            <!-- Здесь будут карточки предыстории -->
+                                            <div id="emptyBackstory" style="color: var(--muted); text-align: center; padding: 1.5rem; font-style: italic; grid-column: 1 / -1;">
+                                                Ну и как ты сюда попал?<br>
+                                                <span style="font-size: 0.8rem; margin-top: 0.5rem; display: block;">Выберите предысторию или напишите свою</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Скрытый textarea для совместимости -->
+                                        <textarea id="backstoryText" style="display: none;" spellcheck="false"></textarea>
+                                    </div>
+                                </div>
                             </div>
                             
                         </div>
@@ -329,107 +312,6 @@
                     </div>
                 </div>
 
-                <!-- Броня -->
-                <div class="section" id="armorSection">
-                    <div class="section-header">
-                        <h3 class="section-title"><img src="https://static.tildacdn.com/tild3531-3730-4631-a438-353361653361/bulletproof-vest.png" alt="🛡️" style="width: 24px; height: 24px; margin-right: 0.5rem;"> Броня</h3>
-                    </div>
-                    <div class="section-content expanded">
-                        <div style="display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1rem;">
-                            <button class="pill-button primary-button" onclick="showArmorShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить броню</button>
-                        </div>
-                        <div style="display: grid; gap: 0.5rem;">
-                            <!-- Голова -->
-                            <div style="display: grid; grid-template-columns: 80px 1fr 1.5fr; gap: 0.75rem; align-items: center;">
-                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">Голова:</span>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="color: var(--muted); font-size: 0.8rem;" title="Останавливающая Сила">ОС:</span>
-                                    <input type="text" class="input-field" id="armorHeadOS" value="0" min="0" max="99" onchange="state.armor.head.os = parseInt(this.value); scheduleSave(); updateArmorPenalty();" style="width: 60px; padding: 0.4rem; text-align: center;">
-                                    <button onclick="decreaseArmorOS('head')" style="background: transparent; border: none; color: var(--accent); cursor: pointer; font-size: 1.2rem; padding: 0; margin-left: 0.25rem;" title="Уменьшить ОС">▼</button>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="color: var(--muted); font-size: 0.8rem;">Тип:</span>
-                                    <select class="input-field" id="armorHeadType" onchange="state.armor.head.type = this.value; scheduleSave(); updateArmorPenalty();" style="padding: 0.4rem;">
-                                        <option value="Лёгкая">Лёгкая 10 ОС</option>
-                                        <option value="Средняя">Средняя 15 ОС</option>
-                                        <option value="Тяжёлая">Тяжёлая 18 ОС</option>
-                                        <option value="Титаническая">Титаническая 25 ОС</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <!-- Тело -->
-                            <div style="display: grid; grid-template-columns: 80px 1fr 1.5fr; gap: 0.75rem; align-items: center;">
-                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">Тело:</span>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="color: var(--muted); font-size: 0.8rem;" title="Останавливающая Сила">ОС:</span>
-                                    <input type="text" class="input-field" id="armorBodyOS" value="0" min="0" max="99" onchange="state.armor.body.os = parseInt(this.value); scheduleSave(); updateArmorPenalty();" style="width: 60px; padding: 0.4rem; text-align: center;">
-                                    <button onclick="decreaseArmorOS('body')" style="background: transparent; border: none; color: var(--accent); cursor: pointer; font-size: 1.2rem; padding: 0; margin-left: 0.25rem;" title="Уменьшить ОС">▼</button>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="color: var(--muted); font-size: 0.8rem;">Тип:</span>
-                                    <select class="input-field" id="armorBodyType" onchange="state.armor.body.type = this.value; scheduleSave(); updateArmorPenalty();" style="padding: 0.4rem;">
-                                        <option value="Лёгкая">Лёгкая 10 ОС</option>
-                                        <option value="Средняя">Средняя 15 ОС</option>
-                                        <option value="Тяжёлая">Тяжёлая 18 ОС</option>
-                                        <option value="Титаническая">Титаническая 25 ОС</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <!-- Руки -->
-                            <div style="display: grid; grid-template-columns: 80px 1fr 1.5fr; gap: 0.75rem; align-items: center;">
-                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">Руки:</span>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="color: var(--muted); font-size: 0.8rem;" title="Останавливающая Сила">ОС:</span>
-                                    <input type="text" class="input-field" id="armorArmsOS" value="0" min="0" max="99" onchange="state.armor.arms.os = parseInt(this.value); scheduleSave(); updateArmorPenalty();" style="width: 60px; padding: 0.4rem; text-align: center;">
-                                    <button onclick="decreaseArmorOS('arms')" style="background: transparent; border: none; color: var(--accent); cursor: pointer; font-size: 1.2rem; padding: 0; margin-left: 0.25rem;" title="Уменьшить ОС">▼</button>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="color: var(--muted); font-size: 0.8rem;">Тип:</span>
-                                    <select class="input-field" id="armorArmsType" onchange="state.armor.arms.type = this.value; scheduleSave(); updateArmorPenalty();" style="padding: 0.4rem;">
-                                        <option value="Лёгкая">Лёгкая 10 ОС</option>
-                                        <option value="Средняя">Средняя 15 ОС</option>
-                                        <option value="Тяжёлая">Тяжёлая 18 ОС</option>
-                                        <option value="Титаническая">Титаническая 25 ОС</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <!-- Ноги -->
-                            <div style="display: grid; grid-template-columns: 80px 1fr 1.5fr; gap: 0.75rem; align-items: center;">
-                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">Ноги:</span>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="color: var(--muted); font-size: 0.8rem;" title="Останавливающая Сила">ОС:</span>
-                                    <input type="text" class="input-field" id="armorLegsOS" value="0" min="0" max="99" onchange="state.armor.legs.os = parseInt(this.value); scheduleSave(); updateArmorPenalty();" style="width: 60px; padding: 0.4rem; text-align: center;">
-                                    <button onclick="decreaseArmorOS('legs')" style="background: transparent; border: none; color: var(--accent); cursor: pointer; font-size: 1.2rem; padding: 0; margin-left: 0.25rem;" title="Уменьшить ОС">▼</button>
-                                </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                    <span style="color: var(--muted); font-size: 0.8rem;">Тип:</span>
-                                    <select class="input-field" id="armorLegsType" onchange="state.armor.legs.type = this.value; scheduleSave(); updateArmorPenalty();" style="padding: 0.4rem;">
-                                        <option value="Лёгкая">Лёгкая 10 ОС</option>
-                                        <option value="Средняя">Средняя 15 ОС</option>
-                                        <option value="Тяжёлая">Тяжёлая 18 ОС</option>
-                                        <option value="Титаническая">Титаническая 25 ОС</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <!-- Штраф от брони -->
-                            <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 91, 135, 0.1); border: 1px solid var(--danger); border-radius: 8px;">
-                                <div style="color: var(--danger); font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem;">Штраф от брони:</div>
-                                <div id="armorPenaltyText" style="color: var(--text); font-family: monospace; font-size: 0.75rem; line-height: 1.4;">Без штрафа</div>
-                            </div>
-                            
-                            <!-- Наративное описание брони -->
-                            <div style="margin-top: 1rem;">
-                                <label class="input-label" style="display: block; margin-bottom: 0.5rem;">ОПИСАНИЕ БРОНИ</label>
-                                <textarea class="input-field" id="armorDescription" placeholder="Опишите, что надето на персонаже..." onchange="state.armor.description = this.value; scheduleSave();" style="min-height: 80px; resize: vertical;"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Киберимпланты -->
                 <div class="section" id="implantsSection">
                     <div class="section-header">
@@ -446,6 +328,104 @@
                         </div>
                     </div>
                 </div>
+                <!-- Броня -->
+                <div class="section" id="armorSection">
+                    <div class="section-header">
+                        <h3 class="section-title"><img src="https://static.tildacdn.com/tild3531-3730-4631-a438-353361653361/bulletproof-vest.png" alt="🛡️" style="width: 24px; height: 24px; margin-right: 0.5rem;"> Броня</h3>
+                    </div>
+                    <div class="section-content expanded">
+                        <div style="display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1rem;">
+                            <button class="pill-button primary-button" onclick="showArmorShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить броню</button>
+                        </div>
+                        <div style="display: grid; gap: 0.5rem;">
+                            <!-- Голова -->
+                            <div style="display: grid; grid-template-columns: 80px 1fr auto; gap: 0.75rem; align-items: center;">
+                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">Голова:</span>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="color: var(--muted); font-size: 0.8rem;" title="Останавливающая Сила">ОС:</span>
+                                    <input type="text" class="input-field" id="armorHeadOS" value="0" min="0" max="99" onchange="state.armor.head.os = parseInt(this.value); scheduleSave(); updateArmorPenalty();" style="width: 60px; padding: 0.4rem; text-align: center;">
+                                    <button onclick="decreaseArmorOS('head')" style="background: transparent; border: none; color: var(--accent); cursor: pointer; font-size: 1.2rem; padding: 0; margin-left: 0.25rem;" title="Уменьшить ОС">▼</button>
+                                    <span id="armorHeadType" style="color: var(--text); font-size: 0.8rem; font-weight: 500; min-width: 80px; text-align: center;"></span>
+                                </div>
+                                <button id="removeArmorHead" onclick="removeEquippedArmor('head')" style="background: transparent; border: none; cursor: pointer; padding: 0; display: none;" title="Снять броню">
+                                    <img src="https://static.tildacdn.com/tild6138-3866-4664-b263-333933323732/down.png" alt="↓" style="width: 20px; height: 20px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                                </button>
+                            </div>
+                            
+                            <!-- Тело -->
+                            <div style="display: grid; grid-template-columns: 80px 1fr auto; gap: 0.75rem; align-items: center;">
+                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">Тело:</span>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="color: var(--muted); font-size: 0.8rem;" title="Останавливающая Сила">ОС:</span>
+                                    <input type="text" class="input-field" id="armorBodyOS" value="0" min="0" max="99" onchange="state.armor.body.os = parseInt(this.value); scheduleSave(); updateArmorPenalty();" style="width: 60px; padding: 0.4rem; text-align: center;">
+                                    <button onclick="decreaseArmorOS('body')" style="background: transparent; border: none; color: var(--accent); cursor: pointer; font-size: 1.2rem; padding: 0; margin-left: 0.25rem;" title="Уменьшить ОС">▼</button>
+                                    <span id="armorBodyType" style="color: var(--text); font-size: 0.8rem; font-weight: 500; min-width: 80px; text-align: center;"></span>
+                                </div>
+                                <button id="removeArmorBody" onclick="removeEquippedArmor('body')" style="background: transparent; border: none; cursor: pointer; padding: 0; display: none;" title="Снять броню">
+                                    <img src="https://static.tildacdn.com/tild6138-3866-4664-b263-333933323732/down.png" alt="↓" style="width: 20px; height: 20px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                                </button>
+                            </div>
+                            
+                            <!-- Руки -->
+                            <div style="display: grid; grid-template-columns: 80px 1fr auto; gap: 0.75rem; align-items: center;">
+                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">Руки:</span>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="color: var(--muted); font-size: 0.8rem;" title="Останавливающая Сила">ОС:</span>
+                                    <input type="text" class="input-field" id="armorArmsOS" value="0" min="0" max="99" onchange="state.armor.arms.os = parseInt(this.value); scheduleSave(); updateArmorPenalty();" style="width: 60px; padding: 0.4rem; text-align: center;">
+                                    <button onclick="decreaseArmorOS('arms')" style="background: transparent; border: none; color: var(--accent); cursor: pointer; font-size: 1.2rem; padding: 0; margin-left: 0.25rem;" title="Уменьшить ОС">▼</button>
+                                    <span id="armorArmsType" style="color: var(--text); font-size: 0.8rem; font-weight: 500; min-width: 80px; text-align: center;"></span>
+                                </div>
+                                <button id="removeArmorArms" onclick="removeEquippedArmor('arms')" style="background: transparent; border: none; cursor: pointer; padding: 0; display: none;" title="Снять броню">
+                                    <img src="https://static.tildacdn.com/tild6138-3866-4664-b263-333933323732/down.png" alt="↓" style="width: 20px; height: 20px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                                </button>
+                            </div>
+                            
+                            <!-- Ноги -->
+                            <div style="display: grid; grid-template-columns: 80px 1fr auto; gap: 0.75rem; align-items: center;">
+                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">Ноги:</span>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="color: var(--muted); font-size: 0.8rem;" title="Останавливающая Сила">ОС:</span>
+                                    <input type="text" class="input-field" id="armorLegsOS" value="0" min="0" max="99" onchange="state.armor.legs.os = parseInt(this.value); scheduleSave(); updateArmorPenalty();" style="width: 60px; padding: 0.4rem; text-align: center;">
+                                    <button onclick="decreaseArmorOS('legs')" style="background: transparent; border: none; color: var(--accent); cursor: pointer; font-size: 1.2rem; padding: 0; margin-left: 0.25rem;" title="Уменьшить ОС">▼</button>
+                                    <span id="armorLegsType" style="color: var(--text); font-size: 0.8rem; font-weight: 500; min-width: 80px; text-align: center;"></span>
+                                </div>
+                                <button id="removeArmorLegs" onclick="removeEquippedArmor('legs')" style="background: transparent; border: none; cursor: pointer; padding: 0; display: none;" title="Снять броню">
+                                    <img src="https://static.tildacdn.com/tild6138-3866-4664-b263-333933323732/down.png" alt="↓" style="width: 20px; height: 20px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                                </button>
+                            </div>
+                            
+                            <!-- Чекбокс для титанической брони -->
+                            <div id="titanicArmorCheckbox" style="margin-top: 1rem; padding: 0.75rem; background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; display: none;">
+                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: var(--accent); font-size: 0.9rem; font-weight: 600;">
+                                    <input type="checkbox" id="titanicArmorConnected" onchange="toggleTitanicArmorConnection()" style="width: 16px; height: 16px; accent-color: var(--accent);">
+                                    <span>Подключено?</span>
+                                </label>
+                                <div style="color: var(--text); font-size: 0.8rem; margin-top: 0.5rem; line-height: 1.4;">
+                                    При подключении титанической брони штрафы к характеристикам отменяются, но максимальные ПЗ уменьшаются на 5.
+                                </div>
+                            </div>
+                            
+                            <!-- Наративное описание брони -->
+                            <div style="margin-top: 1rem;">
+                                <label class="input-label" style="display: block; margin-bottom: 0.5rem;">ОПИСАНИЕ БРОНИ</label>
+                                <textarea class="input-field" id="armorDescription" placeholder="Опишите, что надето на персонаже..." onchange="state.armor.description = this.value; scheduleSave();" style="min-height: 80px; resize: vertical;"></textarea>
+                            </div>
+                            
+                            <!-- Инвентарь купленной брони -->
+                            <div style="margin-top: 1.5rem;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+                                    <label class="input-label" style="margin: 0;">ИНВЕНТАРЬ БРОНИ</label>
+                                    <span style="color: var(--muted); font-size: 0.8rem;" id="armorInventoryCount">(0)</span>
+                                </div>
+                                <div id="armorInventoryContainer" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <p style="color: var(--muted); text-align: center; padding: 1rem; font-size: 0.85rem;">Купленная броня появится здесь</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
 
                 <!-- Дека -->
                 <div class="section" id="deckSection">
@@ -515,34 +495,6 @@
                     </div>
                 </div>
 
-                <!-- Собственность -->
-                <div class="section" id="propertySection">
-                    <div class="section-header">
-                        <h3 class="section-title"><img src="https://static.tildacdn.com/tild6361-6565-4764-b437-306433303764/car-check_1.png" alt="🏠" style="width: 24px; height: 24px; margin-right: 0.5rem;"> Собственность</h3>
-                    </div>
-                    <div class="section-content expanded">
-                        <!-- Жилье -->
-                        <div class="property-subsection">
-                            <div class="section-subtitle">Жилье</div>
-                            <div id="housingContainer">
-                                <p style="color: var(--muted); text-align: center; padding: 1rem;">Жилье не добавлено</p>
-                            </div>
-                            <button class="pill-button" onclick="addHousing()">Добавить жилье</button>
-                        </div>
-
-                        <!-- Транспорт -->
-                        <div class="property-subsection">
-                            <div class="section-subtitle">Транспорт</div>
-                            <div style="display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1rem;">
-                                <button class="pill-button primary-button" onclick="showVehicleShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить транспорт</button>
-                                <button class="pill-button success-button" onclick="showVehicleModulesShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить модули</button>
-                            </div>
-                            <div id="vehiclesContainer">
-                                <p style="color: var(--muted); text-align: center; padding: 1rem;">Транспорт не добавлен</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Скупщик -->
                 <div class="section" id="fenceSection">
@@ -563,9 +515,73 @@
                     </div>
                 </div>
 
+                <!-- Недвижимость -->
+                <div class="section" id="realEstateSection">
+                    <div class="section-header">
+                        <h3 class="section-title"><img src="https://static.tildacdn.com/tild3336-3839-4738-a462-303336633561/lease.png" alt="🏢" style="width: 24px; height: 24px; margin-right: 0.5rem;"> Недвижимость</h3>
+                    </div>
+                    <div class="section-content expanded">
+                        <!-- Жилье -->
+                        <div class="property-subsection">
+                            <div class="section-subtitle">Жилье</div>
+                            <div style="display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1rem;">
+                                <button class="pill-button primary-button" onclick="showHousingShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить жилье</button>
+                            </div>
+                            <div id="housingContainer">
+                                <p style="color: var(--muted); text-align: center; padding: 1rem;">Жилье не добавлено</p>
+                            </div>
+                        </div>
+
+                        <!-- Коммерческая недвижимость -->
+                        <div class="property-subsection">
+                            <div class="section-subtitle">Коммерческая недвижимость</div>
+                            <div style="display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1rem;">
+                                <button class="pill-button success-button" onclick="showCommercialPropertyShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить коммерческую недвижимость</button>
+                            </div>
+                            <div id="commercialPropertyContainer">
+                                <p style="color: var(--muted); text-align: center; padding: 1rem;">Коммерческая недвижимость не добавлена</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Транспорт -->
+                <div class="section" id="transportSection">
+                    <div class="section-header">
+                        <h3 class="section-title"><img src="https://static.tildacdn.com/tild3130-6637-4132-a334-663633373435/car.png" alt="🚗" style="width: 24px; height: 24px; margin-right: 0.5rem;"> Транспорт</h3>
+                    </div>
+                    <div class="section-content expanded">
+                        <div id="transportContainer">
+                            <p style="color: var(--muted); text-align: center; padding: 2rem;">Транспорт не добавлен</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Модули транспорта -->
+                <div class="section" id="vehicleModulesSection">
+                    <div class="section-header">
+                        <h3 class="section-title"><img src="https://static.tildacdn.com/tild6535-3132-4233-b731-356365363437/wrench.png" alt="🔧" style="width: 24px; height: 24px; margin-right: 0.5rem;"> Модули транспорта</h3>
+                    </div>
+                    <div class="section-content expanded">
+                        <div id="vehicleModulesContainer">
+                            <p style="color: var(--muted); text-align: center; padding: 2rem;">Модули не добавлены</p>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
         </main>
+    </div>
+
+    <!-- Плавающая кнопка счетчиков -->
+    <div class="counter-button" id="counterButton" onclick="showCountersModal()" style="position: fixed; bottom: 340px; left: 20px; width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); z-index: 1000; transition: all 0.3s ease; border: 2px solid #2a3d4f;">
+        <img src="https://static.tildacdn.com/tild3437-6537-4161-b166-323464626265/counter.png" alt="🔢" style="width: 32px; height: 32px;">
+    </div>
+
+    <!-- Плавающая кнопка расчета расстояния -->
+    <div class="distance-button" id="distanceButton" onclick="showDistanceModal()" style="position: fixed; bottom: 260px; left: 20px; width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); z-index: 1000; transition: all 0.3s ease; border: 2px solid #2a3d4f;">
+        <img src="https://static.tildacdn.com/tild6165-6336-4430-b838-623834316461/height.png" alt="📏" style="width: 32px; height: 32px;">
     </div>
 
     <!-- Плавающая кнопка бросалки кубов -->
@@ -604,13 +620,138 @@
         <span style="color: #00ffff; font-weight: 600; font-size: 0.85rem;">📡 ЛОГ</span>
     </div>
 
-    <!-- Подключение JavaScript файлов -->
-    <!-- ВАЖНО: Порядок подключения имеет значение! -->
-    <script src="data.js?v=20241220"></script>     <!-- Сначала данные -->
-    <script src="utils.js?v=20241220"></script>    <!-- Затем утилиты -->
-    <script src="scripts.js?v=20241220"></script>  <!-- В конце основные функции -->
-    <script src="fence.js?v=20241220"></script>    <!-- Функции скупщика -->
-    <script src="bargain-purchase.js?v=20241220"></script>  <!-- Система торга при покупке -->
+    <!-- Модальное окно расчета расстояния -->
+    <div class="modal-overlay" id="distanceModal" style="display: none;">
+        <div class="modal" style="width: 800px; max-width: 90vw;">
+            <div class="modal-header">
+                <h3><img src="https://static.tildacdn.com/tild6165-6336-4430-b838-623834316461/height.png" alt="📏" style="width: 24px; height: 24px; margin-right: 0.5rem; vertical-align: middle;"> КАЛЬКУЛЯТОР РАССТОЯНИЯ ДО ЦЕЛИ</h3>
+                <button class="icon-button" onclick="hideDistanceModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start;">
+                    <!-- Форма ввода -->
+                    <div>
+                        <div class="input-group">
+                            <label class="input-label">ВАША ВЫСОТА (пространства)</label>
+                            <input type="number" class="input-field" id="shooterHeight" placeholder="0" min="0" max="999">
+                            <div style="font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem;">
+                                Высота стрелка над землей
+                            </div>
+                        </div>
+                        
+                        <div class="input-group">
+                            <label class="input-label">УДАЛЕНИЕ ЦЕЛИ (пространства)</label>
+                            <input type="number" class="input-field" id="targetDistance" placeholder="0" min="0" max="999">
+                            <div style="font-size: 0.75rem; color: var(--muted); margin-top: 0.15rem;">
+                                Горизонтальное расстояние до цели
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: center; margin-top: 1rem;">
+                            <button class="pill-button primary-button" onclick="calculateDistance()" style="font-size: 0.9rem; padding: 0.6rem 1.5rem;">
+                                <img src="https://static.tildacdn.com/tild3131-3664-4938-a532-363264356661/target_2.png" alt="🎯" style="width: 20px; height: 20px; margin-right: 0.5rem; vertical-align: middle;"> РАССЧИТАТЬ РАССТОЯНИЕ
+                            </button>
+                        </div>
+                        
+                        <!-- Результат -->
+                        <div id="distanceResult" style="display: none; margin-top: 1rem;">
+                            <div style="background: linear-gradient(135deg, rgba(182, 103, 255, 0.1), rgba(58, 44, 247, 0.05)); border: 1px solid var(--accent); border-radius: 12px; padding: 1rem; text-align: center; margin-bottom: 1rem;">
+                                <div style="color: var(--accent); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.25rem;">
+                                    РЕЗУЛЬТАТ
+                                </div>
+                                <div id="totalDistance" style="color: var(--text); font-size: 1.8rem; font-weight: 700; margin-bottom: 0.25rem;">
+                                    0
+                                </div>
+                                <div style="color: var(--muted); font-size: 0.8rem;">
+                                    пространств до цели
+                                </div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                                <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; text-align: center;">
+                                    <div style="color: var(--success); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.15rem;">
+                                        Горизонтально
+                                    </div>
+                                    <div id="horizontalDistance" style="color: var(--text); font-size: 1.1rem; font-weight: 600;">
+                                        0
+                                    </div>
+                                </div>
+                                <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; text-align: center;">
+                                    <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.15rem;">
+                                        По высоте
+                                    </div>
+                                    <div id="verticalDistance" style="color: var(--text); font-size: 1.1rem; font-weight: 600;">
+                                        0
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Визуализация -->
+                    <div>
+                        
+                        <!-- Canvas для визуализации -->
+                        <div id="distanceVisualization" style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; min-height: 160px; display: flex; align-items: center; justify-content: center;">
+                            <div style="text-align: center; color: var(--muted);">
+                                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎯</div>
+                                <div>Введите данные для расчета</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Контейнер для информации о сложности попадания -->
+                        <div id="hitDifficultyInfo" style="display: none;">
+                            <!-- Информация будет добавлена динамически -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- ПОДКЛЮЧЕНИЕ JAVASCRIPT ФАЙЛОВ ПРОЕКТА                                  -->
+    <!-- ВАЖНО: Порядок подключения имеет значение!                             -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    
+    <!-- DATA.JS → Все базовые данные: навыки, оружие, импланты, броня, магазины -->
+    <script src="data.js?v=20241220"></script>
+    
+    <!-- PROFESSIONAL-SKILLS.JS → Профессиональные навыки: выбор, добавление, управление -->
+    <script src="professional-skills.js?v=20250103"></script>
+    
+    <!-- UTILS.JS → Вспомогательные функции: сохранение/загрузка, форматирование, модалки -->
+    <script src="utils.js?v=20241220"></script>
+    
+    <!-- ARMOR.JS → Система брони: покупка, экипировка, расчёт штрафов, ВОС -->
+    <script src="armor.js?v=20241220"></script>
+    
+    <!-- VEHICLES.JS → Транспорт: покупка, модули, багажники, характеристики -->
+    <script src="transport.js?v=20250103&modules-redesign=1"></script>
+    
+    <!-- DRUGS.JS → Препараты: покупка, использование, эффекты -->
+    <script src="drugs.js?v=20241220"></script>
+    
+    <!-- SHOPS.JS → Магазины: жилье, коммерческая недвижимость, универсальная покупка -->
+    <script src="shops.js?v=20250103&stubs-removed=1"></script>
+    
+    <!-- DECK.JS → Дека: программы, щепки памяти, магазин дек, снаряжение -->
+    <script src="deck.js?v=20250103&quotes-fixed=1"></script>
+    
+    <!-- WEAPONS.JS → Оружие: покупка, модули, боеприпасы, стрельба -->
+    <script src="weapons.js?v=20250103&logs-removed=1"></script>
+    
+    <!-- GEAR.JS → Снаряжение: покупка, нагрузка, подбор с пола, управление -->
+    <script src="gear.js?v=20250103&logs-removed=1"></script>
+    
+    <!-- SCRIPTS.JS → Основной функционал: характеристики, здоровье, навыки, инициализация -->
+    <script src="scripts.js?v=20241220"></script>
+    
+    <!-- FENCE.JS → Скупщик: продажа вещей, история продаж, расчёт цен -->
+    <script src="fence.js?v=20241220"></script>
+    
+    <!-- BARGAIN-PURCHASE.JS → Система торга: переговоры при покупке, моды цен -->
+    <script src="bargain-purchase.js?v=20241220"></script>
     
     <script>
         // Инициализация приложения после загрузки DOM
@@ -648,10 +789,6 @@
                 
                 if (typeof initializeNumericInputs === 'function') {
                     initializeNumericInputs();
-                }
-                
-                if (typeof initializeProfessionalSkillsTextareas === 'function') {
-                    initializeProfessionalSkillsTextareas();
                 }
                 
                 // Запускаем загрузочный экран

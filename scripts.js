@@ -1,3 +1,59 @@
+// ═══════════════════════════════════════════════════════════════════════
+// УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ЦВЕТОВ ТЕМЫ
+// ═══════════════════════════════════════════════════════════════════════
+
+function getThemeColors() {
+    const isLightTheme = document.body.classList.contains('light-theme');
+    
+    if (isLightTheme) {
+        return {
+            bg: '#d2d2d2',
+            panel: '#e8e8e8',
+            panelAlt: '#e0e0e0',
+            accent: '#4a4a4a',
+            accent2: '#666666',
+            text: '#2d2d2d',
+            muted: '#6e6e73',
+            danger: '#8b0000',
+            success: '#006400',
+            warning: '#8b5a00',
+            border: 'rgba(74, 74, 74, 0.4)',
+            shadow: '0 0 22px rgba(74, 74, 74, 0.2)',
+            // Дополнительные цвета для инлайн-стилей
+            bgLight: 'rgba(74, 74, 74, 0.1)',
+            bgMedium: 'rgba(74, 74, 74, 0.2)',
+            bgDark: 'rgba(74, 74, 74, 0.3)',
+            successLight: 'rgba(0, 100, 0, 0.1)',
+            dangerLight: 'rgba(139, 0, 0, 0.1)',
+            warningLight: 'rgba(139, 90, 0, 0.1)',
+            accentLight: 'rgba(74, 74, 74, 0.1)'
+        };
+    } else {
+        return {
+            bg: '#0a0712',
+            panel: '#171125',
+            panelAlt: '#211630',
+            accent: '#b667ff',
+            accent2: '#ff6acb',
+            text: '#f3e8ff',
+            muted: '#a394c4',
+            danger: '#ff5b87',
+            success: '#7df4c6',
+            warning: '#ffa500',
+            border: 'rgba(182, 103, 255, 0.38)',
+            shadow: '0 0 22px rgba(182, 103, 255, 0.28)',
+            // Дополнительные цвета для инлайн-стилей
+            bgLight: 'rgba(0, 0, 0, 0.2)',
+            bgMedium: 'rgba(0, 0, 0, 0.3)',
+            bgDark: 'rgba(0, 0, 0, 0.5)',
+            successLight: 'rgba(125, 244, 198, 0.1)',
+            dangerLight: 'rgba(255, 91, 135, 0.1)',
+            warningLight: 'rgba(255, 165, 0, 0.1)',
+            accentLight: 'rgba(182, 103, 255, 0.1)'
+        };
+    }
+}
+
 // Функции управления секциями
 function collapseAllSections() {
     const sections = document.querySelectorAll('.section:not(.full-width-section)');
@@ -11,29 +67,7 @@ function collapseAllSections() {
     });
 }
 
-function expandSection(section) {
-    const content = section.querySelector('.section-content');
-    if (content) {
-        content.classList.add('expanded');
-        content.style.display = 'block';
-    }
-}
-
-function toggleSection(sectionId) {
-    const section = document.getElementById(sectionId);
-    if (!section) return;
-    
-    const content = section.querySelector('.section-content');
-    if (!content) return;
-    
-    if (content.classList.contains('expanded')) {
-        content.classList.remove('expanded');
-        content.style.display = 'none';
-    } else {
-        content.classList.add('expanded');
-        content.style.display = 'block';
-    }
-}
+// Дубль toggleSection и expandSection удален (полная версия на строке 965+)
 
 // Загрузочный экран с синхронизацией текста и прогресса
 function initLoadingScreen() {
@@ -131,24 +165,40 @@ function initLoadingScreen() {
             setTimeout(() => {
                 loadingScreen.classList.add('hidden');
                 mainInterface.classList.add('loaded');
-                loadState();
+                loadState(); // This calls updateUIFromState() internally
                 initAvatarUpload();
-                updateUIFromState();
                 renderRollLog();
                 updateMoneyDisplay();
                 calculateAndUpdateHealth();
                 updateDerivedStats();
+                
+                // ИСПРАВЛЕНИЕ БАГА: Пересчитываем нагрузку после загрузки
+                recalculateLoadFromInventory();
+                updateLoadDisplay();
+                
                 renderSkills();
                 renderProfessionalSkills();
-                renderCriticalInjuries();
+                if (typeof renderCriticalInjuries === 'function') renderCriticalInjuries();
+                
+                // Дополнительный вызов для профессиональных навыков с задержкой
+                setTimeout(() => {
+                    renderProfessionalSkills();
+                }, 100);
                 renderDeckPrograms();
-                renderDeckChips();
+                if (typeof renderDeckChips === 'function') renderDeckChips();
                 renderImplants();
                 renderWeapons();
                 renderAmmo();
                 renderHousing();
-                renderVehicles();
+                // renderVehicles(); // Удалено - используется новая система transport.js
+                if (typeof renderTransport === 'function') renderTransport();
+                if (typeof renderVehicleModulesInventory === 'function') renderVehicleModulesInventory();
                 renderGear();
+                
+                // Финальный вызов для профессиональных навыков
+                setTimeout(() => {
+                    renderProfessionalSkills();
+                }, 200);
             }, 1000); // +1 секунда после 100%
         }
     }, 20); // Чаще обновляем для лучшей синхронизации
@@ -178,7 +228,17 @@ function calculateDerivedStats() {
 function calculateAndUpdateHealth() {
     const will = Number(state.stats.WILL || 0);
     const body = Number(state.stats.BODY || 0);
-    const maxHp = Math.ceil(((will + 10) * body) / 2);
+    let maxHp = Math.ceil(((will + 10) * body) / 2);
+    
+    // Применяем штраф от титанической брони если она подключена
+    const penalties = calculateArmorPenalties();
+    if (penalties.healthPenalty !== 0) {
+        maxHp += penalties.healthPenalty; // healthPenalty уже отрицательный
+    }
+    
+    // Минимум 1 ОСП
+    maxHp = Math.max(1, maxHp);
+    
     state.health.max = maxHp;
     
     // Проверяем, не превышает ли текущее здоровье максимум
@@ -211,6 +271,108 @@ function updateDerivedStats() {
     updateLoadDisplay();
 }
 
+// Функция пересчета нагрузки из инвентаря (исправление бага после перезагрузки)
+function recalculateLoadFromInventory() {
+    let totalLoad = 0;
+    
+    // Считаем нагрузку от снаряжения
+    if (state.gear && Array.isArray(state.gear)) {
+        state.gear.forEach(item => {
+            const itemLoad = parseFloat(item.load) || 0;
+            
+            // Проверяем особые состояния предмета
+            const isEquipped = item.equipped || item.worn || item.activated || item.installed;
+            
+            // Если предмет надето/активировано и имеет флаг zeroLoadWhenEquipped, нагрузка = 0
+            if (isEquipped && item.zeroLoadWhenEquipped) {
+                // Не добавляем нагрузку предмета
+                
+                // Но для рюкзака и кейса учитываем нагрузку содержимого
+                if (item.storage && Array.isArray(item.storage)) {
+                    item.storage.forEach(storedItem => {
+                        totalLoad += parseFloat(storedItem.load) || 0;
+                    });
+                }
+            } else if (item.storedItem) {
+                // Сумка: нагрузка самой сумки, но НЕ предмета внутри
+                totalLoad += itemLoad;
+                // Предмет в сумке не учитывается
+            } else if (item.storage && Array.isArray(item.storage)) {
+                // Хранилище (рюкзак/кейс) когда не надето: нагрузка контейнера + содержимое
+                totalLoad += itemLoad;
+                item.storage.forEach(storedItem => {
+                    totalLoad += parseFloat(storedItem.load) || 0;
+                });
+            } else {
+                totalLoad += itemLoad;
+            }
+        });
+    }
+    
+    // Считаем нагрузку от модулей транспорта (только не установленные)
+    if (state.vehicleModules && Array.isArray(state.vehicleModules)) {
+        state.vehicleModules.forEach(module => {
+            // Модули на транспорте имеют нагрузку 0, в инвентаре - 10
+            if (!module.isInstalled) {
+                totalLoad += parseFloat(module.weight) || 10;
+            }
+        });
+    }
+    
+    // Собираем ID оружия, установленного на транспорте
+    const weaponsOnVehicles = new Set();
+    if (state.property?.vehicles && Array.isArray(state.property.vehicles)) {
+        state.property.vehicles.forEach(vehicle => {
+            if (vehicle.modules && Array.isArray(vehicle.modules)) {
+                vehicle.modules.forEach(module => {
+                    if (module.weapons && Array.isArray(module.weapons)) {
+                        module.weapons.forEach(weapon => {
+                            if (weapon.inventoryWeaponId) {
+                                weaponsOnVehicles.add(weapon.inventoryWeaponId);
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+    
+    // Считаем нагрузку от оружия (исключая оружие на транспорте)
+    if (state.weapons && Array.isArray(state.weapons)) {
+        state.weapons.forEach(weapon => {
+            // Оружие на транспорте не учитывается в нагрузке
+            if (!weaponsOnVehicles.has(weapon.id)) {
+                totalLoad += parseFloat(weapon.load) || 0;
+            }
+        });
+    }
+    
+    // Считаем нагрузку от боеприпасов
+    if (state.ammo && Array.isArray(state.ammo)) {
+        state.ammo.forEach(ammo => {
+            const isGrenadeOrRocket = ammo.weaponType === 'Гранаты' || ammo.weaponType === 'Ракеты';
+            const ammoLoad = isGrenadeOrRocket ? ammo.quantity : Math.ceil(ammo.quantity / 10);
+            totalLoad += ammoLoad;
+        });
+    }
+    
+    // Считаем нагрузку от брони (не надетой)
+    if (state.armorInventory && Array.isArray(state.armorInventory)) {
+        state.armorInventory.forEach(armor => {
+            // Броня в инвентаре (не надетая) имеет нагрузку
+            if (!armor.equipped) {
+                totalLoad += parseFloat(armor.load) || 0;
+            }
+        });
+    }
+    
+    // Обновляем текущую нагрузку
+    const maxLoad = state.load.max || calculateDerivedStats().maxLoad;
+    state.load.current = maxLoad - totalLoad;
+    
+    // Нагрузка пересчитана
+}
+
 function updateAwarenessMax() {
     const int = Number(state.stats.INT || 5);
     const newMax = int * 10;
@@ -240,10 +402,10 @@ function updateLoadWarning() {
             const excess = currentLoad - maxLoad;
             const penalty = Math.ceil(excess / 5);
             warningEl.textContent = `Штраф ${penalty} от нагрузки!`;
-            warningEl.style.color = 'var(--danger)';
+            warningEl.style.color = getThemeColors().danger;
         } else {
             warningEl.textContent = `Нагрузка: ${currentLoad}/${maxLoad}`;
-            warningEl.style.color = 'var(--text)';
+            warningEl.style.color = getThemeColors().text;
         }
     }
 }
@@ -264,13 +426,52 @@ function rollSkillCheck(skillIndex) {
     
     const selectedStat = document.getElementById('skillCheckStat').value;
     const modifier = parseInt(document.getElementById('skillCheckModifier').value) || 0;
-    const statValue = state.stats[selectedStat] || 5;
+    let statValue = state.stats[selectedStat] || 5;
     const skillLevel = skillData.level || 0;
     const skillName = skillData.customName || skillData.name;
     
+    // Применяем штрафы от брони
+    const penalties = calculateArmorPenalties();
+    let armorPenalty = 0;
+    
+    switch (selectedStat) {
+        case 'DEX':
+            // Для ЛВК применяем штраф к ЛВК, но не к скорости перемещения
+            armorPenalty = penalties.dexterity;
+            break;
+        case 'REA':
+            armorPenalty = penalties.reaction;
+            break;
+        default:
+            armorPenalty = 0;
+            break;
+    }
+    
+    // Применяем штраф с учетом минимумов
+    if (armorPenalty !== 0) {
+        if (selectedStat === 'DEX') {
+            // Для ЛВК минимум 1
+            statValue = Math.max(1, statValue + armorPenalty);
+        } else {
+            // Для остальных характеристик минимум 1
+            statValue = Math.max(1, statValue + armorPenalty);
+        }
+    }
+    
+    // Проверяем бонус от мультитула (для проверок с ТЕХ)
+    let multitoolBonus = 0;
+    if (selectedStat === 'TECH') {
+        const activeMultitool = state.gear && state.gear.find(item => 
+            item.name && item.name.includes('МУЛЬТИТУЛ') && item.activated
+        );
+        if (activeMultitool) {
+            multitoolBonus = 2;
+        }
+    }
+    
     // Бросаем 2d6
     const dice = rollDice(2, 6);
-    let total = statValue + skillLevel + modifier + dice[0] + dice[1];
+    let total = statValue + skillLevel + modifier + multitoolBonus + dice[0] + dice[1];
     let criticalText = '';
     let d4Value = null;
     let d4Type = null; // 'penalty' или 'bonus'
@@ -297,7 +498,9 @@ function rollSkillCheck(skillIndex) {
     }
     
     const modifierStr = modifier >= 0 ? `+${modifier}` : `${modifier}`;
-    const formula = `${statValue}+${skillLevel}${modifierStr}+${dice[0]}+${dice[1]}${d4Value ? (d4Type === 'penalty' ? '-' + d4Value : '+' + d4Value) : ''} = ${total}`;
+    const armorPenaltyStr = armorPenalty !== 0 ? ` (броня: ${armorPenalty > 0 ? '+' : ''}${armorPenalty})` : '';
+    const multitoolBonusStr = multitoolBonus > 0 ? ` (мультитул)` : '';
+    const formula = `${statValue}${armorPenaltyStr}+${skillLevel}${modifierStr}${multitoolBonus > 0 ? `+${multitoolBonus}` : ''}${multitoolBonusStr}+${dice[0]}+${dice[1]}${d4Value ? (d4Type === 'penalty' ? '-' + d4Value : '+' + d4Value) : ''} = ${total}`;
     
     // Анимация броска
     showDiceAnimation(dice, total, criticalText, formula, skillName, d4Value, d4Type);
@@ -311,29 +514,10 @@ function rollSkillCheck(skillIndex) {
     });
 }
 
-function rollUniversalDice() {
-    const count = parseInt(document.getElementById('diceCount')?.value) || 1;
-    const sides = parseInt(document.getElementById('diceSides')?.value) || 6;
-    const modifier = parseInt(document.getElementById('diceModifier')?.value) || 0;
-    
-    const dice = rollDice(count, sides);
-    const total = dice.reduce((sum, roll) => sum + roll, 0) + modifier;
-    
-    // Добавляем в лог
-    addToRollLog('universal', {
-        count: count,
-        sides: sides,
-        modifier: modifier,
-        dice: dice,
-        total: total
-    });
-    
-    // Показываем результат
-    showUniversalResult(dice, total, modifier);
-}
+// Дубль rollUniversalDice удален (полная версия с анимацией на строке 1117)
 
 // Новая система лога бросков
-function addToRollLog(type, data) {
+window.addToRollLog = function(type, data) {
     const entry = {
         type: type,
         timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -356,21 +540,23 @@ function renderRollLog() {
     if (!logContainer) return;
     
     if (state.rollLog.length === 0) {
-        logContainer.innerHTML = '<div style="color: var(--muted); text-align: center; padding: 2rem; font-size: 0.9rem;">Лог бросков пуст</div>';
+        const colors = getThemeColors();
+        logContainer.innerHTML = `<div style="color: ${colors.muted}; text-align: center; padding: 2rem; font-size: 0.9rem;">Лог бросков пуст</div>`;
         return;
     }
     
     // Формируем HTML для каждой записи
     const logsHTML = state.rollLog.map(entry => {
         let text = '';
+        const colors = getThemeColors();
         
         switch(entry.type) {
             case 'skill':
-                text = `<strong>${entry.skill}</strong>: ${entry.formula} = <strong>${entry.total}</strong>${entry.critical ? ` <span style="color: var(--danger);">${entry.critical}</span>` : ''}`;
+                text = `<strong>${entry.skill}</strong>: ${entry.formula} = <strong>${entry.total}</strong>${entry.critical ? ` <span style="color: ${colors.danger};">${entry.critical}</span>` : ''}`;
                 break;
             
             case 'weapon_damage':
-                text = `<strong>${entry.weaponName}</strong>: ${entry.formula} = <strong>${entry.total}</strong>${entry.ammoType ? ` (${entry.ammoType})` : ''}${entry.fireMode ? ` [${entry.fireMode}]` : ''}${entry.isCritical ? ' <span style="color: var(--danger); font-weight: 600;">КРИТИЧЕСКАЯ ТРАВМА!</span>' : ''}`;
+                text = `<strong>${entry.weaponName}</strong>: ${entry.formula} = <strong>${entry.total}</strong>${entry.ammoType ? ` (${entry.ammoType})` : ''}${entry.fireMode ? ` [${entry.fireMode}]` : ''}${entry.isCritical ? ' <span style="color: ${getThemeColors().danger}; font-weight: 600;">КРИТИЧЕСКАЯ ТРАВМА!</span>' : ''}`;
                 break;
             
             case 'universal':
@@ -378,7 +564,7 @@ function renderRollLog() {
                 break;
             
             case 'purchase':
-                text = `<img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"> Покупка: <strong>${entry.item}</strong> за <strong style="color: var(--danger);">${entry.price} уе</strong> <span style="color: var(--muted); font-size: 0.8rem;">(${entry.category})</span>`;
+                text = `<img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"> Покупка: <strong>${entry.item}</strong> за <strong style="color: ${getThemeColors().danger};">${entry.price} уе</strong> <span style="color: var(--muted); font-size: 0.8rem;">(${entry.category})</span>`;
                 break;
             
             case 'transaction':
@@ -389,19 +575,40 @@ function renderRollLog() {
                 text = `<img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"> Продано: <strong>${entry.item}</strong> за <strong style="color: var(--success);">${entry.price} уе</strong>`;
                 break;
             
+            case 'rent':
+                text = `<img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="🏠" style="width: 16px; height: 16px; vertical-align: middle;"> Аренда: <strong>${entry.item}</strong> за <strong style="color: var(--warning);">${entry.price} уе/мес</strong> <span style="color: var(--muted); font-size: 0.8rem;">(${entry.category})</span>`;
+                break;
+            
+            case 'rent_payment':
+                text = `<img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💳" style="width: 16px; height: 16px; vertical-align: middle;"> Оплата аренды: <strong>${entry.item}</strong> <strong style="color: var(--warning);">${entry.price} уе</strong> <span style="color: var(--muted); font-size: 0.8rem;">(${entry.category})</span>`;
+                break;
+            
+            case 'move_in':
+                text = `<img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="🏠" style="width: 16px; height: 16px; vertical-align: middle;"> Заселение: <strong>${entry.item}</strong> <span style="color: var(--muted); font-size: 0.8rem;">(${entry.category})</span>`;
+                break;
+            
+            case 'move':
+                text = `<img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="🏠" style="width: 16px; height: 16px; vertical-align: middle;"> Заселение: <strong>${entry.item}</strong> <span style="color: var(--muted); font-size: 0.8rem;">(${entry.category})</span>`;
+                break;
+            
             case 'initiative':
                 const d4Str = entry.d4Value ? (entry.d4Type === 'penalty' ? ` - d4(${entry.d4Value})` : ` + d4(${entry.d4Value})`) : '';
                 text = `<img src="https://static.tildacdn.com/tild3765-3433-4435-b435-636665663530/target_1.png" alt="🎯" style="width: 16px; height: 16px; vertical-align: middle;"> Бросок инициативы: <strong style="color: var(--accent);">${entry.total}</strong> (2d6: ${entry.dice1}+${entry.dice2} + РЕА: ${entry.reaction} + Мод: ${entry.modifier}${d4Str})`;
                 break;
             
             default:
-                text = entry.text || JSON.stringify(entry);
+                // Если тип содержит "🎯 Расчет расстояния", отображаем его как обычный текст
+                if (entry.type && entry.type.includes('🎯 Расчет расстояния')) {
+                    text = entry.type;
+                } else {
+                    text = entry.text || JSON.stringify(entry);
+                }
         }
         
         return `
             <div style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(182, 103, 255, 0.05); font-size: 0.85rem; line-height: 1.4;">
                 <span style="color: var(--muted); font-family: monospace; font-size: 0.75rem; margin-right: 0.5rem;">${entry.timestamp}</span>
-                <span style="color: var(--text);">${text}</span>
+                <span style="color: ${getThemeColors().text};">${text}</span>
             </div>
         `;
     }).join('');
@@ -558,15 +765,24 @@ function showSkillCheckModal(skillIndex) {
         'BODY': 'Телосложение',
         'REA': 'Реакция',
         'TECH': 'Техника',
-        'CHA': 'Харизма'
+        'CHA': 'Характер'
     };
     
     const statName = statNames[skillStat] || skillStat;
     
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     modal.innerHTML = `
         <div class="modal" style="max-width: 500px;">
             <div class="modal-header">
@@ -592,7 +808,7 @@ function showSkillCheckModal(skillIndex) {
                             <option value="BODY" ${skillStat === 'BODY' ? 'selected' : ''}>Телосложение (${state.stats.BODY || 0})</option>
                             <option value="REA" ${skillStat === 'REA' ? 'selected' : ''}>Реакция (${state.stats.REA || 0})</option>
                             <option value="TECH" ${skillStat === 'TECH' ? 'selected' : ''}>Техника (${state.stats.TECH || 0})</option>
-                            <option value="CHA" ${skillStat === 'CHA' ? 'selected' : ''}>Харизма (${state.stats.CHA || 0})</option>
+                            <option value="CHA" ${skillStat === 'CHA' ? 'selected' : ''}>Характер (${state.stats.CHA || 0})</option>
                         </select>
                     </label>
                     
@@ -629,6 +845,9 @@ function showSkillCheckModal(skillIndex) {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем обработчики клавиатуры для правильной работы Enter
+    addModalKeyboardHandlers(modal);
 }
 
 function closeModal(button) {
@@ -637,6 +856,58 @@ function closeModal(button) {
     if (modal) {
         modal.remove();
     }
+}
+
+// Функция для показа toast-уведомлений (не блокирует интерфейс)
+function showToast(message, duration = 3000) {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #1a2633, #213040);
+        color: var(--success);
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        border: 1px solid var(--success);
+        z-index: 10000;
+        animation: slideIn 0.3s ease-out;
+        font-size: 0.9rem;
+        max-width: 300px;
+    `;
+    toast.innerHTML = `✅ ${message}`;
+    
+    // Добавляем анимацию
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(400px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(400px); opacity: 0; }
+        }
+    `;
+    if (!document.querySelector('style[data-toast-styles]')) {
+        style.setAttribute('data-toast-styles', 'true');
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(toast);
+    
+    // Автоматически удаляем через заданное время
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+    
+    // Закрываем по клику
+    toast.addEventListener('click', () => {
+        toast.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => toast.remove(), 300);
+    });
 }
 
 // Универсальная функция для добавления обработчиков клавиш к модалу
@@ -692,14 +963,6 @@ function addModalKeyboardHandlers(modal) {
 }
 
 function showModal(title, content, buttons = []) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    
-    // Увеличиваем z-index для каждого нового модала
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    const baseZIndex = 1000;
-    modal.style.zIndex = baseZIndex + (existingModals.length * 100);
-    
     // Создаем HTML для кнопок
     let buttonsHTML = '';
     if (buttons && buttons.length > 0) {
@@ -712,7 +975,7 @@ function showModal(title, content, buttons = []) {
         `;
     }
     
-    modal.innerHTML = `
+    const html = `
         <div class="modal" style="max-width: 500px;">
             <div class="modal-header">
                 <h3>${title}</h3>
@@ -725,6 +988,9 @@ function showModal(title, content, buttons = []) {
         </div>
     `;
     
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = html;
     document.body.appendChild(modal);
     
     modal.addEventListener('click', (e) => {
@@ -738,7 +1004,7 @@ function showModal(title, content, buttons = []) {
 }
 
 // Функции для работы с деньгами
-function updateMoneyDisplay() {
+window.updateMoneyDisplay = function() {
     const moneyEl = document.getElementById('money');
     if (moneyEl) {
         moneyEl.value = formatMoney(state.money);
@@ -820,10 +1086,19 @@ function clearRollLog() {
 
 // Универсальная бросалка
 function showUniversalDiceModal() {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     modal.innerHTML = `
         <div class="modal" style="max-width: 600px;">
             <div class="modal-header">
@@ -863,7 +1138,7 @@ function showUniversalDiceModal() {
                     </div>
                     
                     <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; text-align: center;">
-                        <div id="universalDiceTotal" style="font-size: 2rem; font-weight: bold; color: var(--text); margin-bottom: 0.5rem;">Σ 0</div>
+                        <div id="universalDiceTotal" style="font-size: 2rem; font-weight: bold; color: ${getThemeColors().text}; margin-bottom: 0.5rem;">Σ 0</div>
                         <div id="universalDiceFormula" style="font-size: 1rem; color: var(--muted);">Бросков: 0</div>
                     </div>
                 </div>
@@ -1000,10 +1275,19 @@ function rollUniversalDice() {
 
 // Функции для работы с критическими травмами
 function addCriticalInjury() {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     modal.innerHTML = `
         <div class="modal" style="max-width: 500px;">
             <div class="modal-header">
@@ -1044,7 +1328,7 @@ function saveCriticalInjury() {
     if (!description) {
         showModal('Ошибка', `
             <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Введите описание травмы!</p>
+                <p style="color: ${getThemeColors().danger};">Введите описание травмы!</p>
             
             </div>
         `);
@@ -1065,10 +1349,19 @@ function saveCriticalInjury() {
 }
 
 function removeCriticalInjury(injuryId) {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     modal.innerHTML = `
         <div class="modal" style="max-width: 400px;">
             <div class="modal-header">
@@ -1076,7 +1369,7 @@ function removeCriticalInjury(injuryId) {
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body">
-                <p style="text-align: center; color: var(--text); font-size: 1rem;">Удалить эту критическую травму?</p>
+                <p style="text-align: center; color: ${getThemeColors().text}; font-size: 1rem;">Удалить эту критическую травму?</p>
             </div>
             <div class="modal-footer">
                 <button class="pill-button danger-button" onclick="confirmRemoveCriticalInjury('${injuryId}')">Удалить</button>
@@ -1092,6 +1385,9 @@ function removeCriticalInjury(injuryId) {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем обработчики клавиатуры для правильной работы Enter
+    addModalKeyboardHandlers(modal);
 }
 
 function confirmRemoveCriticalInjury(injuryId) {
@@ -1112,8 +1408,8 @@ function renderInjuries() {
     
     container.innerHTML = state.criticalInjuries.map(injury => `
         <div style="background: rgba(255, 91, 135, 0.1); border: 1px solid var(--danger); border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem; position: relative;">
-            <button onclick="removeCriticalInjury('${injury.id}')" style="position: absolute; top: 0.5rem; right: 0.5rem; font-size: 1rem; background: transparent; border: none; color: var(--text); cursor: pointer;">×</button>
-            <div style="color: var(--text); font-size: 0.9rem; padding-right: 1.5rem;">${injury.description}</div>
+            <button onclick="removeCriticalInjury('${injury.id}')" style="position: absolute; top: 0.5rem; right: 0.5rem; font-size: 1rem; background: transparent; border: none; color: ${getThemeColors().text}; cursor: pointer;">×</button>
+            <div style="color: ${getThemeColors().text}; font-size: 0.9rem; padding-right: 1.5rem;">${injury.description}</div>
             <div style="color: var(--muted); font-size: 0.75rem; margin-top: 0.25rem;">${injury.timestamp}</div>
         </div>
     `).join('');
@@ -1161,10 +1457,19 @@ function addStandardSkill(skillName) {
 }
 
 function promptSkillCustomName(skill) {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     
     const placeholder = skill.name === "Язык" ? "Например: Английский, Японский, Фурьский" : "Например: Ганката, Кендо, Капоэйра, Сумо";
     
@@ -1208,7 +1513,7 @@ function saveSkillWithCustomName(baseName, stat, level, special, multiplier) {
     if (!customName) {
         showModal('Ошибка', `
             <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Введите название!</p>
+                <p style="color: ${getThemeColors().danger};">Введите название!</p>
        
             </div>
         `);
@@ -1221,7 +1526,7 @@ function saveSkillWithCustomName(baseName, stat, level, special, multiplier) {
     if (state.skills.find(s => s.customName === fullName)) {
         showModal('Ошибка', `
             <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Этот вариант навыка уже добавлен!</p>
+                <p style="color: ${getThemeColors().danger};">Этот вариант навыка уже добавлен!</p>
         
             </div>
         `);
@@ -1262,12 +1567,28 @@ function refreshAddSkillModal() {
                 'BODY': 'Телосложение',
                 'REA': 'Реакция',
                 'TECH': 'Техника',
-                'CHA': 'Харизма'
+                'CHA': 'Характер'
             };
+            
+            // Проверяем наличие профессиональных навыков
+            const hasFixerSkill = state.professionalSkills && state.professionalSkills.some(skill => 
+                skill && skill.name === 'Решала'
+            );
+            const medicSkills = ['Фармацевт', 'Инженер криосистем', 'Специалист по клонированию'];
+            const hasMedicSkill = state.professionalSkills && state.professionalSkills.some(skill => 
+                skill && medicSkills.includes(skill.name)
+            );
             
             const availableSkills = STANDARD_SKILLS.filter(skill => {
                 const canAddMultiple = skill.name === "Язык" || skill.name.startsWith("Боевые искусства");
                 if (canAddMultiple) return true;
+                
+                // Скрываем "Торг" если нет профессии "Решала"
+                if (skill.name === 'Торг' && !hasFixerSkill) return false;
+                
+                // Скрываем "Медицина" если нет медицинской профессии
+                if (skill.name === 'Медицина' && !hasMedicSkill) return false;
+                
                 return !state.skills.find(s => s.name === skill.name);
             });
             
@@ -1279,10 +1600,13 @@ function refreshAddSkillModal() {
                             ${availableSkills.map(skill => `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid rgba(182, 103, 255, 0.15); margin-bottom: 0.5rem;">
                                     <div>
-                                        <span style="color: var(--text); font-weight: 500;">${skill.name}</span>
+                                    <div>
+                                        <span style="color: ${getThemeColors().text}; font-weight: 500;">${skill.name}</span>
                                         <span style="color: var(--muted); font-size: 0.85rem;"> (${statNames[skill.stat] || skill.stat})</span>
-                                        ${skill.special ? '<span style="color: var(--success); font-size: 0.8rem;"> ★</span>' : ''}
+                                            ${skill.special ? '<span style="color: var(--success); font-size: 0.8rem;"> </span>' : ''}
                                         ${skill.multiplier > 1 ? `<span style="color: var(--accent-2); font-size: 0.8rem;"> ×${skill.multiplier}</span>` : ''}
+                                        </div>
+                                        ${skill.footnote ? `<div style="color: var(--muted); font-size: 0.75rem; font-style: italic; margin-top: 0.25rem;">(${skill.footnote})</div>` : ''}
                                     </div>
                                     <button class="pill-button primary-button" onclick="addStandardSkill('${skill.name}');" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Добавить</button>
                                 </div>
@@ -1296,10 +1620,19 @@ function refreshAddSkillModal() {
 }
 
 function addCustomSkill() {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     modal.innerHTML = `
         <div class="modal" style="max-width: 500px;">
             <div class="modal-header">
@@ -1321,7 +1654,7 @@ function addCustomSkill() {
                             <option value="BODY">Телосложение</option>
                             <option value="REA">Реакция</option>
                             <option value="TECH">Техника</option>
-                            <option value="CHA">Харизма</option>
+                            <option value="CHA">Характер</option>
                         </select>
                     </div>
                 </div>
@@ -1340,6 +1673,9 @@ function addCustomSkill() {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем обработчики клавиатуры для правильной работы Enter
+    addModalKeyboardHandlers(modal);
 }
 
 function saveCustomSkill() {
@@ -1349,7 +1685,7 @@ function saveCustomSkill() {
     if (!name) {
         showModal('Ошибка', `
             <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Введите название навыка!</p>
+                <p style="color: ${getThemeColors().danger};">Введите название навыка!</p>
            
             </div>
         `);
@@ -1360,7 +1696,7 @@ function saveCustomSkill() {
     if (state.skills.find(s => s.name === name)) {
         showModal('Ошибка', `
             <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Этот навык уже добавлен!</p>
+                <p style="color: ${getThemeColors().danger};">Этот навык уже добавлен!</p>
              
             </div>
         `);
@@ -1396,6 +1732,12 @@ function updateSkillLevel(skillId, newLevel) {
         skill.level = Math.max(0, Math.min(10, parseInt(newLevel)));
         renderSkills();
         updateDerivedStats(); // Обновляем нагрузку если изменилась Атлетика
+        
+        // Обновляем скорость велосипеда если изменилась Атлетика
+        if (skill.name === 'Атлетика' && typeof updateBikeDescription === 'function') {
+            updateBikeDescription();
+        }
+        
         scheduleSave();
     }
 }
@@ -1424,7 +1766,7 @@ function renderSkills() {
         'BODY': 'Телосложение',
         'REA': 'Реакция',
         'TECH': 'Техника',
-        'CHA': 'Харизма'
+        'CHA': 'Характер'
     };
     
     // Отображаем навыки в виде сетки (как характеристики)
@@ -1439,16 +1781,32 @@ function renderSkills() {
         <div class="skills-grid-compact">
             ${sortedSkills.map(skill => {
                 const isBargainSkill = skill.name === 'Торг' || (skill.customName && skill.customName === 'Торг');
+                const isMedicineSkill = skill.name === 'Медицина' || (skill.customName && skill.customName === 'Медицина');
                 return `
                 <div class="skill-item-compact">
                     <button class="skill-remove-btn-compact" onclick="removeSkill('${skill.id}')">×</button>
                     
                     <div class="skill-name-compact">
                         ${skill.customName || skill.name}
+                        ${skill.multiplier > 1 ? `<span style="color: var(--accent-2); font-size: 0.75rem; font-weight: 600; margin-left: 0.25rem;">×${skill.multiplier}</span>` : ''}
                         ${isBargainSkill ? `
                             <div style="margin-top: 0.25rem;">
                                 <span style="font-size: 0.7rem; color: var(--muted); font-style: italic;">
                                     Только для Решалы!
+                                </span>
+                            </div>
+                            <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <label style="display: flex; align-items: center; gap: 0.25rem; cursor: pointer; font-size: 0.75rem; color: ${getThemeColors().text};">
+                                    <input type="checkbox" ${state.bargainEnabled ? 'checked' : ''} onchange="toggleBargainEnabled(this.checked)" style="cursor: pointer; width: 14px; height: 14px;">
+                                    <span>Активировать</span>
+                                </label>
+                                <span style="font-size: 0.65rem; color: var(--muted); font-style: italic;">(1/сцена)</span>
+                            </div>
+                        ` : ''}
+                        ${isMedicineSkill ? `
+                            <div style="margin-top: 0.25rem;">
+                                <span style="font-size: 0.7rem; color: var(--muted); font-style: italic;">
+                                    Только для Медика!
                                 </span>
                             </div>
                         ` : ''}
@@ -1496,22 +1854,46 @@ function showAddSkillModal() {
         'BODY': 'Телосложение',
         'REA': 'Реакция',
         'TECH': 'Техника',
-        'CHA': 'Харизма'
+        'CHA': 'Характер'
     };
+    
+    // Проверяем наличие профессиональных навыков
+    const hasFixerSkill = state.professionalSkills && state.professionalSkills.some(skill => 
+        skill && skill.name === 'Решала'
+    );
+    const medicSkills = ['Фармацевт', 'Инженер криосистем', 'Специалист по клонированию'];
+    const hasMedicSkill = state.professionalSkills && state.professionalSkills.some(skill => 
+        skill && medicSkills.includes(skill.name)
+    );
     
     // Фильтруем навыки: скрываем уже добавленные (кроме "Язык" и "Боевые искусства")
     const availableSkills = STANDARD_SKILLS.filter(skill => {
         const canAddMultiple = skill.name === "Язык" || skill.name.startsWith("Боевые искусства");
         if (canAddMultiple) return true; // Всегда показываем
         
+        // Скрываем "Торг" если нет профессии "Решала"
+        if (skill.name === 'Торг' && !hasFixerSkill) return false;
+        
+        // Скрываем "Медицина" если нет медицинской профессии
+        if (skill.name === 'Медицина' && !hasMedicSkill) return false;
+        
         // Проверяем, добавлен ли уже этот навык
         return !state.skills.find(s => s.name === skill.name);
     });
     
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     modal.innerHTML = `
         <div class="modal" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header">
@@ -1526,10 +1908,13 @@ function showAddSkillModal() {
                             ${availableSkills.map(skill => `
                                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid rgba(182, 103, 255, 0.15); margin-bottom: 0.5rem;">
                                     <div>
-                                        <span style="color: var(--text); font-weight: 500;">${skill.name}</span>
+                                    <div>
+                                        <span style="color: ${getThemeColors().text}; font-weight: 500;">${skill.name}</span>
                                         <span style="color: var(--muted); font-size: 0.85rem;"> (${statNames[skill.stat] || skill.stat})</span>
                                         ${skill.special ? '<span style="color: var(--success); font-size: 0.8rem;"> </span>' : ''}
                                         ${skill.multiplier > 1 ? `<span style="color: var(--accent-2); font-size: 0.8rem;"> ×${skill.multiplier}</span>` : ''}
+                                        </div>
+                                        ${skill.footnote ? `<div style="color: var(--muted); font-size: 0.75rem; font-style: italic; margin-top: 0.25rem;">(${skill.footnote})</div>` : ''}
                                     </div>
                                     <button class="pill-button primary-button" onclick="addStandardSkill('${skill.name}');" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Добавить</button>
                                 </div>
@@ -1551,4394 +1936,11 @@ function showAddSkillModal() {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
-}
-
-// Функции для работы с секцией "Дека"
-function toggleDeckSection(sectionType) {
-    let containerId, toggleId;
     
-    switch(sectionType) {
-        case 'programs':
-            containerId = 'deckProgramsContainer';
-            toggleId = 'deckProgramsToggle';
-            break;
-        case 'chips':
-            containerId = 'deckChipsContainer';
-            toggleId = 'deckChipsToggle';
-            break;
-        case 'upgrades':
-            containerId = 'deckUpgradesContainer';
-            toggleId = 'deckUpgradesToggle';
-            break;
-        case 'installedChips':
-            containerId = 'deckInstalledChipsContainer';
-            toggleId = 'deckInstalledChipsToggle';
-            break;
-        default:
-            return;
-    }
-    
-    const container = document.getElementById(containerId);
-    const toggle = document.getElementById(toggleId);
-    
-    if (!container || !toggle) return;
-    
-    const isVisible = container.style.display !== 'none';
-    
-    if (isVisible) {
-        // Сворачиваем
-        container.style.display = 'none';
-        toggle.textContent = '▶';
-    } else {
-        // Разворачиваем
-        container.style.display = 'block';
-        toggle.textContent = '▼';
-    }
-}
-
-function renderDeckPrograms() {
-    const container = document.getElementById('deckProgramsContainer');
-    if (!container) return;
-    
-    // Подсчитываем используемую память
-    const usedMemory = state.deckPrograms.reduce((total, program) => total + (program.memory || 1), 0);
-    const maxMemory = parseInt(state.deck.memory) + state.deckGear.filter(item => 
-        item.deckGearType === 'upgrade' && 
-        item.stat === 'memory' && 
-        item.installedDeckId === 'main'
-    ).length;
-    
-    if (state.deckPrograms.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem; font-size: 0.8rem;">Программы не установлены</p>';
-        updateDeckCounters();
-        return;
-    }
-    
-    container.innerHTML = state.deckPrograms.map((program, index) => `
-        <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative;">
-            <button onclick="removeDeckProgramWithChoice(${index})" style="position: absolute; top: 0.5rem; right: 0.5rem; font-size: 1rem; background: transparent; border: none; color: var(--text); cursor: pointer;">×</button>
-            <div style="padding-right: 1.5rem;">
-                <div style="color: var(--success); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">${program.name}</div>
-                <div style="color: var(--muted); font-size: 0.75rem; margin-bottom: 0.25rem;">
-                    Цена: ${program.price} уе | ОЗУ: ${program.ram} | Память: ${program.memory || 1} | ${program.lethal ? 'Смертельная' : 'Несмертельная'}
-                </div>
-                <div style="color: var(--muted); font-size: 0.7rem; line-height: 1.3;">
-                    ${program.description}
-                </div>
-            </div>
-        </div>
-    `).join('');
-    
-    // Добавляем информацию об использовании памяти
-    const memoryInfo = document.createElement('div');
-    memoryInfo.style.cssText = 'margin-top: 0.5rem; padding: 0.75rem; background: rgba(91, 155, 255, 0.1); border: 1px solid #5b9bff; border-radius: 6px; text-align: center;';
-    memoryInfo.innerHTML = `
-        <div style="color: var(--accent); font-size: 0.8rem;">
-            Использовано памяти: <strong>${usedMemory}/${maxMemory}</strong>
-            ${usedMemory > maxMemory ? '<span style="color: var(--danger);"> (ПРЕВЫШЕНО!)</span>' : ''}
-        </div>
-    `;
-    container.appendChild(memoryInfo);
-    
-    // Обновляем счетчик в заголовке
-    updateDeckCounters();
-}
-
-// Функция обновления отображения характеристик деки
-function updateDeckDisplay() {
-    // Блок Деки теперь содержит только кнопки и щепки памяти
-    // Все управление деками происходит через поп-ап "Мои Деки"
-    
-    // Обновляем только щепки памяти
-    renderDeckChips();
-}
-
-// Функция отображения улучшений деки
-function renderDeckUpgrades() {
-    const container = document.getElementById('deckUpgradesContainer');
-    if (!container) return;
-    
-    const upgrades = [
-        { name: 'Улучшение памяти', stat: 'memory', maxUpgrades: 5, priceMultiplier: 200 },
-        { name: 'Улучшение ОЗУ', stat: 'ram', maxUpgrades: 5, priceMultiplier: 1000 },
-        { name: 'Улучшение Видимости', stat: 'grid', maxUpgrades: 5, priceMultiplier: 100 }
-    ];
-    
-    container.innerHTML = upgrades.map(upgrade => {
-        const installedUpgrades = state.deckGear.filter(item => 
-            item.deckGearType === 'upgrade' && 
-            item.stat === upgrade.stat && 
-            item.installedDeckId === 'main'
-        );
-        
-        const upgradeCount = installedUpgrades.length;
-        const canInstall = upgradeCount < upgrade.maxUpgrades;
-        
-        // Рассчитываем стоимость для следующего уровня
-        let nextPrice = 0;
-        if (canInstall) {
-            if (upgrade.stat === 'memory') {
-                const currentMemory = parseInt(state.deck.memory) + upgradeCount;
-                nextPrice = (currentMemory + 1) * upgrade.priceMultiplier;
-            } else if (upgrade.stat === 'ram') {
-                const currentRam = parseInt(state.deckRam.current) + upgradeCount;
-                nextPrice = (currentRam + 1) * upgrade.priceMultiplier;
-            } else if (upgrade.stat === 'grid') {
-                const currentGrid = parseInt(state.deck.grid) + upgradeCount;
-                nextPrice = (currentGrid + 1) * upgrade.priceMultiplier;
-            }
-        }
-        
-        return `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 193, 7, 0.1); border: 1px solid var(--warning); border-radius: 6px;">
-                <div>
-                    <div style="font-weight: 600; font-size: 0.9rem;">${upgrade.name}</div>
-                    <div style="color: var(--muted); font-size: 0.8rem;">Улучшений: ${upgradeCount}/${upgrade.maxUpgrades}</div>
-                </div>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    ${canInstall ? `
-                        <span style="color: var(--accent); font-size: 0.8rem;">${nextPrice} уе</span>
-                        <button class="pill-button primary-button" onclick="installDeckUpgrade('${upgrade.stat}', ${nextPrice})" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Улучшить</button>
-                    ` : `
-                        <span style="color: var(--muted); font-size: 0.8rem;">Максимум улучшений</span>
-                    `}
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-// Функция отображения установленных щепок
-function renderDeckInstalledChips() {
-    const container = document.getElementById('deckInstalledChipsContainer');
-    const countElement = document.getElementById('deckInstalledChipsCount');
-    
-    if (!container) return;
-    
-    // Подсчитываем слоты для щепок
-    const chipSlotModules = state.deckGear.filter(item => 
-        item.deckGearType === 'module' && 
-        item.name === 'Дополнительный слот для Щепки' && 
-        item.installedDeckId === 'main'
-    );
-    const chipSlots = 1 + chipSlotModules.length;
-    
-    // Подсчитываем установленные щепки
-    const installedChips = state.deckChips.filter(chip => chip.installedDeckId === 'main');
-    
-    if (countElement) {
-        countElement.textContent = `(${installedChips.length}/${chipSlots})`;
-    }
-    
-    if (installedChips.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem; font-size: 0.8rem;">Щепки не установлены</p>';
-        return;
-    }
-    
-    container.innerHTML = `
-        <div style="display: grid; gap: 0.5rem;">
-            ${installedChips.map(chip => `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 193, 7, 0.1); border: 1px solid var(--warning); border-radius: 6px;">
-                    <div>
-                        <div style="font-weight: 600; font-size: 0.9rem;">${chip.name}</div>
-                        <div style="color: var(--muted); font-size: 0.8rem;">${chip.description || 'Щепка памяти'}</div>
-                    </div>
-                    <button class="pill-button danger-button" onclick="removeChipFromDeck('${chip.id}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Удалить</button>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
-function renderDeckChips() {
-    const container = document.getElementById('deckChipsContainer');
-    if (!container) return;
-    
-    if (state.deckChips.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem; font-size: 0.8rem;">Щепки памяти не добавлены</p>';
-        updateDeckCounters();
-        return;
-    }
-    
-    container.innerHTML = state.deckChips.map((chip, index) => `
-        <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative;">
-            <div style="display: flex; gap: 0.5rem; padding-right: 3rem;">
-                <button onclick="editMemoryChip(${index})" style="background: transparent; border: none; color: var(--text); cursor: pointer; font-size: 0.8rem;" title="Редактировать">&#x270F;&#xFE0F;</button>
-                <button onclick="removeMemoryChip(${index})" style="position: absolute; top: 0.5rem; right: 0.5rem; font-size: 1rem; background: transparent; border: none; color: var(--text); cursor: pointer;">×</button>
-            </div>
-            <div>
-                <div style="color: var(--accent); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">${chip.name}</div>
-                <div style="color: var(--muted); font-size: 0.75rem; margin-bottom: 0.5rem;">
-                    ${chip.programs && chip.programs.length > 0 ? `
-                        <div style="margin-bottom: 0.5rem;">
-                            <div style="color: var(--accent); font-weight: 600; margin-bottom: 0.25rem;">Программы:</div>
-                            ${chip.programs.map(program => `
-                                <div style="margin-bottom: 0.3rem; padding-left: 0.5rem;">
-                                    <div style="font-weight: 600; color: var(--text);">• ${program.name}</div>
-                                    ${program.description ? `<div style="color: var(--muted); font-size: 0.7rem; margin-top: 0.1rem; line-height: 1.3;">${program.description}</div>` : ''}
-                </div>
-                            `).join('')}
-                        </div>
-                    ` : chip.content ? `Содержимое: ${chip.content.substring(0, 50)}${chip.content.length > 50 ? '...' : ''}` : 'Пустая щепка'}
-                </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    ${chip.installedDeckId ? `
-                        <span style="color: var(--success); font-size: 0.8rem;">Установлена на деку</span>
-                    ` : `
-                        <button class="pill-button primary-button" onclick="installChipOnDeck('${chip.id}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Установить на деку</button>
-                    `}
-                </div>
-            </div>
-        </div>
-    `).join('');
-    
-    // Обновляем счетчик в заголовке
-    updateDeckCounters();
-}
-
-function updateDeckCounters() {
-    // Обновляем счетчики в заголовках секций
-    const programsCount = document.getElementById('deckProgramsCount');
-    const chipsCount = document.getElementById('deckChipsCount');
-    
-    if (programsCount) {
-        programsCount.textContent = `(${state.deckPrograms.length})`;
-    }
-    
-    if (chipsCount) {
-        chipsCount.textContent = `(${state.deckChips.length})`;
-    }
-}
-
-function showProgramShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 800px;">
-            <div class="modal-header">
-                <h3>💾 Магазин программ</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button onclick="toggleProgramsFreeMode()" id="programsFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-            </div>
-            <div class="modal-body">
-                <div style="display: grid; gap: 1rem;">
-                    ${STANDARD_PROGRAMS.map((program, index) => `
-                        <div class="program-item">
-                            <div class="program-info">
-                                <div class="program-name">${program.name}</div>
-                                <div class="program-details">
-                                    Цена: <span class="program-price-display" data-original-price="${program.price}">${program.price}</span> уе | RAM: ${program.ram} | ${program.lethal ? 'Смертельная' : 'Несмертельная'}
-                                </div>
-                                <div class="program-description" style="font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem;">
-                                    ${program.description}
-                                </div>
-                            </div>
-                            <div class="program-actions">
-                                <button class="pill-button primary-button program-buy-button" onclick="buyProgram('${program.name}', ${program.price}, ${program.ram}, ${program.lethal}, '${program.description.replace(/'/g, "\\'")}')" data-program-name="${program.name}" data-price="${program.price}" data-ram="${program.ram}" data-lethal="${program.lethal}" data-description="${program.description.replace(/'/g, "\\'")}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            <div class="modal-footer">
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function getProgramFree(name, ram, lethal, description) {
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    // Показываем модал установки без списания денег
-    showProgramInstallModal(name, 0, ram, lethal, description);
-}
-
-function toggleProgramsFreeMode() {
-    const buyButtons = document.querySelectorAll('.program-buy-button');
-    const priceDisplays = document.querySelectorAll('.program-price-display');
-    const toggleButton = document.getElementById('programsFreeModeButton');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    const isFreeMode = toggleButton.textContent === 'Отключить бесплатно';
-    
-    if (isFreeMode) {
-        // Отключаем бесплатный режим - возвращаем оригинальные цены
-        buyButtons.forEach(btn => {
-            const price = btn.getAttribute('data-price');
-            const name = btn.getAttribute('data-program-name');
-            const ram = btn.getAttribute('data-ram');
-            const lethal = btn.getAttribute('data-lethal');
-            const description = btn.getAttribute('data-description');
-            btn.setAttribute('onclick', `buyProgram('${name}', ${price}, ${ram}, ${lethal}, '${description}')`);
-        });
-        
-        // Возвращаем оригинальные цены визуально
-        priceDisplays.forEach(display => {
-            const originalPrice = display.getAttribute('data-original-price');
-            display.textContent = originalPrice;
-        });
-        
-        toggleButton.textContent = 'Бесплатно';
-        toggleButton.style.background = 'transparent';
-        
-        // Возвращаем обычный фон
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 0, 0, 0.85)';
-        }
-    } else {
-        // Включаем бесплатный режим - ставим цены 0
-        buyButtons.forEach(btn => {
-            const name = btn.getAttribute('data-program-name');
-            const ram = btn.getAttribute('data-ram');
-            const lethal = btn.getAttribute('data-lethal');
-            const description = btn.getAttribute('data-description');
-            btn.setAttribute('onclick', `buyProgram('${name}', 0, ${ram}, ${lethal}, '${description}')`);
-        });
-        
-        // Меняем цены визуально на 0
-        priceDisplays.forEach(display => {
-            display.textContent = '0';
-        });
-        
-        toggleButton.textContent = 'Отключить бесплатно';
-        toggleButton.style.background = 'linear-gradient(135deg, #7DF4C6, #5b9bff)';
-        
-        // Меняем фон на зеленоватый
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 100, 50, 0.85)';
-        }
-    }
-}
-
-function buyProgram(name, price, ram, lethal, description, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < price) {
-        showModal('Недостаточно денег', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Не хватает Еши, мабой</p>
-                <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                    <button class="pill-button" onclick="closeModal(this); setTimeout(() => showProgramInstallModal('${name}', 0, ${ram}, ${lethal}, '${description.replace(/'/g, "\\'")}'), 100)">
-                        Игнорировать
-                    </button>
-                    <button class="pill-button primary-button" onclick="closeModal(this); setTimeout(() => showCustomPriceModal('${name}', ${price}, ${ram}, ${lethal}, '${description.replace(/'/g, "\\'")}'), 100)">
-                        Ввести сумму
-                    </button>
-                </div>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Показываем модал установки программы с выбором деки
-    showProgramInstallModal(name, price, ram, lethal, description, catalogPrice);
-}
-
-function showCustomPriceModal(name, originalPrice, ram, lethal, description) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3><img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"> Ввести свою цену</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1rem;">
-                    <p><strong>${name}</strong></p>
-                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
-                        Оригинальная цена: <strong style="color: var(--danger);">${originalPrice} уе</strong>
-                    </p>
-                </div>
-                
-                <div class="input-group">
-                    <label class="input-label">Ваша цена</label>
-                    <input type="number" class="input-field" id="customProgramPrice" value="${originalPrice}" min="0" placeholder="Введите цену">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="buyProgramWithCustomPrice('${name}', ${ram}, ${lethal}, '${description.replace(/'/g, "\\'")}')">Купить</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Фокусируемся на поле ввода
-    setTimeout(() => {
-        const input = document.getElementById('customProgramPrice');
-        if (input) input.focus();
-    }, 100);
-}
-
-function buyProgramWithCustomPrice(name, ram, lethal, description, catalogPrice = null) {
-    const customPrice = parseInt(document.getElementById('customProgramPrice').value) || 0;
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < customPrice) {
-        showModal('Недостаточно денег', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Даже на эту сумму не хватает денег!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money = currentMoney - customPrice;
-    updateMoneyDisplay();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    // Показываем модал установки
-    showProgramInstallModal(name, customPrice, ram, lethal, description, catalogPrice);
-}
-
-function showProgramInstallModal(name, price, ram, lethal, description, catalogPrice = null) {
-    const content = `
-                <div style="margin-bottom: 1rem;">
-                    <p><strong>${name}</strong></p>
-                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
-                        Цена: <strong style="color: var(--accent);">${price} уе</strong> | 
-                        RAM: <strong style="color: var(--success);">${ram}</strong> |
-                        ${lethal ? '<strong style="color: var(--danger);">Смертельная</strong>' : '<strong style="color: var(--success);">Несмертельная</strong>'}
-                    </p>
-                    <p style="font-size: 0.9rem; color: var(--muted); margin-bottom: 1rem;">
-                        ${description}
-                    </p>
-                </div>
-                
-                <div style="display: grid; gap: 0.75rem;">
-                    <label class="field">
-                        Установить на
-                <select id="programInstallTarget" style="width: 100%;" onchange="toggleProgramInstallOptions()">
-                            <option value="deck">Дека</option>
-                            <option value="chip">Щепку памяти</option>
-                </select>
-            </label>
-            
-            <div id="deckSelectionContainer" style="display: none;">
-                <label class="field">
-                    Выберите деку
-                    <select id="programDeckSelect" style="width: 100%;">
-                        ${state.deck ? `<option value="main">Основная дека (${state.deck.name})</option>` : ''}
-                        ${state.decks.map(deck => `<option value="${deck.id}">${deck.name}</option>`).join('')}
-                        </select>
-                    </label>
-            </div>
-        </div>
-    `;
-    
-    const buttons = [
-        {
-            text: 'Установить',
-            class: 'primary-button',
-            onclick: `installProgram('${name}', ${price}, ${ram}, ${lethal}, '${description.replace(/'/g, "\\'")}', ${catalogPrice || 'null'})`
-        }
-    ];
-    
-    showModal(`Установка программы: ${name}`, content, buttons);
-    
-    // Показываем выбор деки, так как по умолчанию выбрана "Дека"
-    setTimeout(() => {
-        toggleProgramInstallOptions();
-    }, 100);
-}
-
-// Функция переключения опций установки программы
-function toggleProgramInstallOptions() {
-    const target = document.getElementById('programInstallTarget').value;
-    const deckContainer = document.getElementById('deckSelectionContainer');
-    
-    if (deckContainer) {
-    if (target === 'deck') {
-            deckContainer.style.display = 'block';
-        } else {
-            deckContainer.style.display = 'none';
-        }
-    }
-}
-
-function installProgram(name, price, ram, lethal, description, catalogPrice = null) {
-    const target = document.getElementById('programInstallTarget').value;
-    
-    if (target === 'deck') {
-        // Получаем выбранную деку из окна установки
-        const selectedDeckId = document.getElementById('programDeckSelect').value;
-        
-        // Закрываем только окно установки программы, а не весь магазин
-        const installModal = document.querySelector('.modal-overlay:last-child');
-        if (installModal) {
-            installModal.remove();
-        }
-        
-        // Устанавливаем программу на деку (это покажет уведомление об успешной установке)
-        installProgramOnDeck(name, price, ram, lethal, description, catalogPrice, selectedDeckId);
-    } else {
-        // Установка на щепку - создаем новую щепку
-        const currentMoney = parseInt(state.money) || 0;
-        const chipCost = 10; // Стоимость создания щепки
-        const totalCost = price + chipCost; // Общая стоимость программы + щепки
-        
-        if (currentMoney < totalCost) {
-            showModal('Недостаточно денег', `
-                <div style="text-align: center; padding: 1rem;">
-                    <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Недостаточно денег для покупки!</p>
-                    <p style="color: var(--muted); margin-bottom: 1rem;">Программа: ${price} уе + Щепка: ${chipCost} уе = ${totalCost} уе</p>
-                    <p style="color: var(--muted); margin-bottom: 1rem;">Доступно: ${currentMoney} уе</p>
-                    <button class="pill-button" onclick="closeModal(this)">Понятно</button>
-                </div>
-            `);
-            return;
-        }
-        
-        // Списываем деньги за программу и щепку
-        state.money = currentMoney - totalCost;
-        updateMoneyDisplay();
-        
-        // Создаем новую щепку с программой
-        const newChip = {
-            id: generateId('chip'),
-            name: 'Сам купил',
-            programs: [{
-                name: name,
-                price: price,
-                ram: ram,
-                lethal: lethal,
-                description: description
-            }],
-            content: '',
-            installedDeckId: null
-        };
-        
-        state.deckChips.push(newChip);
-        renderDeckChips();
-        
-        // Добавляем в лог
-        if (price > 0) {
-            addToRollLog('purchase', {
-                item: `Программа "${name}" + Щепка`,
-                price: price + chipCost,
-                category: 'Программа (на щепке)'
-            });
-        }
-        
-        closeModal(document.querySelector('.modal-overlay .icon-button'));
-        scheduleSave();
-        
-        showModal('Щепка создана', `&#x2705; Создана щепка "Сам купил" с программой ${name}!<br>Списано ${totalCost} уе (программа: ${price} уе + щепка: ${chipCost} уе).`);
-    }
-}
-
-// Функция установки программы на конкретную деку
-function installProgramOnDeck(name, price, ram, lethal, description, catalogPrice, deckId) {
-    // Проверяем лимит памяти для выбранной деки
-    const usedMemory = state.deckPrograms.reduce((total, program) => {
-        if (program.installedDeckId == deckId) {
-            return total + (program.memory || 1);
-        }
-        return total;
-    }, 0);
-    
-    // Находим деку по ID (стартовая дека или купленная)
-    let targetDeck = null;
-    if (deckId === 'main' && state.deck) {
-        targetDeck = state.deck;
-    } else {
-        console.log('Поиск деки с ID:', deckId, 'тип:', typeof deckId);
-        console.log('Доступные деки:', state.decks.map(d => ({id: d.id, name: d.name, type: typeof d.id})));
-        targetDeck = state.decks.find(d => d.id == deckId); // Используем == для сравнения строки и числа
-    }
-    
-    if (!targetDeck) {
-        showModal('Ошибка', 'Дека не найдена!');
-        return;
-    }
-    
-    const baseMemory = parseInt(targetDeck.memory);
-    const memoryUpgrades = state.deckGear.filter(item => 
-        item.deckGearType === 'upgrade' && 
-        item.stat === 'memory' && 
-        item.installedDeckId == deckId
-    ).length;
-    const maxMemory = baseMemory + memoryUpgrades;
-    
-    const programMemory = 1; // По умолчанию программа занимает 1 единицу памяти
-    if (usedMemory + programMemory > maxMemory) {
-        showModal('Недостаточно памяти', `Недостаточно памяти на деке. Использовано: ${usedMemory}/${maxMemory}`);
-        return;
-    }
-    
-    const newProgram = {
-        id: generateId('program'),
-        name: name,
-        price: price,
-        ram: ram,
-        lethal: lethal,
-        description: description,
-        memory: programMemory,
-        installedOn: 'deck',
-        installedDeckId: deckId,
-        catalogPrice: catalogPrice,
-        purchasePrice: price,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    state.deckPrograms.push(newProgram);
-    
-    // Обновляем отображение программ (если это основная дека)
-    if (deckId === 'main') {
-        renderDeckPrograms();
-    }
-    
-    // Обновляем отображение коллекции дек (если окно открыто)
-    const deckCollectionModal = document.querySelector('.modal-overlay');
-    if (deckCollectionModal && document.getElementById('deckCollectionContainer')) {
-        renderDeckCollection();
-    }
-    
-    // Добавляем в лог (только если программа была куплена за деньги)
-    if (price > 0) {
-        addToRollLog('purchase', {
-            item: name,
-            price: price,
-            category: 'Программа (на Деку)'
-        });
-    }
-    
-    scheduleSave();
-    
-    const deckName = deckId === 'main' ? state.deck.name : state.decks.find(d => d.id == deckId)?.name || 'Неизвестная дека';
-    showModal('Программа установлена', `&#x2705; ${name} установлена на ${deckName}!`);
-}
-
-function removeDeckProgram(index) {
-        state.deckPrograms.splice(index, 1);
-        renderDeckPrograms();
-        scheduleSave();
-}
-
-function addMemoryChip() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>💾 Добавить щепку памяти</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1rem;">
-                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
-                        Стоимость создания щепки: <strong style="color: var(--accent);">10 уе</strong>
-                    </p>
-                </div>
-                
-                <div class="input-group">
-                    <label class="input-label">Название щепки</label>
-                    <input type="text" class="input-field" id="chipName" placeholder="Например: Рабочая щепка">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="saveMemoryChip()">Создать</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Фокусируемся на поле ввода
-    setTimeout(() => {
-        const input = document.getElementById('chipName');
-        if (input) input.focus();
-    }, 100);
-}
-
-function saveMemoryChip() {
-    const name = document.getElementById('chipName').value.trim();
-    
-    if (!name) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Введите название щепки!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    const currentMoney = parseInt(state.money) || 0;
-    const chipCost = 10; // Стоимость создания щепки
-    
-    if (currentMoney < chipCost) {
-        showModal('Недостаточно денег', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Не хватает Еши для создания щепки!</p>
-                <p style="color: var(--muted); margin-bottom: 1rem;">Создание щепки стоит ${chipCost} уе</p>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем деньги за щепку
-    state.money = currentMoney - chipCost;
-    updateMoneyDisplay();
-    
-    const newChip = {
-        id: generateId('chip'),
-        name: name,
-        program: null // Пустая щепка
-    };
-    
-    state.deckChips.push(newChip);
-    renderDeckChips();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    showModal('Щепка создана', `&#x2705; Создана пустая щепка "${name}"!<br>Списано ${chipCost} уе за создание щепки.`);
-}
-
-function editMemoryChip(index) {
-    const chip = state.deckChips[index];
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>&#x270F;&#xFE0F; Редактировать щепку</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="input-group">
-                    <label class="input-label">Название щепки</label>
-                    <input type="text" class="input-field" id="editChipName" value="${chip.name}" placeholder="Введите название">
-                </div>
-                
-                <div style="margin-top: 1.5rem;">
-                    <h4 style="color: var(--accent); margin-bottom: 1rem;">Содержимое щепки</h4>
-                    
-                    ${chip.programs && chip.programs.length > 0 ? `
-                        <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                            <div style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">📀 Программы:</div>
-                            ${chip.programs.map((program, progIndex) => `
-                                <div style="margin-bottom: 0.5rem; padding: 0.5rem; background: rgba(125, 244, 198, 0.2); border-radius: 4px;">
-                                    <div style="font-weight: 600;">${program.name}</div>
-                                    <div style="color: var(--muted); font-size: 0.8rem;">ОЗУ: ${program.ram} | ${program.lethal ? 'Смертельная' : 'Несмертельная'}</div>
-                                    <div style="color: var(--muted); font-size: 0.7rem;">${program.description}</div>
-                                    <button class="pill-button danger-button" onclick="removeProgramFromChip(${index}, ${progIndex})" style="margin-top: 0.25rem; font-size: 0.7rem;">Удалить</button>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : `
-                        <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                            <div style="color: var(--accent); font-weight: 600; margin-bottom: 1rem;">💾 Пустая щепка</div>
-                            
-                            <div style="margin-bottom: 1rem;">
-                                <label class="input-label">Записать программу</label>
-                                <button class="pill-button primary-button" onclick="showProgramInstallModalForChip(${index})" style="width: 100%; margin-top: 0.5rem;">📀 Выбрать программу</button>
-                            </div>
-                            
-                            <div style="margin-bottom: 1rem;">
-                                <label class="input-label">Или заполнить вручную</label>
-                                <textarea class="input-field" id="editChipContent" rows="4" placeholder="Введите содержимое щепки...">${chip.content || ''}</textarea>
-                            </div>
-                        </div>
-                    `}
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="saveEditedChip(${index})">Сохранить</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Фокусируемся на поле ввода и выделяем текст
-    setTimeout(() => {
-        const input = document.getElementById('editChipName');
-        if (input) {
-            input.focus();
-            input.select();
-        }
-    }, 100);
-}
-
-function saveEditedChip(index) {
-    const newName = document.getElementById('editChipName').value.trim();
-    const content = document.getElementById('editChipContent') ? document.getElementById('editChipContent').value.trim() : '';
-    
-    if (!newName) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Введите название щепки!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    state.deckChips[index].name = newName;
-    if (content) {
-        state.deckChips[index].content = content;
-    }
-    
-    // Обновляем отображение щепок и блока Дека
-    renderDeckChips();
-    updateDeckDisplay();
-    
-    // Если открыт поп-ап коллекции дек, обновляем его
-    const collectionModal = document.querySelector('.modal-overlay');
-    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
-        renderDeckCollection();
-    }
-    
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-}
-
-function removeMemoryChip(index) {
-        state.deckChips.splice(index, 1);
-        renderDeckChips();
-        scheduleSave();
-}
-
-function showProgramInstallModalForChip(chipIndex) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header">
-                <h3>📀 Выбрать программу для щепки</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="display: grid; gap: 1rem;">
-                    ${STANDARD_PROGRAMS.map((program, index) => `
-                        <div class="program-item">
-                            <div class="program-info">
-                                <div class="program-name">${program.name}</div>
-                                <div class="program-details">
-                                    Цена: ${program.price} уе | RAM: ${program.ram} | ${program.lethal ? 'Смертельная' : 'Несмертельная'}
-                                </div>
-                                <div class="program-description" style="font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem;">
-                                    ${program.description}
-                                </div>
-                            </div>
-                            <div class="program-actions">
-                                <button class="pill-button primary-button" onclick="installProgramOnChip(${chipIndex}, '${program.name}', ${program.price}, ${program.ram}, ${program.lethal}, '${program.description.replace(/'/g, "\\'")}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Записать на щепку</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function installProgramOnChip(chipIndex, name, price, ram, lethal, description) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < price) {
-        showModal('Недостаточно денег', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Недостаточно денег для покупки программы!</p>
-                <p style="color: var(--muted);">Требуется: ${price} уе | Доступно: ${currentMoney} уе</p>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Записываем программу на щепку
-    if (!state.deckChips[chipIndex].programs) {
-        state.deckChips[chipIndex].programs = [];
-    }
-    
-    state.deckChips[chipIndex].programs.push({
-        name: name,
-        price: price,
-        ram: ram,
-        lethal: lethal,
-        description: description
-    });
-    
-    // Обновляем отображение щепок и блока Дека
-    renderDeckChips();
-    updateDeckDisplay();
-    
-    // Если открыт поп-ап коллекции дек, обновляем его
-    const collectionModal = document.querySelector('.modal-overlay');
-    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
-        renderDeckCollection();
-    }
-    
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: name,
-        price: price,
-        category: 'Программа (на щепку)'
-    });
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    showModal('Программа записана', `&#x2705; ${name} записана на щепку!`);
-}
-
-function removeProgramFromChip(chipIndex, programIndex) {
-    const chip = state.deckChips[chipIndex];
-    if (!chip || !chip.programs || !chip.programs[programIndex]) return;
-    
-    chip.programs.splice(programIndex, 1);
-    
-    // Обновляем отображение щепок и блока Дека
-        renderDeckChips();
-    updateDeckDisplay();
-    
-    // Если открыт поп-ап коллекции дек, обновляем его
-    const collectionModal = document.querySelector('.modal-overlay');
-    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
-        renderDeckCollection();
-    }
-    
-        scheduleSave();
-        
-        closeModal(document.querySelector('.modal-overlay .icon-button'));
-        showModal('Программа удалена', `&#x2705; Программа удалена с щепки!`);
-}
-
-// Функции для работы с киберимплантами
-function renderImplants() {
-    const container = document.getElementById('implantsContainer');
-    if (!container) return;
-    
-    // Собираем все установленные модули из всех имплантов
-    const installedModules = [];
-    
-    for (const [implantType, implant] of Object.entries(state.implants)) {
-        if (!implant.parts) continue;
-        
-        for (const [partName, part] of Object.entries(implant.parts)) {
-            if (!part || !part.modules) continue;
-            
-            for (const module of part.modules) {
-                if (module) {
-                    installedModules.push({
-                        ...module,
-                        implantType: implantType,
-                        partName: partName,
-                        implantName: getImplantName(implantType),
-                        partDisplayName: getPartDisplayName(implantType, partName)
-                    });
-                }
-            }
-        }
-    }
-    
-    if (installedModules.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 2rem;">Киберимпланты не установлены</p>';
-        // Показываем кнопки управления
-        const buttonContainer = container.parentElement.querySelector('div[style*="display: flex"]');
-        if (buttonContainer) buttonContainer.style.display = 'flex';
-        return;
-    }
-    
-    // Скрываем кнопки управления когда есть установленные модули
-    const buttonContainer = container.parentElement.querySelector('div[style*="display: flex"]');
-    if (buttonContainer) buttonContainer.style.display = 'none';
-    
-    container.innerHTML = installedModules.map((module, index) => `
-        <div class="implant-item" style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;">
-            <div class="implant-info">
-                <div class="implant-name" style="color: var(--accent); font-size: 1.1rem; font-weight: bold; margin-bottom: 0.5rem;">${module.name}</div>
-                <div class="implant-category" style="color: var(--success); font-size: 0.9rem; margin-bottom: 0.5rem;">
-                    📍 Место установки: ${module.implantName} → ${module.partDisplayName}
-                </div>
-                <div class="implant-details" style="color: var(--text); font-size: 0.9rem; margin-bottom: 0.5rem;">
-                    &#x26A0;&#xFE0F; Потеря осознанности: ${module.awarenessLoss}
-                </div>
-                <div class="implant-description" style="font-size: 0.9rem; color: var(--muted); line-height: 1.4;">
-                    ${module.description}
-                </div>
-            </div>
-            <div class="implant-actions" style="margin-top: 1rem;">
-                <button class="pill-button" onclick="showImplantsManagement()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Управление</button>
-            </div>
-        </div>
-    `).join('') + `
-        <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem;">
-            <button class="pill-button primary-button" onclick="showImplantShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить модуль</button>
-            <button class="pill-button" onclick="showImplantPartsShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить часть импланта</button>
-            <button class="pill-button" onclick="showImplantsManagement()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Управление имплантами</button>
-        </div>
-    `;
-}
-
-function showImplantShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    let shopHTML = `
-        <div class="modal" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h3>🦾 Магазин киберимплантов</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button onclick="toggleImplantModulesFreeMode()" id="implantModulesFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-            </div>
-            <div class="modal-body" style="overflow-y: auto; flex: 1;">
-                <div style="margin-bottom: 1rem;">
-                    <input type="text" id="implantSearchInput" placeholder="&#x1F50D; Поиск по названию..." style="width: 100%; padding: 0.75rem; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1rem;" onkeyup="filterImplants(this.value)">
-                </div>
-    `;
-    
-    // Проходим по всем категориям
-    for (const [category, implants] of Object.entries(CYBERIMPLANTS_LIBRARY)) {
-        shopHTML += `
-            <div class="category-section" data-category="${category}">
-                <div class="category-title">${category}</div>
-                <div style="display: grid; gap: 1rem;">
-                    ${implants.map((implant) => `
-                        <div class="implant-item" data-name="${implant.name.toLowerCase()}" data-description="${implant.description.toLowerCase()}">
-                            <div class="implant-info">
-                                <div class="implant-name">${implant.name}</div>
-                                <div class="implant-details">
-                                    <span class="implant-module-price-display" data-original-price="${implant.price}" data-awareness="${implant.awarenessLoss}">Цена: ${implant.price} уе</span> | Потеря осознанности: ${implant.awarenessLoss}
-                                </div>
-                                <div class="implant-description" style="font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem;">
-                                    ${implant.description}
-                                </div>
-                            </div>
-                            <div class="implant-actions">
-                                <button class="pill-button primary-button implant-module-buy-button" onclick="buyAndInstallImplant('${category}', '${implant.name}', ${implant.price}, '${implant.awarenessLoss}', '${implant.description.replace(/'/g, "\\'")}')" data-category="${category}" data-name="${implant.name}" data-price="${implant.price}" data-awareness="${implant.awarenessLoss}" data-description="${implant.description.replace(/'/g, "\\'")}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    shopHTML += `
-            </div>
-            <div class="modal-footer">
-            </div>
-        </div>
-    `;
-    
-    modal.innerHTML = shopHTML;
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function filterImplants(searchTerm) {
-    const searchLower = searchTerm.toLowerCase();
-    const implantItems = document.querySelectorAll('.implant-item');
-    const categorySections = document.querySelectorAll('.category-section');
-    
-    let visibleItems = 0;
-    
-    implantItems.forEach(item => {
-        const name = item.dataset.name || '';
-        const description = item.dataset.description || '';
-        
-        if (name.includes(searchLower) || description.includes(searchLower)) {
-            item.style.display = 'block';
-            visibleItems++;
-        } else {
-            item.style.display = 'none';
-        }
-    });
-    
-    // Скрываем категории без видимых элементов
-    categorySections.forEach(section => {
-        const visibleInSection = section.querySelectorAll('.implant-item[style*="block"], .implant-item:not([style*="none"])');
-        if (visibleInSection.length === 0) {
-            section.style.display = 'none';
-        } else {
-            section.style.display = 'block';
-        }
-    });
-}
-
-function buyAndInstallImplant(category, name, price, awarenessLoss, description, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < price) {
-        showModal('Недостаточно денег', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Ха-ха, не так быстро, нищюк!</p>
-                <button class="pill-button" onclick="closeModal(this)">
-                    Закрыть
-                </button>
-            </div>
-        `);
-        return;
-    }
-    
-    // Бросаем кубики для потери осознанности
-    const lossRoll = rollDiceForAwarenessLoss(awarenessLoss);
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Вычитаем из текущей осознанности
-    const currentAwareness = parseInt(state.awareness.current) || 50;
-    state.awareness.current = Math.max(0, currentAwareness - lossRoll);
-    const awarenessEl = document.getElementById('awarenessCurrent');
-    if (awarenessEl) awarenessEl.value = state.awareness.current;
-    
-    // Добавляем модуль в снаряжение
-    const newGear = {
-        id: generateId('gear'),
-        name: name,
-        description: `${description} | Потеря осознанности: ${awarenessLoss}`,
-        price: price,
-        load: 1,
-        type: 'implant',
-        implantData: {
-            category: category,
-            name: name,
-            price: price,
-            awarenessLoss: awarenessLoss,
-            description: description
-        },
-        catalogPrice: catalogPrice,
-        purchasePrice: price,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: name,
-        price: price,
-        category: 'Модуль импланта'
-    });
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    showModal('Модуль куплен и готов к установке', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${name} куплен и добавлен в снаряжение!</p>
-            <p style="color: var(--danger); margin-bottom: 1rem;">Потеря осознанности: ${lossRoll}</p>
-            <p style="color: var(--muted);">Текущая осознанность: ${state.awareness.current}</p>
-            <p style="color: var(--muted);">Теперь установите его через "Управление имплантами"</p>
-            <button class="pill-button" onclick="closeModal(this)">
-                Закрыть
-            </button>
-        </div>
-    `);
-}
-
-function toggleImplantModulesFreeMode() {
-    const buyButtons = document.querySelectorAll('.implant-module-buy-button');
-    const priceDisplays = document.querySelectorAll('.implant-module-price-display');
-    const toggleButton = document.getElementById('implantModulesFreeModeButton');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    const isFreeMode = toggleButton.textContent === 'Отключить бесплатно';
-    
-    if (isFreeMode) {
-        // Отключаем бесплатный режим
-        buyButtons.forEach(btn => {
-            const category = btn.getAttribute('data-category');
-            const name = btn.getAttribute('data-name');
-            const price = btn.getAttribute('data-price');
-            const awareness = btn.getAttribute('data-awareness');
-            const description = btn.getAttribute('data-description');
-            btn.setAttribute('onclick', `buyAndInstallImplant('${category}', '${name}', ${price}, '${awareness}', '${description}')`);
-        });
-        
-        // Возвращаем оригинальные цены визуально
-        priceDisplays.forEach(display => {
-            const originalPrice = display.getAttribute('data-original-price');
-            display.textContent = `Цена: ${originalPrice} уе`;
-        });
-        
-        toggleButton.textContent = 'Бесплатно';
-        toggleButton.style.background = 'transparent';
-        
-        // Возвращаем обычный фон
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 0, 0, 0.85)';
-        }
-    } else {
-        // Включаем бесплатный режим
-        buyButtons.forEach(btn => {
-            const category = btn.getAttribute('data-category');
-            const name = btn.getAttribute('data-name');
-            const awareness = btn.getAttribute('data-awareness');
-            const description = btn.getAttribute('data-description');
-            btn.setAttribute('onclick', `buyAndInstallImplant('${category}', '${name}', 0, '${awareness}', '${description}')`);
-        });
-        
-        // Меняем цены визуально на 0
-        priceDisplays.forEach(display => {
-            display.textContent = `Цена: 0 уе`;
-        });
-        
-        toggleButton.textContent = 'Отключить бесплатно';
-        toggleButton.style.background = 'linear-gradient(135deg, #7DF4C6, #5b9bff)';
-        
-        // Меняем фон на зеленоватый
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 100, 50, 0.85)';
-        }
-    }
-}
-
-function renderImplants() {
-    const container = document.getElementById('implantsContainer');
-    if (!container) return;
-    
-    // Собираем все установленные модули из всех имплантов
-    const installedModules = [];
-    
-    for (const [implantType, implant] of Object.entries(state.implants)) {
-        for (const [partName, partData] of Object.entries(implant.parts)) {
-            if (partData && partData.modules) {
-                partData.modules.forEach((module, slotIndex) => {
-                    if (module) {
-                        const partDisplayName = getPartDisplayName(implantType, partName);
-                        installedModules.push({
-                            ...module,
-                            location: `${getImplantTypeDisplayName(implantType)} → ${partDisplayName} → Слот ${slotIndex + 1}`
-                        });
-                    }
-                });
-            }
-        }
-    }
-    
-    if (installedModules.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 2rem;">Киберимпланты не установлены</p>';
-        return;
-    }
-    
-    container.innerHTML = installedModules.map((implant, index) => `
-        <div class="implant-item" style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: rgba(0,0,0,0.2); border: 1px solid rgba(182, 103, 255, 0.2); border-radius: 8px; margin-bottom: 0.5rem;">
-            <div style="flex: 1;">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span style="color: var(--accent); font-weight: 600;">${implant.name}</span>
-                </div>
-                <div style="color: white; font-weight: bold; font-size: 0.8rem; margin-top: 0.25rem;">${implant.location}</div>
-                ${implant.description ? `<div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">${implant.description}</div>` : ''}
-            </div>
-        </div>
-    `).join('');
-}
-
-function getImplantTypeDisplayName(implantType) {
-    const typeNames = {
-        'head': 'Кибер-голова',
-        'arms': 'Кибер-рука',
-        'legs': 'Кибер-нога',
-        'spine': 'Кибер-спина',
-        'organs': 'Кибер-внутренности',
-        'neuromodule': 'Нейро-модуль'
-    };
-    return typeNames[implantType] || implantType;
-}
-
-
-function rollDiceForAwarenessLoss(awarenessLoss) {
-    if (awarenessLoss === '0') return 0;
-    
-    const match = awarenessLoss.match(/(\d+)d(\d+)/);
-    if (match) {
-        const count = parseInt(match[1]);
-        const sides = parseInt(match[2]);
-        let total = 0;
-        for (let i = 0; i < count; i++) {
-            total += Math.floor(Math.random() * sides) + 1;
-        }
-        return total;
-    }
-    
-    return 0;
-}
-
-
-function giftImplant(category, name, price, awarenessLoss, description) {
-    // Бросаем кубики для потери осознанности
-    const lossRoll = rollDiceForAwarenessLoss(awarenessLoss);
-    
-    // Вычитаем из текущей осознанности
-    const currentAwareness = parseInt(state.awareness.current) || 50;
-    state.awareness.current = Math.max(0, currentAwareness - lossRoll);
-    const awarenessEl = document.getElementById('awarenessCurrent');
-    if (awarenessEl) awarenessEl.value = state.awareness.current;
-    
-    // Добавляем модуль в снаряжение
-    const newGear = {
-        name: name,
-        description: `${description} | Потеря осознанности: ${awarenessLoss}`,
-        price: price,
-        load: 1,
-        type: 'implant',
-        implantData: {
-            category: category,
-            name: name,
-            price: price,
-            awarenessLoss: awarenessLoss,
-            description: description
-        }
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    showModal('Модуль получен', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${name} добавлен в снаряжение!</p>
-            <p style="color: var(--danger); margin-bottom: 1rem;">Потеря осознанности: ${lossRoll}</p>
-            <p style="color: var(--muted);">Текущая осознанность: ${state.awareness.current}</p>
-            <p style="color: var(--muted);">Теперь вы можете установить его через "Управление имплантами"</p>
-            <button class="pill-button" onclick="closeModal(this)">
-                Закрыть
-            </button>
-        </div>
-    `);
-}
-
-function addGiftedImplant() {
-    // Показываем модал магазина, но без списания денег
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    let shopHTML = `
-        <div class="modal" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header">
-                <h3>&#x1F381; Выберите подаренный имплант</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-    `;
-    
-    // Проходим по всем категориям
-    for (const [category, implants] of Object.entries(CYBERIMPLANTS_LIBRARY)) {
-        shopHTML += `
-            <div class="category-section">
-                <div class="category-title">${category}</div>
-                <div style="display: grid; gap: 1rem;">
-                    ${implants.map((implant) => `
-                        <div class="implant-item">
-                            <div class="implant-info">
-                                <div class="implant-name">${implant.name}</div>
-                                <div class="implant-details">
-                                    Потеря осознанности: ${implant.awarenessLoss}
-                                </div>
-                                <div class="implant-description" style="font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem;">
-                                    ${implant.description}
-                                </div>
-                            </div>
-                            <div class="implant-actions">
-                                <button class="pill-button success-button" onclick="installGiftedImplant('${category}', '${implant.name}', ${implant.price}, '${implant.awarenessLoss}', '${implant.description.replace(/'/g, "\\'")}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Установить</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    shopHTML += `
-            </div>
-            <div class="modal-footer">
-            </div>
-        </div>
-    `;
-    
-    modal.innerHTML = shopHTML;
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function installGiftedImplant(category, name, price, awarenessLoss, description) {
-    // Бросаем кубики для потери осознанности
-    const lossRoll = rollDiceForAwarenessLoss(awarenessLoss);
-    
-    // Вычитаем из текущей осознанности
-    const currentAwareness = parseInt(state.awareness.current) || 50;
-    state.awareness.current = Math.max(0, currentAwareness - lossRoll);
-    const awarenessEl = document.getElementById('awarenessCurrent');
-    if (awarenessEl) awarenessEl.value = state.awareness.current;
-    
-    // Добавляем модуль в снаряжение
-    const newGear = {
-        name: name,
-        description: `${description} | Потеря осознанности: ${awarenessLoss}`,
-        price: price,
-        load: 1,
-        type: 'implant',
-        implantData: {
-            category: category,
-            name: name,
-            price: price,
-            awarenessLoss: awarenessLoss,
-            description: description
-        }
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    showModal('Модуль получен', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${name} добавлен в снаряжение!</p>
-            <p style="color: var(--danger); margin-bottom: 1rem;">Потеря осознанности: ${lossRoll}</p>
-            <p style="color: var(--muted);">Текущая осознанность: ${state.awareness.current}</p>
-            <p style="color: var(--muted);">Теперь вы можете установить его через "Управление имплантами"</p>
-            <button class="pill-button" onclick="closeModal(this)">
-                Закрыть
-            </button>
-        </div>
-    `);
-}
-
-// Функция для управления имплантами (полная схема)
-function showImplantsManagement() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    let managementHTML = `
-        <div class="modal" style="max-width: 95vw; max-height: 95vh; overflow-y: auto;">
-            <div class="modal-header">
-                <h3>🦾 Управление имплантами</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="display: grid; grid-template-columns: 300px 1fr; gap: 2rem; min-height: 600px;">
-                    <!-- Левая панель: Схема тела -->
-                    <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 1rem; border: 1px solid var(--border);">
-                        <h4 style="color: var(--accent); text-align: center; margin-bottom: 1rem;">Схема тела</h4>
-                        <div style="position: relative; height: 500px; background: linear-gradient(135deg, #1a1a2e, #16213e); border-radius: 8px; border: 1px solid var(--border);">
-                            <!-- ГОЛОВА -->
-                            <div style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px; background: ${state.implants.head.parts.main ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 50%; border: 2px solid ${state.implants.head.parts.main ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.head.parts.main ? 'pointer' : 'not-allowed'};" onclick="${state.implants.head.parts.main ? "selectImplant('head', 'main')" : 'showUnpurchasedError()'}" title="Кибер-голова">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.head.parts.main ? 'var(--success)' : 'var(--danger)'}; font-size: 0.8rem; font-weight: bold;">ГОЛОВА</div>
-                                ${!state.implants.head.parts.main ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1.2rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <!-- НЕЙРОМОДУЛЬ -->
-                            <div style="position: absolute; top: 100px; left: 50%; transform: translateX(-50%); width: 40px; height: 40px; background: ${state.implants.neuromodule.parts.main ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 50%; border: 2px solid ${state.implants.neuromodule.parts.main ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.neuromodule.parts.main ? 'pointer' : 'not-allowed'};" onclick="${state.implants.neuromodule.parts.main ? 'selectImplant(\'neuromodule\')' : 'showUnpurchasedError()'}" title="Нейромодуль">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.neuromodule.parts.main ? 'var(--success)' : 'var(--danger)'}; font-size: 0.6rem; font-weight: bold;">НЕЙРО</div>
-                                ${!state.implants.neuromodule.parts.main ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <!-- СПИНА - отдельные части -->
-                            <div style="position: absolute; top: 150px; left: 50%; transform: translateX(-50%); width: 60px; height: 15px; background: ${state.implants.spine.parts.cervical ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.cervical ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.spine.parts.cervical ? 'pointer' : 'not-allowed'};" onclick="${state.implants.spine.parts.cervical ? "selectImplant('spine', 'cervical')" : 'showUnpurchasedError()'}" title="Шейная">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.spine.parts.cervical ? 'var(--success)' : 'var(--danger)'}; font-size: 0.3rem; font-weight: bold;">ШЕЙНАЯ</div>
-                                ${!state.implants.spine.parts.cervical ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 0.6rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 170px; left: 30%; transform: translateX(-50%); width: 50px; height: 15px; background: ${state.implants.spine.parts.thoracicLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.thoracicLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.spine.parts.thoracicLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.spine.parts.thoracicLeft ? "selectImplant('spine', 'thoracicLeft')" : 'showUnpurchasedError()'}" title="Грудная левая">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.spine.parts.thoracicLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.25rem; font-weight: bold;">ГРУД Л</div>
-                                ${!state.implants.spine.parts.thoracicLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 0.6rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 170px; right: 30%; transform: translateX(50%); width: 50px; height: 15px; background: ${state.implants.spine.parts.thoracicRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.thoracicRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.spine.parts.thoracicRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.spine.parts.thoracicRight ? "selectImplant('spine', 'thoracicRight')" : 'showUnpurchasedError()'}" title="Грудная правая">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.spine.parts.thoracicRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.25rem; font-weight: bold;">ГРУД П</div>
-                                ${!state.implants.spine.parts.thoracicRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 0.6rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 190px; left: 50%; transform: translateX(-50%); width: 60px; height: 15px; background: ${state.implants.spine.parts.lumbar ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.lumbar ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.spine.parts.lumbar ? 'pointer' : 'not-allowed'};" onclick="${state.implants.spine.parts.lumbar ? "selectImplant('spine', 'lumbar')" : 'showUnpurchasedError()'}" title="Поясничная">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.spine.parts.lumbar ? 'var(--success)' : 'var(--danger)'}; font-size: 0.3rem; font-weight: bold;">ПОЯСНИЧ</div>
-                                ${!state.implants.spine.parts.lumbar ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 0.6rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 210px; left: 50%; transform: translateX(-50%); width: 60px; height: 15px; background: ${state.implants.spine.parts.sacral ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.sacral ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.spine.parts.sacral ? 'pointer' : 'not-allowed'};" onclick="${state.implants.spine.parts.sacral ? "selectImplant('spine', 'sacral')" : 'showUnpurchasedError()'}" title="Крестцовая">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.spine.parts.sacral ? 'var(--success)' : 'var(--danger)'}; font-size: 0.3rem; font-weight: bold;">КРЕСТЦОВ</div>
-                                ${!state.implants.spine.parts.sacral ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 0.6rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <!-- ЛЕВАЯ РУКА - отдельные части -->
-                            <div style="position: absolute; top: 160px; left: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.wristLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.wristLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.wristLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.wristLeft ? "selectImplant('arms', 'wristLeft')" : 'showUnpurchasedError()'}" title="Кисть левая">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.wristLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">КИСТЬ</div>
-                                ${!state.implants.arms.parts.wristLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 190px; left: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.forearmLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.forearmLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.forearmLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.forearmLeft ? "selectImplant('arms', 'forearmLeft')" : 'showUnpurchasedError()'}" title="Предплечье левое">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.forearmLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.4rem; font-weight: bold;">ПРЕДПЛЕЧЬЕ</div>
-                                ${!state.implants.arms.parts.forearmLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 220px; left: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.shoulderLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.shoulderLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.shoulderLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.shoulderLeft ? "selectImplant('arms', 'shoulderLeft')" : 'showUnpurchasedError()'}" title="Плечо левое">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.shoulderLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">ПЛЕЧО</div>
-                                ${!state.implants.arms.parts.shoulderLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <!-- ПРАВАЯ РУКА - отдельные части -->
-                            <div style="position: absolute; top: 160px; right: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.wristRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.wristRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.wristRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.wristRight ? "selectImplant('arms', 'wristRight')" : 'showUnpurchasedError()'}" title="Кисть правая">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.wristRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">КИСТЬ</div>
-                                ${!state.implants.arms.parts.wristRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 190px; right: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.forearmRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.forearmRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.forearmRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.forearmRight ? "selectImplant('arms', 'forearmRight')" : 'showUnpurchasedError()'}" title="Предплечье правое">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.forearmRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.4rem; font-weight: bold;">ПРЕДПЛЕЧЬЕ</div>
-                                ${!state.implants.arms.parts.forearmRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 220px; right: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.shoulderRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.shoulderRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.shoulderRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.shoulderRight ? "selectImplant('arms', 'shoulderRight')" : 'showUnpurchasedError()'}" title="Плечо правое">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.shoulderRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">ПЛЕЧО</div>
-                                ${!state.implants.arms.parts.shoulderRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <!-- ВНУТРЕННОСТИ -->
-                            <div style="position: absolute; top: 300px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px; background: ${state.implants.organs.parts.main ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 8px; border: 2px solid ${state.implants.organs.parts.main ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.organs.parts.main ? 'pointer' : 'not-allowed'};" onclick="${state.implants.organs.parts.main ? 'selectImplant(\'organs\')' : 'showUnpurchasedError()'}" title="Кибер-внутренности">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.organs.parts.main ? 'var(--success)' : 'var(--danger)'}; font-size: 0.6rem; font-weight: bold;">ВНУТРЕННОСТИ</div>
-                                ${!state.implants.organs.parts.main ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <!-- ЛЕВАЯ НОГА - отдельные части -->
-                            <div style="position: absolute; top: 380px; left: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.footLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.footLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.footLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.footLeft ? "selectImplant('legs', 'footLeft')" : 'showUnpurchasedError()'}" title="Стопа левая">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.footLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">СТОПА</div>
-                                ${!state.implants.legs.parts.footLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 410px; left: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.shinLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.shinLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.shinLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.shinLeft ? "selectImplant('legs', 'shinLeft')" : 'showUnpurchasedError()'}" title="Голень левая">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.shinLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">ГОЛЕНЬ</div>
-                                ${!state.implants.legs.parts.shinLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 440px; left: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.thighLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.thighLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.thighLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.thighLeft ? "selectImplant('legs', 'thighLeft')" : 'showUnpurchasedError()'}" title="Бедро левое">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.thighLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">БЕДРО</div>
-                                ${!state.implants.legs.parts.thighLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <!-- ПРАВАЯ НОГА - отдельные части -->
-                            <div style="position: absolute; top: 380px; right: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.footRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.footRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.footRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.footRight ? "selectImplant('legs', 'footRight')" : 'showUnpurchasedError()'}" title="Стопа правая">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.footRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">СТОПА</div>
-                                ${!state.implants.legs.parts.footRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 410px; right: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.shinRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.shinRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.shinRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.shinRight ? "selectImplant('legs', 'shinRight')" : 'showUnpurchasedError()'}" title="Голень правая">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.shinRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">ГОЛЕНЬ</div>
-                                ${!state.implants.legs.parts.shinRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                            
-                            <div style="position: absolute; top: 440px; right: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.thighRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.thighRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.thighRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.thighRight ? "selectImplant('legs', 'thighRight')" : 'showUnpurchasedError()'}" title="Бедро правое">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.thighRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">БЕДРО</div>
-                                ${!state.implants.legs.parts.thighRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--danger); font-size: 1rem;">✖</div>' : ''}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Правая панель: Детали импланта -->
-                    <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 1rem; border: 1px solid var(--border);">
-                        <h4 style="color: var(--accent); text-align: center; margin-bottom: 1rem;">Детали импланта</h4>
-                        <div id="implantDetails">
-                            <p style="color: var(--muted); text-align: center; padding: 2rem;">Выберите имплант на схеме тела</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-            </div>
-        </div>
-    `;
-    
-    modal.innerHTML = managementHTML;
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-// Функция для выбора импланта
-function selectImplant(implantType, partName = null) {
-    const detailsContainer = document.getElementById('implantDetails');
-    if (!detailsContainer) return;
-    
-    const implant = state.implants[implantType];
-    if (!implant || !implant.installed) {
-        detailsContainer.innerHTML = `
-            <p style="color: var(--muted); text-align: center; padding: 2rem;">
-                Имплант не установлен. Купите части импланта в магазине.
-            </p>
-        `;
-        return;
-    }
-    
-    let detailsHTML = `
-        <div style="margin-bottom: 1rem;">
-            <h5 style="color: var(--accent); margin-bottom: 0.5rem;">${getImplantName(implantType)}</h5>
-            <p style="color: var(--muted); font-size: 0.9rem;">${getImplantDescription(implantType)}</p>
-        </div>
-    `;
-    
-    // Если указана конкретная часть, показываем только её
-    if (partName) {
-        const partData = implant.parts[partName];
-        if (!partData || !partData.slots) {
-            detailsContainer.innerHTML = `
-                <p style="color: var(--danger); text-align: center; padding: 2rem;">
-                    Эта часть импланта не куплена!
-                </p>
-            `;
-            return;
-        }
-        
-        const partDisplayName = getPartDisplayName(implantType, partName);
-        detailsHTML += `
-            <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--border);">
-                <h6 style="color: var(--accent); margin-bottom: 0.5rem;">${partDisplayName}</h6>
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                    ${Array.from({length: partData.slots}, (_, i) => `
-                        <div class="implant-slot" style="width: 40px; height: 40px; background: ${partData.modules[i] ? 'rgba(125, 244, 198, 0.3)' : 'rgba(182, 103, 255, 0.2)'}; border: 2px solid ${partData.modules[i] ? 'var(--success)' : 'var(--border)'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="manageSlot('${implantType}', '${partName}', ${i})">
-                            ${partData.modules[i] ? '✓' : '○'}
-                        </div>
-                    `).join('')}
-                </div>
-                <p style="color: var(--muted); font-size: 0.8rem;">Слотов: ${partData.modules.filter(m => m).length}/${partData.slots}</p>
-                ${partData.modules.filter(m => m).length > 0 ? `
-                    <div style="margin-top: 0.5rem;">
-                        <h7 style="color: var(--success); font-size: 0.8rem;">Установленные модули:</h7>
-                        ${partData.modules.map((module, i) => module ? `
-                            <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 6px; padding: 0.75rem; margin-top: 0.25rem;">
-                                <div style="color: var(--success); font-weight: bold; font-size: 0.8rem;">${module.name}</div>
-                                <div style="color: var(--muted); font-size: 0.7rem;">${module.description}</div>
-                            </div>
-                        ` : '').join('')}
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    } else {
-        // Показываем все части импланта
-        for (const [partName, partData] of Object.entries(implant.parts)) {
-            if (!partData || !partData.slots) continue; // Пропускаем не установленные части
-            
-            const partDisplayName = getPartDisplayName(implantType, partName);
-            detailsHTML += `
-                <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--border);">
-                    <h6 style="color: var(--accent); margin-bottom: 0.5rem;">${partDisplayName}</h6>
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                        ${Array.from({length: partData.slots}, (_, i) => `
-                            <div class="implant-slot" style="width: 40px; height: 40px; background: ${partData.modules[i] ? 'rgba(125, 244, 198, 0.3)' : 'rgba(182, 103, 255, 0.2)'}; border: 2px solid ${partData.modules[i] ? 'var(--success)' : 'var(--border)'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="manageSlot('${implantType}', '${partName}', ${i})">
-                                ${partData.modules[i] ? '✓' : '○'}
-                            </div>
-                        `).join('')}
-                    </div>
-                    <p style="color: var(--muted); font-size: 0.8rem;">Слотов: ${partData.modules.filter(m => m).length}/${partData.slots}</p>
-                    ${partData.modules.filter(m => m).length > 0 ? `
-                        <div style="margin-top: 0.5rem;">
-                            <h7 style="color: var(--success); font-size: 0.8rem;">Установленные модули:</h7>
-                            ${partData.modules.map((module, i) => module ? `
-                                <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 6px; padding: 0.75rem; margin-top: 0.25rem;">
-                                    <div style="color: var(--success); font-weight: bold; font-size: 0.8rem;">${module.name}</div>
-                                    <div style="color: var(--muted); font-size: 0.7rem;">${module.description}</div>
-                                </div>
-                            ` : '').join('')}
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-        }
-    }
-    
-    detailsContainer.innerHTML = detailsHTML;
-}
-
-function showUnpurchasedError() {
-    showModal('Часть не куплена', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">&#x274C; Эта часть импланта не куплена!</p>
-            <p style="color: var(--muted); margin-bottom: 1rem;">Купите её в магазине частей имплантов.</p>
-        </div>
-    `);
-}
-
-// Вспомогательные функции для имплантов
-function getImplantName(type) {
-    const names = {
-        head: 'Кибер-голова',
-        arms: 'Кибер-руки', 
-        legs: 'Кибер-ноги',
-        spine: 'Кибер-спина',
-        organs: 'Кибер-внутренности',
-        neuromodule: 'Нейромодуль'
-    };
-    return names[type] || type;
-}
-
-function getImplantDescription(type) {
-    const descriptions = {
-        head: 'Замена головы с сохранением мозга, слуха и зрения',
-        arms: 'Замена рук с независимыми частями',
-        legs: 'Замена ног с независимыми частями', 
-        spine: 'Замена мышечного каркаса спины и тела',
-        organs: 'Замена или дублирование внутренних органов',
-        neuromodule: 'Нейросеть для передачи информации в мозг'
-    };
-    return descriptions[type] || '';
-}
-
-function getPartDisplayName(implantType, partName) {
-    const partNames = {
-        head: { 
-            main: 'Полная замена головы'
-        },
-        arms: { 
-            wristLeft: 'Кисть левая', 
-            wristRight: 'Кисть правая',
-            forearmLeft: 'Предплечье левое', 
-            forearmRight: 'Предплечье правое',
-            shoulderLeft: 'Плечо левое', 
-            shoulderRight: 'Плечо правое'
-        },
-        legs: { 
-            footLeft: 'Стопа левая', 
-            footRight: 'Стопа правая',
-            shinLeft: 'Голень левая', 
-            shinRight: 'Голень правая',
-            thighLeft: 'Бедро левое', 
-            thighRight: 'Бедро правое'
-        },
-        spine: { cervical: 'Шейная', thoracicLeft: 'Грудная левая', thoracicRight: 'Грудная правая', lumbar: 'Поясничная', sacral: 'Крестцовая' },
-        organs: { main: 'Внутренние органы' },
-        neuromodule: { main: 'Нейронная сеть' }
-    };
-    return partNames[implantType]?.[partName] || partName;
-}
-
-function manageSlot(implantType, partName, slotIndex) {
-    // Показываем модал для управления слотом
-    showSlotManagement(implantType, partName, slotIndex);
-}
-
-function showSlotManagement(implantType, partName, slotIndex) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    const implant = state.implants[implantType];
-    const part = implant.parts[partName];
-    
-    // Проверяем, куплена ли эта конкретная часть
-    if (!part || !part.slots) {
-        modal.innerHTML = `
-            <div class="modal" style="max-width: 600px;">
-                <div class="modal-header">
-                    <h3>Ошибка</h3>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-                <div class="modal-body">
-                    <p style="color: var(--danger); text-align: center; padding: 2rem;">
-                        Эта часть импланта не куплена!<br>
-                        Купите "${getPartDisplayName(implantType, partName)}" в магазине частей имплантов.
-                    </p>
-                </div>
-                <div class="modal-footer">
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        return;
-    }
-    
-    const currentModule = part.modules[slotIndex];
-    
-    let slotHTML = `
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>Управление слотом</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="color: var(--muted); margin-bottom: 1rem;">
-                    ${getImplantName(implantType)} → ${getPartDisplayName(implantType, partName)} → Слот ${slotIndex + 1}
-                </p>
-    `;
-    
-    if (currentModule) {
-        slotHTML += `
-            <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                <h5 style="color: var(--success); margin-bottom: 0.5rem;">Установленный модуль:</h5>
-                <p style="color: var(--text); font-weight: 600;">${currentModule.name}</p>
-                <p style="color: var(--muted); font-size: 0.9rem;">${currentModule.description}</p>
-                <button class="pill-button danger-button" onclick="removeModuleFromSlot('${implantType}', '${partName}', ${slotIndex}); closeModal(this);" style="margin-top: 0.5rem;">Удалить модуль</button>
-            </div>
-        `;
-    } else {
-        slotHTML += `
-            <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                <h5 style="color: var(--accent); margin-bottom: 0.5rem;">Свободный слот</h5>
-                <div class="drop-zone" data-implant-type="${implantType}" data-part-name="${partName}" data-slot-index="${slotIndex}" style="background: rgba(125, 244, 198, 0.1); border: 2px dashed var(--success); border-radius: 8px; padding: 2rem; text-align: center; margin-bottom: 1rem; min-height: 80px; display: flex; align-items: center; justify-content: center;">
-                    <p style="color: var(--success); font-weight: 600; margin: 0;">Перетащите модуль сюда</p>
-                </div>
-                <p style="color: var(--muted);">Или выберите модуль для установки:</p>
-                <div id="availableModules" style="max-height: 300px; overflow-y: auto;">
-                    <!-- Модули из снаряжения будут загружены здесь -->
-                </div>
-            </div>
-        `;
-    }
-    
-    slotHTML += `
-            </div>
-            <div class="modal-footer">
-            </div>
-        </div>
-    `;
-    
-    modal.innerHTML = slotHTML;
-    document.body.appendChild(modal);
-    
-    // Загружаем доступные модули
-    loadAvailableModules(implantType, partName, slotIndex);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function loadAvailableModules(implantType, partName, slotIndex) {
-    const container = document.getElementById('availableModules');
-    if (!container) return;
-    
-    // Ищем модули в снаряжении
-    const availableModules = state.gear.filter(item => item.type === 'implant');
-    
-    if (availableModules.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem;">Нет доступных модулей в снаряжении</p>';
-        return;
-    }
-    
-    container.innerHTML = availableModules.map((module, index) => `
-        <div class="draggable-module" draggable="true" data-module-index="${state.gear.findIndex(item => item === module)}" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; cursor: grab;">
-            <div style="color: var(--text); font-weight: 600;">${module.implantData.name}</div>
-            <div style="color: var(--muted); font-size: 0.8rem;">${module.implantData.description}</div>
-            <div style="margin-top: 0.5rem;">
-                <button class="pill-button success-button" onclick="installModuleInSlot('${implantType}', '${partName}', ${slotIndex}, ${state.gear.findIndex(item => item === module)}); closeModal(this);" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">
-                    Установить
-                </button>
-            </div>
-        </div>
-    `).join('');
-    
-    // Добавляем обработчики drag & drop
-    addDragAndDropHandlers(implantType, partName, slotIndex);
-}
-
-function addDragAndDropHandlers(implantType, partName, slotIndex) {
-    // Обработчики для перетаскиваемых модулей
-    const draggableModules = document.querySelectorAll('.draggable-module');
-    draggableModules.forEach(module => {
-        module.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('text/plain', module.dataset.moduleIndex);
-            module.style.opacity = '0.5';
-        });
-        
-        module.addEventListener('dragend', (e) => {
-            module.style.opacity = '1';
-        });
-    });
-    
-    // Обработчики для drop zone
-    const dropZone = document.querySelector('.drop-zone');
-    if (dropZone) {
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.style.background = 'rgba(125, 244, 198, 0.3)';
-            dropZone.style.borderColor = 'var(--success)';
-        });
-        
-        dropZone.addEventListener('dragleave', (e) => {
-            dropZone.style.background = 'rgba(125, 244, 198, 0.1)';
-            dropZone.style.borderColor = 'var(--success)';
-        });
-        
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.style.background = 'rgba(125, 244, 198, 0.1)';
-            dropZone.style.borderColor = 'var(--success)';
-            
-            const moduleIndex = e.dataTransfer.getData('text/plain');
-            if (moduleIndex) {
-                installModuleInSlot(implantType, partName, slotIndex, parseInt(moduleIndex));
-                closeModal(document.querySelector('.modal-overlay .icon-button'));
-            }
-        });
-    }
-}
-
-function installModuleInSlot(implantType, partName, slotIndex, gearIndex) {
-    const module = state.gear[gearIndex];
-    if (!module) return;
-    
-    // Устанавливаем модуль в слот
-    state.implants[implantType].parts[partName].modules[slotIndex] = module.implantData;
-    
-    // Удаляем модуль из снаряжения
-    state.gear.splice(gearIndex, 1);
-    
-    // Обновляем отображение
-    renderGear();
-    renderImplants();
-    scheduleSave();
-    
-    // Обновляем слот в DOM
-    const slotElement = document.querySelector(`[data-implant-type="${implantType}"][data-part-name="${partName}"][data-slot-index="${slotIndex}"]`);
-    if (slotElement) {
-        slotElement.style.background = 'rgba(125, 244, 198, 0.3)';
-        slotElement.style.borderColor = 'var(--success)';
-        slotElement.innerHTML = '✓';
-    }
-    
-    // Обновляем блок "Детали импланта" в модале управления
-    selectImplant(implantType, partName);
-    
-    showModal('Модуль установлен', `&#x2705; ${module.implantData.name} установлен в слот!`);
-}
-
-function removeModuleFromSlot(implantType, partName, slotIndex) {
-    const module = state.implants[implantType].parts[partName].modules[slotIndex];
-    if (!module) return;
-    
-    // Возвращаем модуль в снаряжение
-    state.gear.push({
-        name: module.name,
-        description: `${module.description} | Потеря осознанности: ${module.awarenessLoss}`,
-        price: module.price,
-        load: 1,
-        type: 'implant',
-        implantData: module
-    });
-    
-    // Удаляем модуль из слота
-    state.implants[implantType].parts[partName].modules[slotIndex] = null;
-    
-    // Обновляем отображение
-    renderGear();
-    renderImplants();
-    scheduleSave();
-    
-    // Обновляем блок "Детали импланта" в модале управления
-    selectImplant(implantType, partName);
-    
-    showModal('Модуль удален', `&#x2705; ${module.name} возвращен в снаряжение!`);
-}
-
-// Магазин частей имплантов
-function showImplantPartsShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    const implantParts = [
-        {
-            category: 'head',
-            name: 'Кибер-Голова',
-            description: 'Сложнейшая операция заменяет на имплант голову, сохраняя мозг, слуховой и зрительный каналы. Имеет 4 слота для зрения, 4 для слуха и 2 для лица.',
-            price: 1000,
-            awarenessLoss: '2d6',
-            parts: [
-                { name: 'main', displayName: 'Полная замена головы', slots: 10 }
-            ]
-        },
-        {
-            category: 'arms',
-            name: 'Кибер-Рука',
-            description: 'Замена человеческой руки. Состоит из 3х частей: кисть, предплечье и плечо, каждое можно устанавливать отдельно.',
-            price: 100,
-            awarenessLoss: '1d6',
-            parts: [
-                { name: 'wristLeft', displayName: 'Кисть левая', slots: 2 },
-                { name: 'wristRight', displayName: 'Кисть правая', slots: 2 },
-                { name: 'forearmLeft', displayName: 'Предплечье левое', slots: 2 },
-                { name: 'forearmRight', displayName: 'Предплечье правое', slots: 2 },
-                { name: 'shoulderLeft', displayName: 'Плечо левое', slots: 2 },
-                { name: 'shoulderRight', displayName: 'Плечо правое', slots: 2 }
-            ]
-        },
-        {
-            category: 'legs',
-            name: 'Кибер-Нога',
-            description: 'Замена человеческой ноги. Состоит из 3х частей: стопа, голень и бедро, каждое можно устанавливать отдельно.',
-            price: 100,
-            awarenessLoss: '1d6',
-            parts: [
-                { name: 'footLeft', displayName: 'Стопа левая', slots: 2 },
-                { name: 'footRight', displayName: 'Стопа правая', slots: 2 },
-                { name: 'shinLeft', displayName: 'Голень левая', slots: 2 },
-                { name: 'shinRight', displayName: 'Голень правая', slots: 2 },
-                { name: 'thighLeft', displayName: 'Бедро левое', slots: 2 },
-                { name: 'thighRight', displayName: 'Бедро правое', slots: 2 }
-            ]
-        },
-        {
-            category: 'spine',
-            name: 'Кибер-Спина',
-            description: 'Имплант, заменяющий мышечный каркас спины и тела. Состоит из 5 частей: шейная, грудная левая и правая, поясничная, крестцовая.',
-            price: 500,
-            awarenessLoss: '1d6',
-            parts: [
-                { name: 'cervical', displayName: 'Шейная', slots: 3 },
-                { name: 'thoracicLeft', displayName: 'Грудная левая', slots: 3 },
-                { name: 'thoracicRight', displayName: 'Грудная правая', slots: 3 },
-                { name: 'lumbar', displayName: 'Поясничная', slots: 3 },
-                { name: 'sacral', displayName: 'Крестцовая', slots: 3 }
-            ]
-        },
-        {
-            category: 'organs',
-            name: 'Кибер-Внутренности',
-            description: 'Имплант, замещающий внутренние органы, или дублирующий их. Возможно заменить вообще все органы кибернетическими.',
-            price: 1000,
-            awarenessLoss: '4d6',
-            parts: [{ name: 'main', displayName: 'Внутренние органы', slots: 2 }]
-        },
-        {
-            category: 'neuromodule',
-            name: 'Нейро-модуль',
-            description: 'Модуль нейронной сети, находящийся в шее на сочленении спинного и головного мозга. Позволяет передавать в мозг информацию.',
-            price: 500,
-            awarenessLoss: '1d6',
-            parts: [{ name: 'main', displayName: 'Нейронная сеть', slots: 7 }]
-        }
-    ];
-    
-    let shopHTML = `
-        <div class="modal" style="max-width: 800px; max-height: 90vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h3>🦾 Магазин частей имплантов</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button onclick="toggleImplantPartsFreeMode()" id="implantPartsFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-            </div>
-            <div class="modal-body" style="overflow-y: auto; flex: 1;">
-                <p style="color: var(--muted); margin-bottom: 1.5rem;">
-                    Выберите часть импланта для покупки. Каждая часть может быть установлена отдельно.
-                </p>
-                <div style="display: grid; gap: 1rem;">
-    `;
-    
-    implantParts.forEach(implant => {
-        shopHTML += `
-            <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--border); border-radius: 12px; padding: 1rem;">
-                <h4 style="color: var(--accent); margin-bottom: 0.5rem;">${implant.name}</h4>
-                <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">${implant.description}</p>
-                <div style="display: grid; gap: 0.5rem;">
-        `;
-        
-        implant.parts.forEach(part => {
-            const partData = state.implants[implant.category].parts[part.name];
-            const isPurchased = partData !== null && partData !== undefined;
-            const purchasedText = isPurchased ? ' (куплена)' : '';
-            
-            shopHTML += `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(0, 0, 0, 0.2); border-radius: 8px;">
-                    <div>
-                        <strong>${part.displayName}${purchasedText}</strong>
-                        <div class="implant-part-price-display" style="color: var(--muted); font-size: 0.8rem;" data-original-price="${implant.price}" data-slots="${part.slots}" data-awareness="${implant.awarenessLoss}">
-                            ${part.slots} слотов | Цена: ${implant.price} уе | ПО: ${implant.awarenessLoss}
-                        </div>
-                    </div>
-                    ${isPurchased ? 
-                        `<div style="display: flex; gap: 0.5rem;">
-                            <button class="pill-button" disabled style="font-size: 0.8rem; padding: 0.3rem 0.6rem; opacity: 0.6; cursor: not-allowed;">Куплено</button>
-                            <button class="pill-button danger-button" onclick="removeImplantPart('${implant.category}', '${part.name}', '${implant.name}', '${part.displayName}', ${implant.price}, '${implant.awarenessLoss}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Удалить</button>
-                        </div>` :
-                        `<button class="pill-button primary-button implant-part-buy-button" onclick="buyImplantPart('${implant.category}', '${part.name}', '${implant.name}', '${part.displayName}', ${implant.price}, '${implant.awarenessLoss}', '${implant.description.replace(/'/g, "\\'")}', ${part.slots})" data-category="${implant.category}" data-part-name="${part.name}" data-implant-name="${implant.name}" data-display-name="${part.displayName}" data-price="${implant.price}" data-awareness-loss="${implant.awarenessLoss}" data-description="${implant.description.replace(/'/g, "\\'")}" data-slots="${part.slots}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>`
-                    }
-                </div>
-            `;
-        });
-        
-        shopHTML += `
-                </div>
-            </div>
-        `;
-    });
-    
-    shopHTML += `
-                </div>
-            </div>
-            <div class="modal-footer">
-            </div>
-        </div>
-    `;
-    
-    modal.innerHTML = shopHTML;
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function buyImplantPart(category, partName, implantName, partDisplayName, price, awarenessLoss, description, slots, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < price) {
-        showModal('Недостаточно денег', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Ха-ха, не так быстро, нищюк!</p>
-                <button class="pill-button" onclick="closeModal(this)">
-                    Закрыть
-                </button>
-            </div>
-        `);
-        return;
-    }
-    
-    // Бросаем кубики для потери осознанности
-    const lossRoll = rollDiceForAwarenessLoss(awarenessLoss);
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Вычитаем из текущей осознанности
-    let currentAwareness;
-    if (typeof state.awareness === 'object') {
-        currentAwareness = parseInt(state.awareness.current) || 50;
-        state.awareness.current = Math.max(0, currentAwareness - lossRoll);
-    } else {
-        // Для старых сохранений где awareness - число
-        currentAwareness = parseInt(state.awareness) || 50;
-        state.awareness = {
-            current: Math.max(0, currentAwareness - lossRoll),
-            max: parseInt(state.stats.INT || 5) * 10
-        };
-    }
-    
-    const awarenessEl = document.getElementById('awarenessCurrent');
-    if (awarenessEl) awarenessEl.value = state.awareness.current;
-    
-    // Устанавливаем часть импланта
-    state.implants[category].installed = true;
-    state.implants[category].parts[partName] = {
-        slots: slots,
-        modules: new Array(slots).fill(null),
-        catalogPrice: catalogPrice,
-        purchasePrice: price,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: `${implantName} - ${partDisplayName}`,
-        price: price,
-        category: 'Киберимпланты'
-    });
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    showModal('Часть импланта установлена', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${partDisplayName} установлена!</p>
-            <p style="color: var(--danger); margin-bottom: 1rem;">Потеря осознанности: ${lossRoll}</p>
-            <p style="color: var(--muted);">Текущая осознанность: ${typeof state.awareness === 'object' ? state.awareness.current : state.awareness}</p>
-            <p style="color: var(--muted);">Теперь вы можете установить модули через "Управление имплантами"</p>
-            <button class="pill-button" onclick="closeModal(this)">
-                Закрыть
-            </button>
-        </div>
-    `);
-}
-
-function removeImplantPart(category, partName, implantName, partDisplayName, price, awarenessLoss) {
-    const partData = state.implants[category].parts[partName];
-    
-    // Проверяем, есть ли установленные модули
-    if (partData && partData.modules && partData.modules.some(m => m !== null)) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">❌ Невозможно удалить!</p>
-                <p style="color: var(--text); margin-bottom: 1rem;">В этой части импланта установлены модули. Сначала удалите все модули.</p>
-            </div>
-        `);
-        return;
-    }
-    
-    // Подтверждение удаления
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>⚠️ Подтверждение удаления</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1rem;">
-                    Вы уверены, что хотите удалить <strong style="color: var(--accent);">${partDisplayName}</strong>?
-                </p>
-                <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem;">
-                    <p style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">Вы получите обратно:</p>
-                    <p style="color: var(--text); font-size: 0.9rem;"><img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"> Деньги: ${price} уе</p>
-                    <p style="color: var(--text); font-size: 0.9rem;">🧠 Осознанность: ${awarenessLoss} (будет брошен кубик)</p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button danger-button" onclick="confirmRemoveImplantPart('${category}', '${partName}', '${partDisplayName}', ${price}, '${awarenessLoss}')">Удалить</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function confirmRemoveImplantPart(category, partName, partDisplayName, price, awarenessLoss) {
-    // Бросаем кубики для возврата осознанности
-    const awarenessReturn = rollDiceForAwarenessLoss(awarenessLoss);
-    
-    // Возвращаем деньги
-    state.money = (parseInt(state.money) || 0) + price;
-    updateMoneyDisplay();
-    
-    // Возвращаем осознанность
-    let currentAwareness;
-    if (typeof state.awareness === 'object') {
-        currentAwareness = parseInt(state.awareness.current) || 50;
-        const maxAwareness = parseInt(state.awareness.max) || 50;
-        state.awareness.current = Math.min(maxAwareness, currentAwareness + awarenessReturn);
-    } else {
-        currentAwareness = parseInt(state.awareness) || 50;
-        const maxAwareness = parseInt(state.stats.INT || 5) * 10;
-        state.awareness = {
-            current: Math.min(maxAwareness, currentAwareness + awarenessReturn),
-            max: maxAwareness
-        };
-    }
-    
-    const awarenessEl = document.getElementById('awarenessCurrent');
-    if (awarenessEl) awarenessEl.value = state.awareness.current;
-    
-    // Удаляем часть импланта
-    delete state.implants[category].parts[partName];
-    
-    // Проверяем, остались ли еще части
-    const remainingParts = Object.keys(state.implants[category].parts || {}).length;
-    if (remainingParts === 0) {
-        state.implants[category].installed = false;
-    }
-    
-    scheduleSave();
-    
-    // Закрываем все модалы
-    const allModals = document.querySelectorAll('.modal-overlay');
-    allModals.forEach(modal => modal.remove());
-    
-    showModal('Часть импланта удалена', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">✅ ${partDisplayName} удалена!</p>
-            <p style="color: var(--text); margin-bottom: 0.5rem;"><img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"> Возвращено денег: ${price} уе</p>
-            <p style="color: var(--text); margin-bottom: 1rem;">🧠 Восстановлено осознанности: ${awarenessReturn}</p>
-            <p style="color: var(--muted);">Текущая осознанность: ${typeof state.awareness === 'object' ? state.awareness.current : state.awareness}</p>
-        </div>
-    `);
-}
-
-function toggleImplantPartsFreeMode() {
-    const buyButtons = document.querySelectorAll('.implant-part-buy-button');
-    const priceDisplays = document.querySelectorAll('.implant-part-price-display');
-    const toggleButton = document.getElementById('implantPartsFreeModeButton');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    const isFreeMode = toggleButton.textContent === 'Отключить бесплатно';
-    
-    if (isFreeMode) {
-        buyButtons.forEach(btn => {
-            const category = btn.getAttribute('data-category');
-            const partName = btn.getAttribute('data-part-name');
-            const implantName = btn.getAttribute('data-implant-name');
-            const displayName = btn.getAttribute('data-display-name');
-            const price = btn.getAttribute('data-price');
-            const awarenessLoss = btn.getAttribute('data-awareness-loss');
-            const description = btn.getAttribute('data-description');
-            const slots = btn.getAttribute('data-slots');
-            btn.setAttribute('onclick', `buyImplantPart('${category}', '${partName}', '${implantName}', '${displayName}', ${price}, '${awarenessLoss}', '${description}', ${slots})`);
-        });
-        
-        // Возвращаем обычные цены визуально
-        priceDisplays.forEach(display => {
-            const originalPrice = display.getAttribute('data-original-price');
-            const slots = display.getAttribute('data-slots');
-            const awareness = display.getAttribute('data-awareness');
-            display.textContent = `${slots} слотов | Цена: ${originalPrice} уе | ПО: ${awareness}`;
-        });
-        
-        toggleButton.textContent = 'Бесплатно';
-        toggleButton.style.background = 'transparent';
-        
-        // Возвращаем обычный фон
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 0, 0, 0.85)';
-        }
-    } else {
-        buyButtons.forEach(btn => {
-            const category = btn.getAttribute('data-category');
-            const partName = btn.getAttribute('data-part-name');
-            const implantName = btn.getAttribute('data-implant-name');
-            const displayName = btn.getAttribute('data-display-name');
-            const awarenessLoss = btn.getAttribute('data-awareness-loss');
-            const description = btn.getAttribute('data-description');
-            const slots = btn.getAttribute('data-slots');
-            btn.setAttribute('onclick', `buyImplantPart('${category}', '${partName}', '${implantName}', '${displayName}', 0, '${awarenessLoss}', '${description}', ${slots})`);
-        });
-        
-        // Меняем цены визуально на 0
-        priceDisplays.forEach(display => {
-            const slots = display.getAttribute('data-slots');
-            const awareness = display.getAttribute('data-awareness');
-            display.textContent = `${slots} слотов | Цена: 0 уе | ПО: ${awareness}`;
-        });
-        
-        toggleButton.textContent = 'Отключить бесплатно';
-        toggleButton.style.background = 'linear-gradient(135deg, #7DF4C6, #5b9bff)';
-        
-        // Меняем фон на зеленоватый
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 100, 50, 0.85)';
-        }
-    }
-}
-
-// Функции для работы с оружием удалены - используется версия ниже
-
-// Функции для работы с собственностью
-// Функции для работы с транспортом
-function renderVehicles() {
-    const container = document.getElementById('vehiclesContainer');
-    if (!container) return;
-    
-    if (state.property.vehicles.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem;">Транспорт не добавлен</p>';
-        return;
-    }
-    
-    container.innerHTML = state.property.vehicles.map((vehicle, index) => `
-        <div class="property-item">
-            <div class="property-header">
-                <div class="property-name">${vehicle.name}</div>
-                <button class="pill-button danger-button" onclick="removeVehicle(${index})" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Удалить</button>
-            </div>
-            ${vehicle.description ? `<div class="property-description">${vehicle.description}</div>` : ''}
-            ${vehicle.image ? `
-                <div class="vehicle-image-wrapper">
-                    <div class="vehicle-image">
-                        <img src="${vehicle.image}" alt="${vehicle.name}" />
-                    </div>
-                    <div class="vehicle-image-actions">
-                        <button class="pill-button danger-button" onclick="removeVehicleImage(${index})" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">&#x1F5D1;&#xFE0F; Удалить фото</button>
-                    </div>
-                </div>
-            ` : `
-                <div class="vehicle-image-wrapper">
-                    <div class="vehicle-image">
-                        <div class="vehicle-image-placeholder">&#x1F697;</div>
-                    </div>
-                    <div class="vehicle-image-actions">
-                        <label class="pill-button muted-button" style="cursor: pointer; font-size: 0.8rem; padding: 0.3rem 0.6rem;">
-                            📷 Загрузить фото
-                            <input type="file" accept="image/*" onchange="uploadVehicleImage(${index}, this)" style="display: none;" />
-                        </label>
-                    </div>
-                </div>
-            `}
-        </div>
-    `).join('');
-}
-
-function addHousing() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>🏠 Добавить жилье</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="display: grid; gap: 1rem;">
-                    <div class="input-group">
-                        <label class="input-label">Название</label>
-                        <input type="text" class="input-field" id="housingName" placeholder="Например: «Квартира на окраине»">
-                    </div>
-                    <div class="input-group">
-                        <label class="input-label">Описание</label>
-                        <textarea class="input-field" id="housingDescription" rows="3" placeholder="Описание жилья"></textarea>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="saveHousing()">Добавить</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
+    // Добавляем обработчики клавиатуры для правильной работы Enter
     addModalKeyboardHandlers(modal);
 }
 
-function saveHousing() {
-    const name = document.getElementById('housingName').value;
-    const description = document.getElementById('housingDescription').value;
-    
-    if (!name) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Введите название жилья!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    // Проверяем и инициализируем state.property если нужно
-    if (!state.property) {
-        state.property = {
-            housing: [],
-            vehicles: []
-        };
-    }
-    
-    if (!state.property.housing) {
-        state.property.housing = [];
-    }
-    
-    const newHousing = {
-        id: generateId('housing'),
-        name: name,
-        description: description,
-        addedDate: new Date().toLocaleDateString('ru-RU')
-    };
-    
-    state.property.housing.push(newHousing);
-    renderHousing();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    showModal('Жилье добавлено', `✅ ${name} добавлено в собственность!`);
-}
-
-function removeHousing(housingId) {
-    const index = state.property.housing.findIndex(h => h.id === housingId);
-    if (index !== -1) {
-        state.property.housing.splice(index, 1);
-        renderHousing();
-        scheduleSave();
-    }
-}
-
-function addVehicle() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>&#x1F697; Добавить транспорт</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="display: grid; gap: 1rem;">
-                    <div class="input-group">
-                        <label class="input-label">Название</label>
-                        <input type="text" class="input-field" id="vehicleName" placeholder="Например: «Harley-Davidson»">
-                    </div>
-                    <div class="input-group">
-                        <label class="input-label">Описание</label>
-                        <textarea class="input-field" id="vehicleDescription" rows="3" placeholder="Описание транспорта"></textarea>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="saveVehicle()">Добавить</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function saveVehicle() {
-    const name = document.getElementById('vehicleName').value;
-    const description = document.getElementById('vehicleDescription').value;
-    
-    if (!name) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Введите название транспорта!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    const newVehicle = {
-        id: generateId('vehicle'),
-        name: name,
-        description: description,
-        image: null
-    };
-    
-    state.property.vehicles.push(newVehicle);
-    renderVehicles();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-}
-
-function removeVehicle(index) {
-        state.property.vehicles.splice(index, 1);
-        renderVehicles();
-        scheduleSave();
-}
-
-function uploadVehicleImage(index, input) {
-    const file = input.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            state.property.vehicles[index].image = e.target.result;
-            renderVehicles();
-            scheduleSave();
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
-function removeVehicleImage(index) {
-        state.property.vehicles[index].image = null;
-        renderVehicles();
-        scheduleSave();
-}
-
-// Функции для работы со снаряжением
-function renderGear() {
-    const container = document.getElementById('gearContainer');
-    if (!container) return;
-    
-    if (state.gear.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 2rem;">Снаряжение не добавлено</p>';
-        return;
-    }
-    
-    container.innerHTML = state.gear.map((item, index) => `
-        <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-right: 2rem;">
-                <div style="flex: 1;">
-                    <div style="color: var(--accent); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">
-                        ${item.name}
-                    </div>
-                    <div style="color: var(--text); font-size: 0.75rem; margin-bottom: 0.25rem; line-height: 1.3;">
-                        ${item.description}
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Блок Нагрузка и кнопка Удалить в правом верхнем углу -->
-            <div style="position: absolute; top: 0.75rem; right: 0.75rem; display: flex; flex-direction: column; align-items: flex-end; gap: 5px;">
-                <div style="background: #003366; border-radius: 6px; padding: 0.3rem 0.6rem; color: white; font-size: 0.85rem; white-space: nowrap; font-weight: 500; text-align: center;">
-                    Нагрузка: ${item.load}
-                </div>
-                <button onclick="removeGear(${index})" style="background: transparent; border: none; cursor: pointer; padding: 0;" title="Удалить">
-                    <img src="https://static.tildacdn.com/tild6166-3331-4338-b038-623539346365/x-button.png" alt="Удалить" style="width: 20px; height: 20px; display: block;">
-                </button>
-            </div>
-        </div>
-    `).join('');
-    
-    updateLoadDisplay();
-}
-
-// Перенос оружия из Снаряжения в блок "Оружие"
-function takeWeaponFromGear(gearIndex) {
-    const item = state.gear[gearIndex];
-    if (!item || item.type !== 'weapon') return;
-    const weaponData = item.weaponData;
-    if (!weaponData) {
-        showModal('Ошибка', 'Нет данных оружия для переноса.');
-        return;
-    }
-
-    // Гарантируем id и слоты
-    const weaponToAdd = Object.assign({}, weaponData);
-    weaponToAdd.id = generateId('weapon');
-    if (weaponToAdd.type === 'ranged') {
-        if (typeof weaponToAdd.slots !== 'number') {
-            weaponToAdd.slots = getRangedWeaponSlots(item.name || '');
-        }
-        if (!Array.isArray(weaponToAdd.modules)) {
-            weaponToAdd.modules = [];
-        }
-    } else {
-        // ближний бой: 1 слот по правилам
-        weaponToAdd.slots = 1;
-        if (!Array.isArray(weaponToAdd.modules)) {
-            weaponToAdd.modules = [];
-        }
-    }
-
-    state.weapons.push(weaponToAdd);
-    state.gear.splice(gearIndex, 1);
-    renderGear();
-    renderWeapons();
-    scheduleSave();
-    showModal('Оружие взято', `&#x2705; ${item.name} перенесено в блок Оружие!`);
-}
-
-function updateLoadDisplay() {
-    // Обновляем отображение нагрузки
-    const currentLoadEl = document.getElementById('currentLoad');
-    const maxLoadEl = document.getElementById('maxLoad');
-    
-    if (currentLoadEl) currentLoadEl.textContent = state.load.current;
-    if (maxLoadEl) maxLoadEl.textContent = state.load.max;
-    
-    // Показываем штраф под "Скорость перемещения" только если нагрузка меньше 0
-    const speedWarningEl = document.getElementById('speedWarning');
-    
-    if (state.load.current < 0) {
-        const penalty = Math.ceil(Math.abs(state.load.current) / 5);
-        
-        if (speedWarningEl) {
-            speedWarningEl.textContent = `Штраф ${penalty} от перегрузки!`;
-            speedWarningEl.style.display = 'block';
-            speedWarningEl.style.color = 'var(--danger)';
-            speedWarningEl.style.fontSize = '0.8rem';
-            speedWarningEl.style.fontWeight = '600';
-            speedWarningEl.style.marginTop = '0.25rem';
-        }
-    } else if (speedWarningEl) {
-        speedWarningEl.style.display = 'none';
-    }
-}
-
-function resetLoad() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 400px;">
-            <div class="modal-header">
-                <h3>⚖️ Сброс нагрузки</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1rem;">
-                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
-                        Текущая нагрузка: <strong style="color: var(--accent);">${state.load.current}</strong> / ${state.load.max}
-                    </p>
-                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
-                        Общая нагрузка предметов: <strong style="color: var(--success);">${state.gear.reduce((sum, item) => sum + (item.load || 0), 0)}</strong>
-                    </p>
-                </div>
-                
-                <div style="display: grid; gap: 0.75rem;">
-                    <label class="field">
-                        Новая текущая нагрузка
-                        <input type="number" class="input-field" id="newLoadValue" value="${state.load.current}" min="0" max="${state.load.max}">
-                    </label>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="applyLoadReset()">
-                    Применить
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function applyLoadReset() {
-    const newLoad = parseInt(document.getElementById('newLoadValue').value);
-    
-    if (isNaN(newLoad) || newLoad < 0 || newLoad > state.load.max) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Введите корректное значение нагрузки!</p>
-                <p style="color: var(--muted); font-size: 0.9rem;">Значение должно быть от 0 до ${state.load.max}</p>
-            </div>
-        `);
-        return;
-    }
-    
-    state.load.current = newLoad;
-    updateLoadDisplay();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    showModal('Нагрузка обновлена', `&#x2705; Текущая нагрузка установлена: ${newLoad}`);
-}
-
-function showGearShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header">
-                <h3>🎒 Магазин снаряжения</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button onclick="toggleGearFreeMode()" id="gearFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1rem;">
-                    <input type="text" id="gearSearchInput" placeholder="&#x1F50D; Поиск по названию..." style="width: 100%; padding: 0.75rem; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 1rem;" onkeyup="filterGear(this.value)">
-                </div>
-                <div style="display: grid; gap: 1rem;">
-                    ${GEAR_LIBRARY.map((item) => `
-                        <div class="property-item gear-item" data-name="${item.name.toLowerCase()}" data-description="${item.description.toLowerCase()}">
-                            <div class="property-header">
-                                <div class="property-name">${item.name}</div>
-                                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                    <span class="gear-price-display" style="color: var(--muted); font-size: 0.9rem;" data-original-price="${item.price}" data-load="${item.load}">Цена: ${item.price} уе | Нагрузка: ${item.load}</span>
-                                    <button class="pill-button primary-button gear-buy-button" onclick="buyGear('${item.name}', ${item.price}, ${item.load}, '${item.description.replace(/'/g, "\\'")}')" data-gear-name="${item.name}" data-price="${item.price}" data-load="${item.load}" data-description="${item.description.replace(/'/g, "\\'")}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                                </div>
-                            </div>
-                            <div class="property-description">${item.description}</div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
-    addModalKeyboardHandlers(modal);
-}
-
-function filterGear(searchTerm) {
-    const searchLower = searchTerm.toLowerCase();
-    const gearItems = document.querySelectorAll('.gear-item');
-    
-    gearItems.forEach(item => {
-        const name = item.dataset.name || '';
-        const description = item.dataset.description || '';
-        
-        if (name.includes(searchLower) || description.includes(searchLower)) {
-            item.style.display = 'block';
-        } else {
-            item.style.display = 'none';
-        }
-    });
-}
-
-function buyGear(name, price, load, description, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < price) {
-        showModal('Недостаточно денег', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Не хватает денег!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Уменьшаем доступную нагрузку
-    state.load.current -= load;
-    
-    // Добавляем в снаряжение
-    const newGear = {
-        id: generateId('gear'),
-        name: name,
-        description: description,
-        price: price,
-        load: load,
-        catalogPrice: catalogPrice,
-        purchasePrice: price,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    updateLoadDisplay();
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: name,
-        price: price,
-        category: 'Снаряжение'
-    });
-    
-    showModal('Снаряжение куплено', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${name} добавлено в снаряжение!</p>
-            <p style="color: var(--muted); font-size: 0.9rem;">Осталось нагрузки: ${state.load.current}</p>
-        </div>
-    `);
-}
-
-function forceBuyGear(name, price, load, description) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Уменьшаем доступную нагрузку (даже при перегрузке)
-    state.load.current -= load;
-    
-    // Добавляем в снаряжение
-    const newGear = {
-        id: generateId('gear'),
-        name: name,
-        description: description,
-        price: price,
-        load: load
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    updateLoadDisplay();
-    scheduleSave();
-}
-
-function toggleGearFreeMode() {
-    const buyButtons = document.querySelectorAll('.gear-buy-button');
-    const priceDisplays = document.querySelectorAll('.gear-price-display');
-    const toggleButton = document.getElementById('gearFreeModeButton');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    const isFreeMode = toggleButton.textContent === 'Отключить бесплатно';
-    
-    if (isFreeMode) {
-        // Отключаем бесплатный режим
-        buyButtons.forEach(btn => {
-            const price = btn.getAttribute('data-price');
-            const name = btn.getAttribute('data-gear-name');
-            const load = btn.getAttribute('data-load');
-            const description = btn.getAttribute('data-description');
-            btn.setAttribute('onclick', `buyGear('${name}', ${price}, ${load}, '${description}')`);
-        });
-        
-        // Возвращаем оригинальные цены визуально
-        priceDisplays.forEach(display => {
-            const originalPrice = display.getAttribute('data-original-price');
-            const load = display.getAttribute('data-load');
-            display.textContent = `Цена: ${originalPrice} уе | Нагрузка: ${load}`;
-        });
-        
-        toggleButton.textContent = 'Бесплатно';
-        toggleButton.style.background = 'transparent';
-        
-        // Возвращаем обычный фон
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 0, 0, 0.85)';
-        }
-    } else {
-        // Включаем бесплатный режим
-        buyButtons.forEach(btn => {
-            const name = btn.getAttribute('data-gear-name');
-            const load = btn.getAttribute('data-load');
-            const description = btn.getAttribute('data-description');
-            btn.setAttribute('onclick', `buyGear('${name}', 0, ${load}, '${description}')`);
-        });
-        
-        // Меняем цены визуально на 0
-        priceDisplays.forEach(display => {
-            const load = display.getAttribute('data-load');
-            display.textContent = `Цена: 0 уе | Нагрузка: ${load}`;
-        });
-        
-        toggleButton.textContent = 'Отключить бесплатно';
-        toggleButton.style.background = 'linear-gradient(135deg, #7DF4C6, #5b9bff)';
-        
-        // Меняем фон на зеленоватый
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 100, 50, 0.85)';
-        }
-    }
-}
-
-function pickupGear() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>📦 Подобрать снаряжение</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="display: grid; gap: 1rem;">
-                    <div class="input-group">
-                        <label class="input-label">Название</label>
-                        <input type="text" class="input-field" id="pickedGearName" placeholder="Например: «Старый фонарик»">
-                    </div>
-                    <div class="input-group">
-                        <label class="input-label">Цена (для скупщика)</label>
-                        <input type="number" class="input-field" id="pickedGearPrice" value="0" min="0" placeholder="Цена предмета в уе">
-                    </div>
-                    <div class="input-group">
-                        <label class="input-label">Нагрузка</label>
-                        <input type="number" class="input-field" id="pickedGearLoad" value="1" min="0">
-                    </div>
-                    <div class="input-group">
-                        <label class="input-label">Описание</label>
-                        <textarea class="input-field" id="pickedGearDescription" rows="3" placeholder="Описание предмета"></textarea>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="savePickedGear()">Подобрать</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function savePickedGear() {
-    const name = document.getElementById('pickedGearName').value;
-    const price = parseInt(document.getElementById('pickedGearPrice').value) || 0;
-    const load = parseInt(document.getElementById('pickedGearLoad').value) || 0;
-    const description = document.getElementById('pickedGearDescription').value;
-    
-    if (!name) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Введите название предмета!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    
-    // Уменьшаем доступную нагрузку
-    state.load.current -= load;
-    
-    const newGear = {
-        id: generateId('gear'),
-        name: name,
-        description: description,
-        price: price,
-        load: load,
-        type: 'custom' // Маркер для скупщика
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    updateLoadDisplay();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-}
-
-function removeGear(index) {
-        const item = state.gear[index];
-        if (item) {
-            // Возвращаем нагрузку
-            state.load.current += item.load || 0;
-            
-            // Удаляем предмет
-            state.gear.splice(index, 1);
-            
-            // Обновляем отображение
-            renderGear();
-            updateLoadDisplay();
-            scheduleSave();
-        }
-}
-
-// Функции для работы с оружием
-function showWeaponShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3><img src="https://static.tildacdn.com/tild6334-3163-4362-b232-366332396435/weapon.png" alt="🔫" style="width: 24px; height: 24px; margin-right: 0.5rem; vertical-align: middle;"> Какое оружие ищешь?</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="display: grid; gap: 1rem;">
-                    <button class="pill-button primary-button" onclick="closeModal(this); setTimeout(() => showMeleeWeaponsShop(), 100);" style="font-size: 1rem; padding: 1rem;">
-                        <img src="https://static.tildacdn.com/tild6232-3061-4366-b935-333266373362/sword.png" alt="⚔️" style="width: 20px; height: 20px; margin-right: 0.5rem; vertical-align: middle;"> Для ближнего боя
-                    </button>
-                    <button class="pill-button primary-button" onclick="closeModal(this); setTimeout(() => showRangedWeaponsShop(), 100);" style="font-size: 1rem; padding: 1rem;">
-                        <img src="https://static.tildacdn.com/tild6332-3731-4662-b731-326433633632/assault-rifle.png" alt="🔫" style="width: 20px; height: 20px; margin-right: 0.5rem; vertical-align: middle;"> Для дальнего боя
-                    </button>
-                    <button class="pill-button success-button" onclick="closeModal(this); setTimeout(() => showCustomWeaponCreator(), 100);" style="font-size: 1rem; padding: 1rem;">
-                        🔧 Создам своё!
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function showMeleeWeaponsShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 800px; max-height: 90vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h3>⚔️ Оружие ближнего боя</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button onclick="toggleMeleeWeaponsFreeMode()" id="meleeWeaponsFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-            </div>
-            <div class="modal-body" style="overflow-y: auto; flex: 1;">
-                <div style="display: grid; gap: 1rem;">
-                    ${MELEE_WEAPONS.map((weapon) => `
-                        <div class="property-item">
-                            <div class="property-header">
-                                <div class="property-name">${weapon.type}</div>
-                                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                    <span class="melee-weapon-price" style="color: var(--muted); font-size: 0.9rem;" data-original-price="${weapon.price}" data-load="${weapon.load}">Цена: ${weapon.price} уе | Нагрузка: ${weapon.load}</span>
-                                    <button class="pill-button primary-button melee-weapon-buy-button" onclick="buyMeleeWeapon('${weapon.type}', ${weapon.price}, ${weapon.load}, '${weapon.damage}', ${weapon.concealable}, '${weapon.stealthPenalty}', '${weapon.examples}')" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-load="${weapon.load}" data-damage="${weapon.damage}" data-concealable="${weapon.concealable}" data-stealth-penalty="${weapon.stealthPenalty}" data-examples="${weapon.examples}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                                    <button class="pill-button success-button melee-weapon-gear-button" onclick="buyMeleeWeaponToGear('${weapon.type}', ${weapon.price}, ${weapon.load}, '${weapon.damage}', ${weapon.concealable}, '${weapon.stealthPenalty}', '${weapon.examples}')" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-load="${weapon.load}" data-damage="${weapon.damage}" data-concealable="${weapon.concealable}" data-stealth-penalty="${weapon.stealthPenalty}" data-examples="${weapon.examples}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">В сумку</button>
-                                </div>
-                            </div>
-                            <div class="property-description">
-                                <div style="font-family: monospace; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem;">
-                                    Урон: ${weapon.damage} | Можно скрыть: ${formatYesNo(weapon.concealable)} | Штраф к СКА: ${weapon.stealthPenalty}
-                                </div>
-                                <div style="font-size: 0.9rem;">
-                                    <strong>Примеры:</strong> ${weapon.examples}
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
-    addModalKeyboardHandlers(modal);
-}
-
-function showRangedWeaponsShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 800px; max-height: 90vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h3><img src="https://static.tildacdn.com/tild6332-3731-4662-b731-326433633632/assault-rifle.png" alt="🔫" style="width: 24px; height: 24px; margin-right: 0.5rem; vertical-align: middle;"> Оружие дальнего боя</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button onclick="toggleRangedWeaponsFreeMode()" id="rangedWeaponsFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-            </div>
-            <div class="modal-body" style="overflow-y: auto; flex: 1;">
-                <div style="display: grid; gap: 1rem;">
-                    ${RANGED_WEAPONS.map((weapon) => `
-                        <div class="property-item">
-                            <div class="property-header">
-                                <div class="property-name">${weapon.type}</div>
-                                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                    <span class="ranged-weapon-price" style="color: var(--muted); font-size: 0.9rem;" data-original-price="${weapon.price}" data-load="${weapon.load}">Цена: ${weapon.price} уе | Нагрузка: ${weapon.load}</span>
-                                    <button class="pill-button primary-button ranged-weapon-buy-button" onclick="buyRangedWeapon(${JSON.stringify(weapon.type)}, ${weapon.price}, ${weapon.load}, ${JSON.stringify(weapon.primaryDamage)}, ${JSON.stringify(weapon.altDamage)}, ${JSON.stringify(weapon.concealable)}, ${JSON.stringify(weapon.hands)}, ${weapon.stealth}, ${JSON.stringify(weapon.magazine)}, null)" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-original-price="${weapon.price}" data-load="${weapon.load}" data-primary-damage="${weapon.primaryDamage}" data-alt-damage="${weapon.altDamage}" data-concealable="${weapon.concealable}" data-hands="${weapon.hands}" data-stealth="${weapon.stealth}" data-magazine="${weapon.magazine}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                                    <button class="pill-button success-button ranged-weapon-gear-button" onclick="buyRangedWeaponToGear(${JSON.stringify(weapon.type)}, ${weapon.price}, ${weapon.load}, ${JSON.stringify(weapon.primaryDamage)}, ${JSON.stringify(weapon.altDamage)}, ${JSON.stringify(weapon.concealable)}, ${JSON.stringify(weapon.hands)}, ${weapon.stealth}, ${JSON.stringify(weapon.magazine)}, null)" data-weapon-type="${weapon.type}" data-price="${weapon.price}" data-original-price="${weapon.price}" data-load="${weapon.load}" data-primary-damage="${weapon.primaryDamage}" data-alt-damage="${weapon.altDamage}" data-concealable="${weapon.concealable}" data-hands="${weapon.hands}" data-stealth="${weapon.stealth}" data-magazine="${weapon.magazine}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">В сумку</button>
-                                </div>
-                            </div>
-                            <div class="property-description">
-                                <div style="font-family: monospace; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem;">
-                                    Урон основной: ${weapon.primaryDamage} | Урон альтернативный: ${weapon.altDamage} | Можно скрыть: ${formatYesNo(weapon.concealable)} | # рук: ${weapon.hands} | СКА: ${weapon.stealth} | Патронов в магазине: ${weapon.magazine}
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
-    addModalKeyboardHandlers(modal);
-    
-    // Принудительно обновляем onclick атрибуты кнопок после применения обёрток
-    setTimeout(() => {
-        initializeRangedWeaponButtons();
-    }, 100);
-}
-
-// Магазин Дек
-function showDeckShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h3>💻 Магазин Дек</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body" style="overflow-y: auto; flex: 1;">
-                <div style="display: grid; gap: 1rem;">
-                    ${DECK_CATALOG.map((deck) => `
-                        <div class="property-item">
-                            <div class="property-header">
-                                <div class="property-name">${deck.name}</div>
-                                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                    <span style="color: var(--muted); font-size: 0.9rem;">Цена: ${deck.price.toLocaleString()} уе</span>
-                                    <button class="pill-button primary-button" onclick="buyDeck('${deck.name}', ${deck.memory}, ${deck.ram}, ${deck.grid}, ${deck.price})" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                                </div>
-                            </div>
-                            <div class="property-description">
-                                <div style="font-family: monospace; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem;">
-                                    Память: ${deck.memory} | ОЗУ: ${deck.ram} | Сетка: ${deck.grid}
-                                </div>
-                                <div style="font-size: 0.9rem; line-height: 1.4;">
-                                    ${deck.description}
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
-    addModalKeyboardHandlers(modal);
-}
-
-// Функция покупки деки
-function buyDeck(name, memory, ram, grid, price, catalogPrice = null) {
-    if (state.money < price) {
-        showModal('Недостаточно средств', `У вас ${state.money.toLocaleString()} уе, а нужно ${price.toLocaleString()} уе.`);
-        return;
-    }
-    
-    const newDeck = {
-        id: Date.now(),
-        name: name,
-        memory: memory,
-        ram: ram,
-        grid: grid,
-        version: '10',
-        osVersion: '',
-        programs: [],
-        chips: [],
-        modules: [],
-        catalogPrice: catalogPrice || price,
-        purchasePrice: price,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    state.decks.push(newDeck);
-    state.money -= price;
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: name,
-        price: price,
-        category: 'Дека'
-    });
-    
-    showModal('Дека куплена', `${name} добавлена в коллекцию! Теперь вы можете переключиться на неё в магазине дек.`);
-    scheduleSave();
-    updateAllDisplays();
-}
-
-// Магазин снаряжения для Дек
-function showDeckGearShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h3>🔧 Снаряжение для Дек</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body" style="overflow-y: auto; flex: 1;">
-                <div style="display: grid; gap: 1rem;">
-                    ${DECK_GEAR_CATALOG.map((item) => `
-                        <div class="property-item">
-                            <div class="property-header">
-                                <div class="property-name">${item.name}</div>
-                                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                    <span style="color: var(--muted); font-size: 0.9rem;">Цена: ${item.price}</span>
-                                    <button class="pill-button primary-button" onclick="buyDeckGear('${item.name}', '${item.price}', '${item.type}', '${item.stat || ''}', ${item.maxValue || 0}, ${item.unique || false}, ${item.maxQuantity || 0})" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                                </div>
-                            </div>
-                            <div class="property-description">
-                                <div style="font-size: 0.9rem; line-height: 1.4;">
-                                    ${item.description}
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
-    addModalKeyboardHandlers(modal);
-}
-
-// Функция покупки снаряжения для деки
-function buyDeckGear(name, priceStr, type, stat, maxValue, unique, maxQuantity, catalogPrice = null) {
-    let price = 0;
-    
-    // Обработка цен типа "ур*200"
-    if (priceStr.includes('ур*')) {
-        const multiplier = parseInt(priceStr.replace('ур*', ''));
-        price = state.reputation * multiplier;
-    } else {
-        price = parseInt(priceStr.replace(/\s/g, ''));
-    }
-    
-    if (state.money < price) {
-        showModal('Недостаточно средств', `У вас ${state.money.toLocaleString()} уе, а нужно ${price.toLocaleString()} уе.`);
-        return;
-    }
-    
-    // Проверка уникальности (только для не-модулей)
-    if (unique && type !== 'module') {
-        const existingItem = state.deckGear.find(item => item.name === name);
-        if (existingItem) {
-            showModal('Уже куплено', `${name} уже есть в вашем снаряжении для дек.`);
-            return;
-        }
-    }
-    
-    // Проверка максимального количества
-    if (maxQuantity > 0) {
-        const existingItems = state.deckGear.filter(item => item.name === name);
-        if (existingItems.length >= maxQuantity) {
-            showModal('Достигнут лимит', `Максимальное количество "${name}" - ${maxQuantity}.`);
-            return;
-        }
-    }
-    
-    const newGear = {
-        id: Date.now(),
-        name: name,
-        type: 'deck_gear',
-        deckGearType: type,
-        stat: stat,
-        maxValue: maxValue,
-        unique: unique,
-        maxQuantity: maxQuantity,
-        installedDeckId: null,
-        catalogPrice: catalogPrice || price,
-        purchasePrice: price,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    state.deckGear.push(newGear);
-    // НЕ списываем деньги сразу для модулей - только при установке
-    
-    // Для модулей сразу предлагаем установку
-    if (type === 'module') {
-        // Создаем модал с выбором деки для модуля
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        const existingModals = document.querySelectorAll('.modal-overlay');
-        modal.style.zIndex = 1000 + (existingModals.length * 100);
-        modal.innerHTML = `
-            <div class="modal" style="max-width: 500px;">
-                <div class="modal-header">
-                    <h3>ВЫБОР ДЕКИ</h3>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-                <div class="modal-body">
-                    <p style="margin-bottom: 1rem;">Необходимо выбрать деку, на которую установить "${name}"!</p>
-                    <div style="margin-bottom: 1rem;">
-                        <div style="margin-bottom: 0.5rem; color: var(--accent); font-weight: 600;">Выберите деку:</div>
-                        <select id="deckSelect" style="width: 100%; padding: 0.75rem; background: var(--bg-primary); border: 2px solid var(--accent); border-radius: 8px; color: var(--text); font-size: 1rem; box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);">
-                            ${state.deck ? `<option value="main">Основная дека (${state.deck.name})</option>` : ''}
-                            ${state.decks.map(deck => `<option value="${deck.id}">${deck.name}</option>`).join('')}
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="pill-button muted-button" onclick="closeModal(this)">Отменить</button>
-                    <button class="pill-button primary-button" onclick="installDeckModuleOnDeck(${newGear.id}, document.getElementById('deckSelect').value); closeModal(this)">Установить</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                closeModal(modal.querySelector('.icon-button'));
-            }
-        });
-        
-        addModalKeyboardHandlers(modal);
-    } else {
-        state.money -= price; // Для не-модулей списываем деньги сразу
-        showModal('Снаряжение куплено', `${name} добавлено в снаряжение для дек!`);
-    }
-    
-    scheduleSave();
-    updateAllDisplays();
-}
-
-// Функция установки модуля на конкретную деку
-function installDeckModuleOnDeck(moduleId, deckId) {
-    console.log('installDeckModuleOnDeck called with:', moduleId, deckId);
-    const module = state.deckGear.find(item => item.id == moduleId);
-    console.log('Found module:', module);
-    if (!module) return false;
-    
-    // Списываем деньги при установке
-    if (state.money < module.purchasePrice) {
-        showModal('Недостаточно средств', `У вас ${state.money.toLocaleString()} уе, а нужно ${module.purchasePrice.toLocaleString()} уе.`);
-        return false;
-    }
-    
-    // Проверяем уникальность для уникальных модулей
-    if (module.unique) {
-        console.log('Checking uniqueness for module:', module.name);
-        const existingModule = state.deckGear.find(item => 
-            item.name === module.name && 
-            item.installedDeckId == deckId
-        );
-        if (existingModule) {
-            console.log('Module already installed on this deck');
-            showModal('Модуль уже установлен', `${module.name} уже установлен на эту деку.`);
-            return false;
-        }
-    }
-    
-    // Проверяем максимальное количество
-    if (module.maxQuantity > 0) {
-        console.log('Checking max quantity for module:', module.name, 'max:', module.maxQuantity);
-        const existingModules = state.deckGear.filter(item => 
-            item.name === module.name && 
-            item.installedDeckId == deckId
-        );
-        if (existingModules.length >= module.maxQuantity) {
-            console.log('Max quantity reached for module');
-            showModal('Достигнут лимит', `Максимальное количество "${module.name}" - ${module.maxQuantity}.`);
-            return false;
-        }
-    }
-    
-    // Устанавливаем модуль и списываем деньги
-    module.installedDeckId = deckId;
-    state.money -= module.purchasePrice;
-    
-    const deckName = deckId === 'main' ? state.deck.name : state.decks.find(d => d.id == deckId)?.name || 'Неизвестная дека';
-    console.log('Installing module on deck:', deckName);
-    showModal('Модуль установлен', `${module.name} установлен на ${deckName} за ${module.purchasePrice.toLocaleString()} уе!`);
-    scheduleSave();
-    updateAllDisplays();
-    console.log('Module installation completed successfully');
-    return true;
-}
-
-// Функция установки модуля на деку
-function installDeckModule(moduleId) {
-    const module = state.deckGear.find(item => item.id === moduleId);
-    if (!module) return;
-    
-    // Проверяем уникальность для уникальных модулей
-    if (module.unique) {
-        const existingModule = state.deckGear.find(item => 
-            item.name === module.name && 
-            item.installedDeckId === 'main'
-        );
-        if (existingModule) {
-            showModal('Модуль уже установлен', `${module.name} уже установлен на деку.`);
-            return;
-        }
-    }
-    
-    // Проверяем максимальное количество
-    if (module.maxQuantity > 0) {
-        const existingModules = state.deckGear.filter(item => 
-            item.name === module.name && 
-            item.installedDeckId === 'main'
-        );
-        if (existingModules.length >= module.maxQuantity) {
-            showModal('Достигнут лимит', `Максимальное количество "${module.name}" - ${module.maxQuantity}.`);
-            return;
-        }
-    }
-    
-    // Устанавливаем модуль
-    module.installedDeckId = 'main';
-    
-    showModal('Модуль установлен', `${module.name} установлен на деку!`);
-    scheduleSave();
-    updateAllDisplays();
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-}
-
-// Функция показа коллекции дек
-function showDeckCollection() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 1200px; max-height: 90vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h3><img src="https://static.tildacdn.com/tild3633-6632-4463-a435-353036636235/live-streaming.png" alt="💾" style="width: 24px; height: 24px; margin-right: 0.5rem;"> Мои Деки</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body" style="overflow-y: auto; flex: 1;">
-                <div id="deckCollectionContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1rem;">
-                    <!-- Деки будут добавлены через JavaScript -->
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Рендерим коллекцию дек после добавления в DOM
-    setTimeout(() => {
-        renderDeckCollection();
-    }, 0);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
-    addModalKeyboardHandlers(modal);
-}
-
-// Функция отображения коллекции дек
-function renderDeckCollection() {
-    const container = document.getElementById('deckCollectionContainer');
-    if (!container) return;
-    
-    // Добавляем основную деку в коллекцию только если она существует
-    const allDecks = [];
-    
-    if (state.deck) {
-        allDecks.push({
-            id: 'main',
-            name: state.deck.name,
-            memory: parseInt(state.deck.memory),
-            ram: parseInt(state.deckRam.max),
-            grid: parseInt(state.deck.grid),
-            version: state.deck.version,
-            osVersion: state.deck.osVersion || '',
-            isMain: true
-        });
-    }
-    
-    // Добавляем купленные деки
-    allDecks.push(...state.decks.map(deck => ({
-        ...deck,
-        isMain: false
-    })));
-    
-    if (allDecks.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 2rem;">У вас нет дек. Купите деку в магазине!</p>';
-        return;
-    }
-    
-    container.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
-            ${allDecks.map(deck => {
-        // Подсчитываем улучшения
-        const upgrades = state.deckGear.filter(item => 
-            item.deckGearType === 'upgrade' && 
-            item.installedDeckId == deck.id // Используем == для сравнения строки и числа
-        );
-        
-        const memoryUpgrades = upgrades.filter(u => u.stat === 'memory').length;
-        const ramUpgrades = upgrades.filter(u => u.stat === 'ram').length;
-        const gridUpgrades = upgrades.filter(u => u.stat === 'grid').length;
-        
-        // Финальные характеристики
-        const finalMemory = deck.memory + memoryUpgrades;
-        const finalRam = deck.ram + ramUpgrades;
-        const finalGrid = deck.grid + gridUpgrades;
-        
-        // Подсчитываем модули
-        const modules = state.deckGear.filter(item => 
-            item.deckGearType === 'module' && 
-            item.installedDeckId == deck.id
-        );
-        
-        // Подсчитываем щепки
-        const chips = state.deckChips.filter(chip => chip.installedDeckId == deck.id);
-        const chipSlots = 1 + modules.filter(m => m.name === 'Дополнительный слот для Щепки').length;
-        
-        return `
-            <div style="background: linear-gradient(135deg, rgba(138, 43, 226, 0.1), rgba(75, 0, 130, 0.1)); border: 2px solid var(--accent); border-radius: 12px; padding: 1rem; position: relative; overflow: hidden;">
-                <!-- Декоративные элементы -->
-                <div style="position: absolute; top: -20px; right: -20px; width: 60px; height: 60px; background: radial-gradient(circle, rgba(138, 43, 226, 0.2), transparent); border-radius: 50%;"></div>
-                <div style="position: absolute; bottom: -30px; left: -30px; width: 80px; height: 80px; background: radial-gradient(circle, rgba(75, 0, 130, 0.15), transparent); border-radius: 50%;"></div>
-                
-                <!-- Заголовок -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; position: relative; z-index: 1;">
-                    <div>
-                        <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: var(--accent); display: flex; align-items: center; gap: 0.5rem;">
-                            ${deck.isMain ? '🏠' : '💾'} ${deck.name}
-                        </h3>
-                        ${deck.isMain ? '' : ''}
-                    </div>
-                    <button class="pill-button primary-button" onclick="renameDeck('${deck.id}')" style="font-size: 0.7rem; padding: 0.3rem 0.6rem; background: linear-gradient(45deg, var(--accent), #9d4edd);">✏️</button>
-                </div>
-                
-                <!-- Статистики -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; position: relative; z-index: 1;">
-                    <div style="background: rgba(138, 43, 226, 0.2); border: 1px solid var(--accent); border-radius: 8px; padding: 0.5rem; text-align: center;">
-                        <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">ПАМЯТЬ</div>
-                        <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);">${finalMemory}</div>
-                        ${memoryUpgrades > 0 ? `<div style="color: var(--success); font-size: 0.6rem;">+${memoryUpgrades}</div>` : ''}
-                    </div>
-                    <div style="background: rgba(138, 43, 226, 0.2); border: 1px solid var(--accent); border-radius: 8px; padding: 0.5rem; text-align: center;">
-                        <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">ОЗУ</div>
-                        <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);">${finalRam}</div>
-                        ${ramUpgrades > 0 ? `<div style="color: var(--success); font-size: 0.6rem;">+${ramUpgrades}</div>` : ''}
-                    </div>
-                    <div style="background: rgba(138, 43, 226, 0.2); border: 1px solid var(--accent); border-radius: 8px; padding: 0.5rem; text-align: center;">
-                        <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">СЕТКА</div>
-                        <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);">${finalGrid}</div>
-                        ${gridUpgrades > 0 ? `<div style="color: var(--success); font-size: 0.6rem;">+${gridUpgrades}</div>` : ''}
-                    </div>
-                    <div style="background: rgba(138, 43, 226, 0.2); border: 1px solid var(--accent); border-radius: 8px; padding: 0.5rem; text-align: center;">
-                        <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">OS ВЕРСИЯ</div>
-                        <input type="text" 
-                               value="${deck.osVersion || ''}" 
-                               placeholder="Введите версию"
-                               onchange="updateDeckOsVersion('${deck.id}', this.value)"
-                               style="width: 100%; background: transparent; border: none; color: var(--text); font-size: 0.8rem; font-weight: 600; text-align: center; outline: none;"
-                               maxlength="20">
-                    </div>
-                </div>
-                
-                <!-- Кнопки улучшений -->
-                <div style="margin-bottom: 1rem; position: relative; z-index: 1;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.3rem;">
-                        ${memoryUpgrades < 5 ? `
-                            <button class="pill-button" onclick="installDeckUpgradeOnDeck('memory', ${(finalMemory + 1) * 200}, '${deck.id}')" style="font-size: 0.6rem; padding: 0.2rem 0.3rem; background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2)); border: 1px solid var(--accent); color: var(--accent); transition: all 0.2s ease;" onmouseover="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(75, 0, 130, 0.3))'" onmouseout="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2))'">
-                                Память<br><small style="color: var(--text);">${(finalMemory + 1) * 200}уе</small>
-                            </button>
-                        ` : `
-                            <div style="background: rgba(108, 117, 125, 0.3); border-radius: 6px; padding: 0.2rem; text-align: center; font-size: 0.6rem; color: var(--muted);">Макс</div>
-                        `}
-                        ${ramUpgrades < 5 ? `
-                            <button class="pill-button" onclick="installDeckUpgradeOnDeck('ram', ${(finalRam + 1) * 1000}, '${deck.id}')" style="font-size: 0.6rem; padding: 0.2rem 0.3rem; background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2)); border: 1px solid var(--accent); color: var(--accent); transition: all 0.2s ease;" onmouseover="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(75, 0, 130, 0.3))'" onmouseout="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2))'">
-                                ОЗУ<br><small style="color: var(--text);">${(finalRam + 1) * 1000}уе</small>
-                            </button>
-                        ` : `
-                            <div style="background: rgba(108, 117, 125, 0.3); border-radius: 6px; padding: 0.2rem; text-align: center; font-size: 0.6rem; color: var(--muted);">Макс</div>
-                        `}
-                        ${gridUpgrades < 5 ? `
-                            <button class="pill-button" onclick="installDeckUpgradeOnDeck('grid', ${(finalGrid + 1) * 100}, '${deck.id}')" style="font-size: 0.6rem; padding: 0.2rem 0.3rem; background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2)); border: 1px solid var(--accent); color: var(--accent); transition: all 0.2s ease;" onmouseover="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(75, 0, 130, 0.3))'" onmouseout="this.style.background='linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2))'">
-                                Сетка<br><small style="color: var(--text);">${(finalGrid + 1) * 100}уе</small>
-                            </button>
-                        ` : `
-                            <div style="background: rgba(108, 117, 125, 0.3); border-radius: 6px; padding: 0.2rem; text-align: center; font-size: 0.6rem; color: var(--muted);">Макс</div>
-                        `}
-                    </div>
-                </div>
-                
-                <!-- Модули -->
-                ${modules.length > 0 ? `
-                    <div style="margin-bottom: 0.5rem; position: relative; z-index: 1;">
-                        <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">МОДУЛИ</div>
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.2rem;">
-                            ${modules.map(module => `
-                                <span style="background: rgba(125, 244, 198, 0.3); border: 1px solid #7DF4C6; border-radius: 4px; padding: 0.1rem 0.3rem; font-size: 0.6rem; color: var(--text);">${module.name}</span>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-                
-                <!-- Щепки -->
-                <div style="margin-bottom: 0.5rem; position: relative; z-index: 1;">
-                    <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">ЩЕПКИ (${chips.length}/${chipSlots})</div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 0.2rem;">
-                        ${Array.from({length: chipSlots}, (_, i) => {
-                            const chip = chips[i];
-                            return chip ? `
-                                <div style="background: rgba(9, 7, 255, 0.3); border: 1px solid #FFC107; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.6rem; max-width: 200px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.1rem;">
-                                        <div style="font-weight: 600;">${chip.name}</div>
-                                        <button onclick="removeChipFromDeck('${chip.id}')" style="background: rgba(220, 53, 69, 0.3); border: 1px solid #DC3545; border-radius: 3px; color: #DC3545; font-size: 0.5rem; padding: 0.1rem 0.2rem; cursor: pointer;" title="Вытащить щепку">×</button>
-                                    </div>
-                                    ${chip.programs && chip.programs.length > 0 ? `
-                                        <div style="color: var(--text); font-size: 0.7rem;">
-                                            ${chip.programs.map(program => `
-                                                <div style="margin-bottom: 0.3rem;">
-                                                    <div style="font-weight: 600; color: var(--accent);">• ${program.name}</div>
-                                                    ${program.description ? `<div style="color: var(--muted); font-size: 0.7rem; margin-top: 0.1rem; line-height: 1.2;">${program.description}</div>` : ''}
-                                                </div>
-                                            `).join('')}
-                                        </div>
-                                    ` : `
-                                        <div style="color: var(--muted); font-size: 0.5rem;">Пустая</div>
-                                    `}
-                                </div>
-                            ` : `
-                                <div style="background: rgba(108, 117, 125, 0.2); border: 1px solid #6C757D; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.6rem; color: var(--muted); text-align: center; min-width: 60px;">
-                                    Пусто
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-                
-                <!-- Программы -->
-                ${(() => {
-                    const programs = state.deckPrograms.filter(program => program.installedDeckId == deck.id);
-                    const usedMemory = programs.reduce((sum, program) => sum + (program.memory || 1), 0);
-                    return programs.length > 0 ? `
-                        <div style="margin-bottom: 0.5rem; position: relative; z-index: 1;">
-                            <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">
-                                ПРОГРАММЫ (Память: ${usedMemory}/${finalMemory})
-                            </div>
-                            <div style="display: flex; flex-direction: column; gap: 0.2rem;">
-                                ${programs.map((program, programIndex) => `
-                                    <div style="background: rgba(138, 43, 226, 0.3); border: 1px solid var(--accent); border-radius: 4px; padding: 0.3rem 0.4rem; font-size: 0.8rem; position: relative;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                                            <div style="flex: 1;">
-                                                <div style="font-weight: 600; color: var(--accent);">${program.name}</div>
-                                                ${program.description ? `<div style="color: var(--muted); font-size: 0.7rem; margin-top: 0.1rem; line-height: 1.2;">${program.description}</div>` : ''}
-                                            </div>
-                                            <div style="text-align: right; margin-right: 2rem;">
-                                                <div style="color: var(--text); font-size: 0.7rem;">Память: ${program.memory || 1}</div>
-                                                <div style="color: var(--muted); font-size: 0.6rem;">ОЗУ: ${program.ram}</div>
-                                            </div>
-                                        </div>
-                                        <button onclick="removeProgramFromDeck('${deck.id.toString().replace(/'/g, "\\'")}', ${programIndex})" style="position: absolute; top: 0.3rem; right: 0.3rem; background: rgba(255, 91, 135, 0.2); border: 1px solid var(--danger); border-radius: 4px; color: var(--danger); padding: 0.2rem 0.4rem; font-size: 0.6rem; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.background='rgba(255, 91, 135, 0.3)'" onmouseout="this.style.background='rgba(255, 91, 135, 0.2)'" title="Удалить программу безвозвратно">
-                                            ✖
-                                        </button>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    ` : '';
-                })()}
-                
-                <!-- Информация -->
-                <div style="border-top: 1px solid rgba(138, 43, 226, 0.3); padding-top: 0.5rem; position: relative; z-index: 1;">
-                    ${!deck.isMain ? `
-                        <div style="color: var(--muted); font-size: 0.6rem;">
-                            Куплена: ${deck.purchasePrice.toLocaleString()} уе
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-        `;
-    }).join('')}
-        </div>
-    `;
-}
-
-// Функция переименования деки
-function renameDeck(deckId) {
-    const deck = deckId === 'main' ? state.deck : state.decks.find(d => d.id == deckId);
-    if (!deck) return;
-    
-    // Создаем модальное окно для переименования
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>Подтвердите действие</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="margin-bottom: 1rem;">Введите новое название для деки "${deck.name}":</p>
-                <div class="input-group">
-                    <input type="text" class="input-field" id="newDeckName" value="${deck.name}" placeholder="Введите название деки" style="width: 100%;">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button muted-button" onclick="closeModal(this)">Отмена</button>
-                <button class="pill-button primary-button" onclick="confirmRenameDeck('${deckId}')">OK</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
-    if (typeof addModalKeyboardHandlers === 'function') {
-        addModalKeyboardHandlers(modal);
-    }
-    
-    // Фокусируемся на поле ввода
-    setTimeout(() => {
-        const input = document.getElementById('newDeckName');
-        if (input) {
-            input.focus();
-            input.select();
-        }
-    }, 100);
-}
-
-// Функция подтверждения переименования деки
-function confirmRenameDeck(deckId) {
-    const newName = document.getElementById('newDeckName').value.trim();
-    if (!newName) {
-        showModal('Ошибка', 'Введите название деки!');
-        return;
-    }
-    
-    const deck = deckId === 'main' ? state.deck : state.decks.find(d => d.id == deckId);
-    if (!deck) return;
-    
-    if (newName === deck.name) {
-        closeModal(document.querySelector('.modal-overlay .icon-button'));
-        return;
-    }
-    
-    deck.name = newName;
-    scheduleSave();
-    updateAllDisplays();
-    
-    // Если это основная дека, обновляем отображение
-    if (deckId === 'main') {
-        updateDeckDisplay();
-    }
-    
-    // Если открыт поп-ап коллекции дек, обновляем его
-    const collectionModal = document.querySelector('.modal-overlay');
-    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
-        renderDeckCollection();
-    }
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    showModal('Дека переименована', `Дека переименована в "${deck.name}"!`);
-}
-
-// Функция продажи деки
-function sellDeck(deckId) {
-    const deck = state.decks.find(d => d.id === deckId);
-    if (!deck) return;
-    
-    // Проверяем, что на деке нет программ
-    const programsOnDeck = state.deckPrograms.filter(p => p.installedDeckId === deckId);
-    if (programsOnDeck.length > 0) {
-        showModal('Нельзя продать', 'Сначала удалите все программы с деки перед продажей.');
-        return;
-    }
-    
-    // Проверяем, что на деке нет щепок
-    const chipsOnDeck = state.deckChips.filter(c => c.installedDeckId === deckId);
-    if (chipsOnDeck.length > 0) {
-        showModal('Нельзя продать', 'Сначала удалите все щепки с деки перед продажей.');
-        return;
-    }
-    
-    // Удаляем улучшения с деки
-    const upgradesOnDeck = state.deckGear.filter(item => 
-        item.installedDeckId === deckId
-    );
-    upgradesOnDeck.forEach(upgrade => {
-        upgrade.installedDeckId = null;
-    });
-    
-    // Используем скупщика для продажи
-    if (typeof initiateSale === 'function') {
-        initiateSale(deckId, 'deck');
-    } else {
-        // Fallback - прямая продажа за половину цены
-        const sellPrice = Math.floor(deck.purchasePrice / 2);
-        state.money += sellPrice;
-        
-        // Удаляем деку
-        state.decks = state.decks.filter(d => d.id !== deckId);
-        
-        showModal('Дека продана', `${deck.name} продана за ${sellPrice.toLocaleString()} уе!`);
-        scheduleSave();
-        updateAllDisplays();
-    }
-}
-
-// Функция показа улучшений для деки
-function showDeckUpgrades(deckId) {
-    const deck = state.decks.find(d => d.id === deckId);
-    if (!deck) return;
-    
-    // Получаем доступные улучшения
-    const availableUpgrades = state.gear.filter(item => 
-        item.type === 'deck_gear' && 
-        item.deckGearType === 'upgrade' && 
-        !item.installedDeckId
-    );
-    
-    if (availableUpgrades.length === 0) {
-        showModal('Нет улучшений', 'У вас нет доступных улучшений для установки.');
-        return;
-    }
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>🔧 Улучшения для ${deck.name}</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="display: grid; gap: 0.5rem;">
-                    ${availableUpgrades.map(upgrade => {
-                        // Проверяем лимиты
-                        const installedUpgrades = state.gear.filter(item => 
-                            item.type === 'deck_gear' && 
-                            item.deckGearType === 'upgrade' && 
-                            item.stat === upgrade.stat && 
-                            item.installedDeckId === deckId
-                        );
-                        
-                        const currentValue = deck[upgrade.stat] + installedUpgrades.length;
-                        const canInstall = currentValue < upgrade.maxValue;
-                        
-                        return `
-                            <div class="property-item">
-                                <div class="property-header">
-                                    <div class="property-name">${upgrade.name}</div>
-                                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                        <span style="color: var(--muted); font-size: 0.8rem;">Текущее: ${currentValue}/${upgrade.maxValue}</span>
-                                        <button class="pill-button primary-button" onclick="installDeckUpgrade(${upgrade.id}, ${deckId})" ${!canInstall ? 'disabled' : ''} style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Установить</button>
-                                    </div>
-                                </div>
-                                <div class="property-description">
-                                    <div style="font-size: 0.9rem; line-height: 1.4;">
-                                        ${upgrade.description}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
-    addModalKeyboardHandlers(modal);
-}
-
-// Функция установки улучшения на деку
-function installDeckUpgrade(upgradeId, deckId) {
-    const upgrade = state.gear.find(item => item.id === upgradeId);
-    const deck = state.decks.find(d => d.id === deckId);
-    
-    if (!upgrade || !deck) return;
-    
-    // Проверяем лимиты
-    const installedUpgrades = state.gear.filter(item => 
-        item.type === 'deck_gear' && 
-        item.deckGearType === 'upgrade' && 
-        item.stat === upgrade.stat && 
-        item.installedDeckId === deckId
-    );
-    
-    const currentValue = deck[upgrade.stat] + installedUpgrades.length;
-    if (currentValue >= upgrade.maxValue) {
-        showModal('Достигнут лимит', `Максимальное значение ${upgrade.stat} для этой деки: ${upgrade.maxValue}`);
-        return;
-    }
-    
-    // Устанавливаем улучшение
-    upgrade.installedDeckId = deckId;
-    
-    showModal('Улучшение установлено', `${upgrade.name} установлено на ${deck.name}!`);
-    scheduleSave();
-    updateAllDisplays();
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-}
-
-// Функция удаления щепки с деки
-function removeChipFromDeck(chipId, deckId) {
-    const chip = state.deckChips.find(c => c.id === chipId);
-    if (!chip) return;
-    
-    chip.installedDeckId = null;
-    
-    showModal('Щепка удалена', 'Щепка памяти удалена с деки.');
-    scheduleSave();
-    updateAllDisplays();
-}
-
-// Функция удаления программы с выбором действий
-function removeDeckProgramWithChoice(programIndex) {
-    const program = state.deckPrograms[programIndex];
-    if (!program) return;
-    
-    showModal('Удаление программы', `Что делать с программой "${program.name}"?`, [
-        { 
-            text: 'Удалить', 
-            class: 'danger-button', 
-            onclick: `removeDeckProgram(${programIndex}); closeModal(this)` 
-        },
-        { 
-            text: 'Создать щепку (10 уе)', 
-            class: 'primary-button', 
-            onclick: `createChipFromProgram(${programIndex}); closeModal(this)` 
-        },
-        { 
-            text: 'Отмена', 
-            class: 'muted-button', 
-            onclick: 'closeModal(this)' 
-        }
-    ]);
-}
-
-// Функция создания щепки из программы
-function createChipFromProgram(programIndex) {
-    const program = state.deckPrograms[programIndex];
-    if (!program) return;
-    
-    if (state.money < 10) {
-        showModal('Недостаточно средств', 'Нужно 10 уе для создания щепки.');
-        return;
-    }
-    
-    // Создаем щепку
-    const newChip = {
-        id: Date.now(),
-        name: `${program.name} (щепка)`,
-        programs: [{
-            name: program.name,
-            ram: program.ram,
-            lethal: program.lethal,
-            description: program.description
-        }],
-        content: '',
-        installedDeckId: null
-    };
-    
-    state.deckChips.push(newChip);
-    state.money -= 10;
-    
-    // Удаляем программу
-    state.deckPrograms.splice(programIndex, 1);
-    
-    showModal('Щепка создана', `Программа "${program.name}" перенесена на щепку за 10 уе.`);
-    scheduleSave();
-    updateAllDisplays();
-}
-
-// Функция установки улучшения деки
-function installDeckUpgrade(stat, price) {
-    if (state.money < price) {
-        showModal('Недостаточно средств', `У вас ${state.money.toLocaleString()} уе, а нужно ${price.toLocaleString()} уе.`);
-        return;
-    }
-    
-    // Создаем модал с выбором деки для улучшения
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>ВЫБОР ДЕКИ</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="margin-bottom: 1rem;">Необходимо выбрать деку, на которую установить улучшение!</p>
-                <div style="margin-bottom: 1rem;">
-                    <div style="margin-bottom: 0.5rem; color: var(--accent); font-weight: 600;">Выберите деку:</div>
-                    <select id="deckSelect" style="width: 100%; padding: 0.75rem; background: var(--bg-primary); border: 2px solid var(--accent); border-radius: 8px; color: var(--text); font-size: 1rem; box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);">
-                        <option value="main">Основная дека (${state.deck.name})</option>
-                        ${state.decks.map(deck => `<option value="${deck.id}">${deck.name}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button muted-button" onclick="closeModal(this)">Отменить</button>
-                <button class="pill-button primary-button" onclick="installDeckUpgradeOnDeck('${stat}', ${price}, document.getElementById('deckSelect').value); closeModal(this)">Установить</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    addModalKeyboardHandlers(modal);
-}
-
-// Функция установки улучшения на конкретную деку
-function installDeckUpgradeOnDeck(stat, price, deckId) {
-    // Проверяем лимиты улучшений для выбранной деки
-    const installedUpgrades = state.deckGear.filter(item => 
-        item.deckGearType === 'upgrade' && 
-        item.stat === stat && 
-        item.installedDeckId == deckId // Используем == для сравнения строки и числа
-    );
-    
-    const maxUpgrades = 5; // Максимум 5 улучшений каждого типа на деку
-    if (installedUpgrades.length >= maxUpgrades) {
-        showModal('Достигнут лимит', `Максимальное количество улучшений ${stat} для деки: ${maxUpgrades}`);
-        return;
-    }
-    
-    // Создаем улучшение
-    const newUpgrade = {
-        id: Date.now(),
-        name: `Улучшение ${stat === 'memory' ? 'памяти' : stat === 'ram' ? 'ОЗУ' : 'Видимости'}`,
-        type: 'deck_gear',
-        deckGearType: 'upgrade',
-        stat: stat,
-        maxUpgrades: maxUpgrades,
-        installedDeckId: deckId,
-        catalogPrice: price,
-        purchasePrice: price,
-        itemType: 'purchased'
-    };
-    
-    // Проверяем, что у нас достаточно денег
-    if (state.money < price) {
-        showModal('Недостаточно денег', `Не хватает ${price - state.money} уе для покупки улучшения.`);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money -= price;
-    
-    // Обновляем отображение денег
-    updateMoneyDisplay();
-    
-    // Добавляем улучшение
-    state.deckGear.push(newUpgrade);
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: newUpgrade.name,
-        price: price,
-        category: 'Улучшение деки'
-    });
-    
-    // Находим название деки
-    let deckName = 'Неизвестная дека';
-    if (deckId === 'main') {
-        deckName = state.deck ? state.deck.name : 'Основная дека';
-    } else {
-        const deck = state.decks.find(d => d.id == deckId); // Используем == для сравнения строки и числа
-        if (deck) {
-            deckName = deck.name;
-        }
-    }
-    
-    showModal('Улучшение установлено', `${newUpgrade.name} установлено на ${deckName}!`);
-    
-    // Обновляем коллекцию дек если она открыта
-    const collectionModal = document.querySelector('.modal-overlay');
-    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
-        renderDeckCollection();
-    }
-    
-    scheduleSave();
-    updateAllDisplays();
-    
-    // Обновляем отображение деки
-    updateDeckDisplay();
-}
-
-// Функция удаления щепки с деки
-function removeChipFromDeck(chipId) {
-    const chip = state.deckChips.find(c => c.id === chipId);
-    if (!chip) return;
-    
-    chip.installedDeckId = null;
-    
-    // Обновляем отображение
-    updateDeckDisplay();
-    
-    // Если открыт поп-ап коллекции дек, обновляем его
-    const collectionModal = document.querySelector('.modal-overlay');
-    if (collectionModal && collectionModal.querySelector('#deckCollectionContainer')) {
-        renderDeckCollection();
-    }
-    
-    scheduleSave();
-    showModal('Щепка извлечена', `&#x2705; Щепка "${chip.name}" извлечена из деки!`);
-}
-
-// Функция установки щепки на деку
-function installChipOnDeck(chipId) {
-    const chip = state.deckChips.find(c => c.id === chipId);
-    if (!chip) return;
-    
-    // Проверяем, есть ли доступные деки
-    if (!state.deck && state.decks.length === 0) {
-        showModal('Нет дек', 'Купите деку в магазине дек, чтобы установить щепку!');
-        return;
-    }
-    
-    // Создаем модал с выбором деки для щепки
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    // Формируем список дек
-    let deckOptions = '';
-    if (state.deck) {
-        deckOptions += `<option value="main">Основная дека (${state.deck.name})</option>`;
-    }
-    deckOptions += state.decks.map(deck => `<option value="${deck.id}">${deck.name}</option>`).join('');
-    
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>ВЫБОР ДЕКИ</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="margin-bottom: 1rem;">Необходимо выбрать деку, на которую установить щепку!</p>
-                <div style="margin-bottom: 1rem;">
-                    <div style="margin-bottom: 0.5rem; color: var(--accent); font-weight: 600;">Выберите деку:</div>
-                    <select id="deckSelect" style="width: 100%; padding: 0.75rem; background: var(--bg-primary); border: 2px solid var(--accent); border-radius: 8px; color: var(--text); font-size: 1rem; box-shadow: 0 0 10px rgba(138, 43, 226, 0.3);">
-                        ${deckOptions}
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button muted-button" onclick="closeModal(this)">Отменить</button>
-                <button class="pill-button primary-button" onclick="installChipOnDeckTarget('${chipId}', document.getElementById('deckSelect').value); closeModal(this)">Установить</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    addModalKeyboardHandlers(modal);
-}
-
-// Функция установки щепки на конкретную деку
 function installChipOnDeckTarget(chipId, deckId) {
     const chip = state.deckChips.find(c => c.id === chipId);
     if (!chip) return;
@@ -5966,10 +1968,19 @@ function installChipOnDeckTarget(chipId, deckId) {
 }
 
 function showCustomWeaponCreator() {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     modal.innerHTML = `
         <div class="modal" style="max-width: 600px;">
             <div class="modal-header">
@@ -6002,10 +2013,19 @@ function showCustomWeaponCreator() {
 }
 
 function showCustomMeleeWeaponForm() {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     modal.innerHTML = `
         <div class="modal" style="max-width: 600px;">
             <div class="modal-header">
@@ -6065,13 +2085,25 @@ function showCustomMeleeWeaponForm() {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем обработчики клавиатуры для правильной работы Enter
+    addModalKeyboardHandlers(modal);
 }
 
 function showCustomRangedWeaponForm() {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     modal.innerHTML = `
         <div class="modal" style="max-width: 600px;">
             <div class="modal-header">
@@ -6139,2976 +2171,9 @@ function showCustomRangedWeaponForm() {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
-}
-
-// Функции покупки оружия ближнего боя
-function buyMeleeWeapon(type, price, load, damage, concealable, stealthPenalty, examples, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
     
-    if (currentMoney < price) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem; background: var(--danger); color: white; border-radius: 8px;">
-                <p style="font-size: 1.1rem; margin-bottom: 1rem;">Нищим не продаём. Вали отсюда!</p>
-                <button class="pill-button" onclick="closeModal(this)">Понятно</button>
-            </div>
-        `);
-        return;
-    }
-    
-  
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Уменьшаем доступную нагрузку
-    state.load.current -= load;
-    
-    // Добавляем оружие
-    const newWeapon = {
-        id: generateId('weapon'),
-        name: type,
-        customName: '', // Дополнительное название
-        type: 'melee',
-        damage: damage,
-        concealable: concealable,
-        stealthPenalty: stealthPenalty,
-        examples: examples,
-        price: price,
-        load: load,
-        modules: [],
-        slots: 1, // У ОББ всегда 1 слот
-        catalogPrice: catalogPrice,
-        purchasePrice: price,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    state.weapons.push(newWeapon);
-    renderWeapons();
-    updateLoadDisplay();
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: type,
-        price: price,
-        category: 'Оружие ближнего боя'
-    });
-    
-    showModal('Оружие куплено', `&#x2705; ${type} добавлено в блок Оружие!`);
-}
-
-function buyMeleeWeaponToGear(type, price, load, damage, concealable, stealthPenalty, examples, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < price) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem; background: var(--danger); color: white; border-radius: 8px;">
-                <p style="font-size: 1.1rem; margin-bottom: 1rem;">Нищим не продаём. Вали отсюда!</p>
-                <button class="pill-button" onclick="closeModal(this)">Понятно</button>
-            </div>
-        `);
-        return;
-    }
-    
- 
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Уменьшаем доступную нагрузку
-    state.load.current -= load;
-    
-    // Добавляем в снаряжение
-    const newGear = {
-        id: generateId('gear'),
-        name: type,
-        description: `Урон: ${damage} | Можно скрыть: ${concealable} | Штраф к СКА: ${stealthPenalty} | Примеры: ${examples}`,
-        price: price,
-        load: load,
-        type: 'weapon',
-        weaponData: {
-            type: 'melee',
-            damage: damage,
-            concealable: concealable,
-            stealthPenalty: stealthPenalty,
-            examples: examples
-        },
-        catalogPrice: catalogPrice,
-        purchasePrice: price,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    updateLoadDisplay();
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: type,
-        price: price,
-        category: 'Оружие ближнего боя (в сумку)'
-    });
-    
-    showModal('Оружие куплено', `&#x2705; ${type} добавлено в Снаряжение!`);
-}
-
-function getMeleeWeaponFree(type, load, damage, concealable, stealthPenalty, examples) {
-
-    // Уменьшаем доступную нагрузку
-    state.load.current -= load;
-    
-    // Добавляем в снаряжение бесплатно
-    const newGear = {
-        id: generateId('gear'),
-        name: type,
-        description: `Урон: ${damage} | Можно скрыть: ${concealable} | Штраф к СКА: ${stealthPenalty} | Примеры: ${examples}`,
-        price: 0,
-        load: load,
-        type: 'weapon',
-        weaponData: {
-            type: 'melee',
-            damage: damage,
-            concealable: concealable,
-            stealthPenalty: stealthPenalty,
-            examples: examples
-        }
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    updateLoadDisplay();
-    scheduleSave();
-    
-    showModal('Оружие получено', `&#x2705; ${type} добавлено в Снаряжение бесплатно!`);
-}
-
-// Функции покупки оружия дальнего боя
-function buyRangedWeapon(type, price, load, primaryDamage, altDamage, concealable, hands, stealth, magazine, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < price) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem; background: var(--danger); color: white; border-radius: 8px;">
-                <p style="font-size: 1.1rem; margin-bottom: 1rem;">Нищим не продаём. Вали отсюда!</p>
-                <button class="pill-button" onclick="closeModal(this)">Понятно</button>
-            </div>
-        `);
-        return;
-    }
-    
-
-  
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Уменьшаем доступную нагрузку
-    state.load.current -= load;
-    
-    // Определяем количество слотов для модулей
-    const slots = getRangedWeaponSlots(type);
-    
-    // Добавляем оружие
-    const newWeapon = {
-        id: generateId('weapon'),
-        name: type,
-        customName: '', // Дополнительное название
-        type: 'ranged',
-        primaryDamage: primaryDamage,
-        altDamage: altDamage,
-        concealable: concealable,
-        hands: hands,
-        stealth: stealth,
-        magazine: magazine,
-        price: catalogPrice || price,  // Используем каталожную цену если есть
-        catalogPrice: catalogPrice,     // Сохраняем каталожную цену отдельно
-        purchasePrice: price,          // Сохраняем цену покупки (0 если бесплатно)
-        itemType: price === 0 && catalogPrice > 0 ? 'free_catalog' : 'catalog',  // Маркер для скупщика
-        load: load,
-        modules: [],
-        slots: slots,
-        // Система магазина
-        maxAmmo: parseInt(magazine),
-        currentAmmo: 0,
-        loadedAmmoType: null,
-        // Тип оружия для боеприпасов
-        weaponTypeForAmmo: getWeaponTypeForAmmo(type),
-        // Особая система для дробовиков
-        isShotgun: type.includes('Дробовик'),
-        shotgunAmmo1: { type: null, count: 0 }, // Первый тип патронов (до 3 шт)
-        shotgunAmmo2: { type: null, count: 0 }  // Второй тип патронов (до 3 шт)
-    };
-    
-    state.weapons.push(newWeapon);
-    renderWeapons();
-    updateLoadDisplay();
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: type,
-        price: price,
-        category: 'Оружие дальнего боя'
-    });
-    
-    showModal('Оружие куплено', `&#x2705; ${type} добавлено в блок Оружие!`);
-}
-
-function buyRangedWeaponToGear(type, price, load, primaryDamage, altDamage, concealable, hands, stealth, magazine, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < price) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem; background: var(--danger); color: white; border-radius: 8px;">
-                <p style="font-size: 1.1rem; margin-bottom: 1rem;">Нищим не продаём. Вали отсюда!</p>
-                <button class="pill-button" onclick="closeModal(this)">Понятно</button>
-            </div>
-        `);
-        return;
-    }
-    
-  
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Уменьшаем доступную нагрузку
-    state.load.current -= load;
-    
-    // Добавляем в снаряжение
-    const newGear = {
-        id: generateId('gear'),
-        name: type,
-        description: `Урон основной: ${primaryDamage} | Урон альтернативный: ${altDamage} | Можно скрыть: ${concealable} | # рук: ${hands} | СКА: ${stealth} | Патронов в магазине: ${magazine}`,
-        price: catalogPrice || price,  // Используем каталожную цену если есть
-        catalogPrice: catalogPrice,     // Сохраняем каталожную цену отдельно
-        purchasePrice: price,          // Сохраняем цену покупки (0 если бесплатно)
-        load: load,
-        type: price === 0 && catalogPrice > 0 ? 'free_catalog' : 'weapon',
-        weaponData: {
-            type: 'ranged',
-            primaryDamage: primaryDamage,
-            altDamage: altDamage,
-            concealable: concealable,
-            hands: hands,
-            stealth: stealth,
-            magazine: magazine
-        }
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    updateLoadDisplay();
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: type,
-        price: price,
-        category: 'Оружие дальнего боя (в сумку)'
-    });
-    
-    showModal('Оружие куплено', `&#x2705; ${type} добавлено в Снаряжение!`);
-}
-
-function getRangedWeaponFree(type, load, primaryDamage, altDamage, concealable, hands, stealth, magazine) {
- 
-    
-    // Уменьшаем доступную нагрузку
-    state.load.current -= load;
-    
-    // Добавляем в снаряжение бесплатно
-    const newGear = {
-        id: generateId('gear'),
-        name: type,
-        description: `Урон основной: ${primaryDamage} | Урон альтернативный: ${altDamage} | Можно скрыть: ${concealable} | # рук: ${hands} | СКА: ${stealth} | Патронов в магазине: ${magazine}`,
-        price: 0,
-        load: load,
-        type: 'weapon',
-        weaponData: {
-            type: 'ranged',
-            primaryDamage: primaryDamage,
-            altDamage: altDamage,
-            concealable: concealable,
-            hands: hands,
-            stealth: stealth,
-            magazine: magazine
-        }
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    updateLoadDisplay();
-    scheduleSave();
-    
-    showModal('Оружие получено', `&#x2705; ${type} добавлено в Снаряжение бесплатно!`);
-}
-
-function toggleMeleeWeaponsFreeMode() {
-    const buyButtons = document.querySelectorAll('.melee-weapon-buy-button');
-    const gearButtons = document.querySelectorAll('.melee-weapon-gear-button');
-    const toggleButton = document.getElementById('meleeWeaponsFreeModeButton');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    const isFreeMode = toggleButton.textContent === 'Отключить бесплатно';
-    
-    if (isFreeMode) {
-        buyButtons.forEach(btn => {
-            const price = btn.getAttribute('data-price');
-            const type = btn.getAttribute('data-weapon-type');
-            const load = btn.getAttribute('data-load');
-            const damage = btn.getAttribute('data-damage');
-            const concealable = btn.getAttribute('data-concealable');
-            const stealthPenalty = btn.getAttribute('data-stealth-penalty');
-            const examples = btn.getAttribute('data-examples');
-            btn.setAttribute('onclick', `buyMeleeWeapon('${type}', ${price}, ${load}, '${damage}', ${concealable}, '${stealthPenalty}', '${examples}')`);
-        });
-        
-        gearButtons.forEach(btn => {
-            const price = btn.getAttribute('data-price');
-            const type = btn.getAttribute('data-weapon-type');
-            const load = btn.getAttribute('data-load');
-            const damage = btn.getAttribute('data-damage');
-            const concealable = btn.getAttribute('data-concealable');
-            const stealthPenalty = btn.getAttribute('data-stealth-penalty');
-            const examples = btn.getAttribute('data-examples');
-            btn.setAttribute('onclick', `buyMeleeWeaponToGear('${type}', ${price}, ${load}, '${damage}', ${concealable}, '${stealthPenalty}', '${examples}')`);
-        });
-        
-        // Обновляем отображение цен
-        const priceElements = document.querySelectorAll('.melee-weapon-price');
-        priceElements.forEach(el => {
-            const originalPrice = el.getAttribute('data-original-price');
-            el.textContent = `Цена: ${originalPrice} уе | Нагрузка: ${el.getAttribute('data-load')}`;
-        });
-        
-        toggleButton.textContent = 'Бесплатно';
-        toggleButton.style.background = 'transparent';
-        
-        // Возвращаем обычный фон
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 0, 0, 0.85)';
-        }
-    } else {
-        buyButtons.forEach(btn => {
-            const type = btn.getAttribute('data-weapon-type');
-            const load = btn.getAttribute('data-load');
-            const damage = btn.getAttribute('data-damage');
-            const concealable = btn.getAttribute('data-concealable');
-            const stealthPenalty = btn.getAttribute('data-stealth-penalty');
-            const examples = btn.getAttribute('data-examples');
-            btn.setAttribute('onclick', `buyMeleeWeapon('${type}', 0, ${load}, '${damage}', ${concealable}, '${stealthPenalty}', '${examples}')`);
-        });
-        
-        gearButtons.forEach(btn => {
-            const type = btn.getAttribute('data-weapon-type');
-            const load = btn.getAttribute('data-load');
-            const damage = btn.getAttribute('data-damage');
-            const concealable = btn.getAttribute('data-concealable');
-            const stealthPenalty = btn.getAttribute('data-stealth-penalty');
-            const examples = btn.getAttribute('data-examples');
-            btn.setAttribute('onclick', `buyMeleeWeaponToGear('${type}', 0, ${load}, '${damage}', ${concealable}, '${stealthPenalty}', '${examples}')`);
-        });
-        
-        // Обновляем отображение цен
-        const priceElements = document.querySelectorAll('.melee-weapon-price');
-        priceElements.forEach(el => {
-            el.textContent = `Цена: 0 уе | Нагрузка: ${el.getAttribute('data-load')}`;
-        });
-        
-        toggleButton.textContent = 'Отключить бесплатно';
-        toggleButton.style.background = 'linear-gradient(135deg, #7DF4C6, #5b9bff)';
-        
-        // Меняем фон на зеленоватый
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 100, 50, 0.85)';
-        }
-    }
-}
-
-// Инициализация кнопок оружия дальнего боя без переключения режима
-function initializeRangedWeaponButtons() {
-    const buyButtons = document.querySelectorAll('.ranged-weapon-buy-button');
-    const gearButtons = document.querySelectorAll('.ranged-weapon-gear-button');
-    
-    buyButtons.forEach(btn => {
-        const originalPrice = btn.getAttribute('data-original-price');
-        const type = btn.getAttribute('data-weapon-type');
-        const load = btn.getAttribute('data-load');
-        const primaryDamage = btn.getAttribute('data-primary-damage');
-        const altDamage = btn.getAttribute('data-alt-damage');
-        const concealable = btn.getAttribute('data-concealable');
-        const hands = btn.getAttribute('data-hands');
-        const stealth = btn.getAttribute('data-stealth');
-        const magazine = btn.getAttribute('data-magazine');
-        btn.setAttribute('onclick', `buyRangedWeapon(${JSON.stringify(type)}, ${originalPrice}, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, null)`);
-    });
-    
-    gearButtons.forEach(btn => {
-        const originalPrice = btn.getAttribute('data-original-price');
-        const type = btn.getAttribute('data-weapon-type');
-        const load = btn.getAttribute('data-load');
-        const primaryDamage = btn.getAttribute('data-primary-damage');
-        const altDamage = btn.getAttribute('data-alt-damage');
-        const concealable = btn.getAttribute('data-concealable');
-        const hands = btn.getAttribute('data-hands');
-        const stealth = btn.getAttribute('data-stealth');
-        const magazine = btn.getAttribute('data-magazine');
-        btn.setAttribute('onclick', `buyRangedWeaponToGear(${JSON.stringify(type)}, ${originalPrice}, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, null)`);
-    });
-}
-
-function toggleRangedWeaponsFreeMode() {
-    const buyButtons = document.querySelectorAll('.ranged-weapon-buy-button');
-    const gearButtons = document.querySelectorAll('.ranged-weapon-gear-button');
-    const toggleButton = document.getElementById('rangedWeaponsFreeModeButton');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    const isFreeMode = toggleButton.textContent === 'Отключить бесплатно';
-    
-    if (isFreeMode) {
-        buyButtons.forEach(btn => {
-            const originalPrice = btn.getAttribute('data-original-price');
-            const type = btn.getAttribute('data-weapon-type');
-            const load = btn.getAttribute('data-load');
-            const primaryDamage = btn.getAttribute('data-primary-damage');
-            const altDamage = btn.getAttribute('data-alt-damage');
-            const concealable = btn.getAttribute('data-concealable');
-            const hands = btn.getAttribute('data-hands');
-            const stealth = btn.getAttribute('data-stealth');
-            const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `buyRangedWeapon(${JSON.stringify(type)}, ${originalPrice}, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, null)`);
-        });
-        
-        gearButtons.forEach(btn => {
-            const originalPrice = btn.getAttribute('data-original-price');
-            const type = btn.getAttribute('data-weapon-type');
-            const load = btn.getAttribute('data-load');
-            const primaryDamage = btn.getAttribute('data-primary-damage');
-            const altDamage = btn.getAttribute('data-alt-damage');
-            const concealable = btn.getAttribute('data-concealable');
-            const hands = btn.getAttribute('data-hands');
-            const stealth = btn.getAttribute('data-stealth');
-            const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `buyRangedWeaponToGear(${JSON.stringify(type)}, ${originalPrice}, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, null)`);
-        });
-        
-        // Обновляем отображение цен
-        const priceElements = document.querySelectorAll('.ranged-weapon-price');
-        priceElements.forEach(el => {
-            const originalPrice = el.getAttribute('data-original-price');
-            el.textContent = `Цена: ${originalPrice} уе | Нагрузка: ${el.getAttribute('data-load')}`;
-        });
-        
-        toggleButton.textContent = 'Бесплатно';
-        toggleButton.style.background = 'transparent';
-        
-        // Возвращаем обычный фон
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 0, 0, 0.85)';
-        }
-    } else {
-        buyButtons.forEach(btn => {
-            const catalogPrice = btn.getAttribute('data-price'); // Каталожная цена
-            const type = btn.getAttribute('data-weapon-type');
-            const load = btn.getAttribute('data-load');
-            const primaryDamage = btn.getAttribute('data-primary-damage');
-            const altDamage = btn.getAttribute('data-alt-damage');
-            const concealable = btn.getAttribute('data-concealable');
-            const hands = btn.getAttribute('data-hands');
-            const stealth = btn.getAttribute('data-stealth');
-            const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `buyRangedWeapon(${JSON.stringify(type)}, 0, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, ${catalogPrice})`);
-        });
-        
-        gearButtons.forEach(btn => {
-            const catalogPrice = btn.getAttribute('data-price'); // Каталожная цена
-            const type = btn.getAttribute('data-weapon-type');
-            const load = btn.getAttribute('data-load');
-            const primaryDamage = btn.getAttribute('data-primary-damage');
-            const altDamage = btn.getAttribute('data-alt-damage');
-            const concealable = btn.getAttribute('data-concealable');
-            const hands = btn.getAttribute('data-hands');
-            const stealth = btn.getAttribute('data-stealth');
-            const magazine = btn.getAttribute('data-magazine');
-            btn.setAttribute('onclick', `buyRangedWeaponToGear(${JSON.stringify(type)}, 0, ${load}, ${JSON.stringify(primaryDamage)}, ${JSON.stringify(altDamage)}, ${JSON.stringify(concealable)}, ${JSON.stringify(hands)}, ${stealth}, ${JSON.stringify(magazine)}, ${catalogPrice})`);
-        });
-        
-        // Обновляем отображение цен
-        const priceElements = document.querySelectorAll('.ranged-weapon-price');
-        priceElements.forEach(el => {
-            el.textContent = `Цена: 0 уе | Нагрузка: ${el.getAttribute('data-load')}`;
-        });
-        
-        toggleButton.textContent = 'Отключить бесплатно';
-        toggleButton.style.background = 'linear-gradient(135deg, #7DF4C6, #5b9bff)';
-        
-        // Меняем фон на зеленоватый
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 100, 50, 0.85)';
-        }
-    }
-}
-
-// Функция определения количества слотов для оружия дальнего боя
-function getRangedWeaponSlots(type) {
-    const slotMap = {
-        'Лёгкий пистолет': 1,                'Лёгкий пистолет': 1,
-        'Обычный пистолет': 2,
-        'Крупнокалиберный пистолет': 3,
-        'Пистолет-пулемёт': 2,
-        'Тяжёлый пистолет-пулемёт': 3,
-        'Штурмовая винтовка': 4,
-        'Снайперская винтовка': 1,
-        'Пулемёт': 3,
-        'Дробовик': 2,
-        'Гранатомёт': 1,
-        'Ракетомёт': 1,
-        'Оружие с самонаведением': 1
-    };
-    return slotMap[type] || 1;
-}
-
-// Функции создания собственного оружия
-function createCustomMeleeWeapon() {
-    const type = document.getElementById('customMeleeType').value;
-    const appearance = document.getElementById('customMeleeAppearance').value;
-    const damage = document.getElementById('customMeleeDamage').value;
-    const concealable = document.getElementById('customMeleeConcealable').value === 'true';
-    const stealthPenalty = document.getElementById('customMeleeStealthPenalty').value;
-    const price = parseInt(document.getElementById('customMeleePrice').value) || 0;
-    const load = parseInt(document.getElementById('customMeleeLoad').value) || 0;
-    const description = document.getElementById('customMeleeDescription').value;
-    
-    if (!type || !damage || !stealthPenalty || !load) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Заполните все обязательные поля!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    // Добавляем в снаряжение
-    const newGear = {
-        id: generateId('gear'),
-        name: type,
-        description: `Внешний вид: ${appearance} | Урон: ${damage} | Можно скрыть: ${concealable} | Штраф к СКА: ${stealthPenalty} | ${description}`,
-        price: price,
-        load: load,
-        type: 'weapon',
-        weaponData: {
-            type: 'melee',
-            damage: damage,
-            concealable: concealable,
-            stealthPenalty: stealthPenalty,
-            appearance: appearance,
-            customDescription: description
-        }
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    showModal('Оружие создано', `&#x2705; ${type} добавлено в Снаряжение!`);
-}
-
-function createCustomRangedWeapon() {
-    const type = document.getElementById('customRangedType').value;
-    const primaryDamage = document.getElementById('customRangedPrimaryDamage').value;
-    const altDamage = document.getElementById('customRangedAltDamage').value;
-    const concealable = document.getElementById('customRangedConcealable').value === 'true';
-    const hands = parseInt(document.getElementById('customRangedHands').value) || 1;
-    const stealth = parseInt(document.getElementById('customRangedStealth').value) || 2;
-    const magazine = document.getElementById('customRangedMagazine').value;
-    const price = parseInt(document.getElementById('customRangedPrice').value) || 0;
-    const load = parseInt(document.getElementById('customRangedLoad').value) || 0;
-    const description = document.getElementById('customRangedDescription').value;
-    
-    if (!type || !primaryDamage || !hands || !stealth || !magazine || !load) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Заполните все обязательные поля!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    // Добавляем в снаряжение
-    const newGear = {
-        id: generateId('gear'),
-        name: type,
-        description: `Урон основной: ${primaryDamage} | Урон альтернативный: ${altDamage} | Можно скрыть: ${concealable} | # рук: ${hands} | СКА: ${stealth} | Патронов в магазине: ${magazine} | ${description}`,
-        price: price,
-        load: load,
-        type: 'weapon',
-        weaponData: {
-            type: 'ranged',
-            primaryDamage: primaryDamage,
-            altDamage: altDamage,
-            concealable: concealable,
-            hands: hands,
-            stealth: stealth,
-            magazine: magazine,
-            customDescription: description
-        }
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    showModal('Оружие создано', `&#x2705; ${type} добавлено в Снаряжение!`);
-}
-
-// Функция отображения оружия
-function renderWeapons() {
-    const container = document.getElementById('weaponsContainer');
-    if (!container) return;
-    
-    if (state.weapons.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem; font-size: 0.8rem;">Оружие не добавлено</p>';
-        return;
-    }
-    
-    container.innerHTML = state.weapons.map((weapon, index) => `
-        <div class="weapon-item" style="background: rgba(0,0,0,0.2); border: 1px solid rgba(182, 103, 255, 0.2); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem;">
-            <div class="weapon-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; gap: 0.5rem;">
-                <div style="flex: 1;">
-                    <h4 style="color: var(--accent); font-size: 0.95rem; margin: 0 0 0.25rem 0;">
-                        <span contenteditable="true" onblur="updateWeaponCustomName('${weapon.id}', this.textContent)" style="outline: none; border: none; background: transparent; color: inherit; font-size: inherit; font-weight: inherit;">${weapon.customName || weapon.name}</span>
-                    </h4>
-                </div>
-                <button class="pill-button success-button" onclick="moveWeaponToGear(${index})" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; white-space: nowrap;">Сложить в сумку</button>
-            </div>
-            
-            <div class="weapon-damage" style="margin-bottom: 0.5rem;">
-                ${weapon.type === 'melee' ? `
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span style="color: var(--text); font-weight: 600; font-size: 0.85rem;">Урон:</span>
-                        <button class="pill-button primary-button" onclick="rollWeaponDamage('${weapon.damage}', '${weapon.name}', '${weapon.type}', '${weapon.id}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">${weapon.damage}</button>
-                    </div>
-                ` : `
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
-                        <span style="color: var(--text); font-weight: 600; font-size: 0.85rem;">Урон основной:</span>
-                        <button class="pill-button primary-button" onclick="rollWeaponDamage('${weapon.primaryDamage}', '${weapon.name}', '${weapon.type}', '${weapon.id}', 'primary')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">${weapon.primaryDamage}</button>
-                    </div>
-                    ${weapon.altDamage ? `
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="color: var(--text); font-weight: 600; font-size: 0.85rem;">Урон альтернативный:</span>
-                            <button class="pill-button primary-button" onclick="rollWeaponDamage('${weapon.altDamage}', '${weapon.name}', '${weapon.type}', '${weapon.id}', 'alt')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">${weapon.altDamage}</button>
-                        </div>
-                    ` : ''}
-                `}
-            </div>
-            
-            <div class="weapon-stats" style="font-family: monospace; font-size: 0.7rem; color: var(--muted); margin-bottom: 0.5rem;">
-                ${weapon.type === 'melee' ? `
-                    Можно скрыть: ${formatYesNo(weapon.concealable)} | Штраф к СКА: ${weapon.stealthPenalty}
-                ` : `
-                    Можно скрыть: ${formatYesNo(weapon.concealable)} | # рук: ${weapon.hands} | СКА: ${weapon.stealth} | Патронов в магазине: ${weapon.magazine}
-                `}
-            </div>
-            
-            ${weapon.type === 'ranged' ? `
-                ${weapon.isShotgun ? `
-                    <!-- Особая система для дробовиков -->
-                    <div class="weapon-magazine" style="margin-bottom: 0.5rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                            <span style="color: var(--accent); font-weight: 600; font-size: 0.85rem;">Патроны в дробовике:</span>
-                            <button class="pill-button success-button" onclick="reloadShotgun('${weapon.id}')" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;">&#x1F504; Перезарядить</button>
-                        </div>
-                        <div style="display: grid; gap: 0.25rem;">
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.75rem; min-width: 50px; text-align: center;">
-                                    <span style="color: var(--accent); font-weight: 600;">${weapon.shotgunAmmo1.count}/3</span>
-                                </div>
-                                ${weapon.shotgunAmmo1.type ? `
-                                    <div style="font-size: 0.7rem; color: var(--success); font-family: monospace;">
-                                        ${weapon.shotgunAmmo1.type}
-                                    </div>
-                                ` : `
-                                    <div style="font-size: 0.7rem; color: var(--muted); font-style: italic;">
-                                        Не заряжено
-                                    </div>
-                                `}
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.75rem; min-width: 50px; text-align: center;">
-                                    <span style="color: var(--accent); font-weight: 600;">${weapon.shotgunAmmo2.count}/3</span>
-                                </div>
-                                ${weapon.shotgunAmmo2.type ? `
-                                    <div style="font-size: 0.7rem; color: var(--success); font-family: monospace;">
-                                        ${weapon.shotgunAmmo2.type}
-                                    </div>
-                                ` : `
-                                    <div style="font-size: 0.7rem; color: var(--muted); font-style: italic;">
-                                        Не заряжено
-                                    </div>
-                                `}
-                            </div>
-                        </div>
-                    </div>
-                ` : `
-                    <!-- Обычная система для остального оружия -->
-                    <div class="weapon-magazine" style="margin-bottom: 0.5rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                            <span style="color: var(--accent); font-weight: 600; font-size: 0.85rem;">Патроны в магазине:</span>
-                            <button class="pill-button success-button" onclick="reloadWeapon('${weapon.id}')" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;">&#x1F504; Перезарядить</button>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
-                                <span style="color: var(--accent); font-weight: 600;">${weapon.currentAmmo || 0}</span>
-                                <span style="color: var(--muted);">/</span>
-                                <span style="color: var(--text);">${weapon.maxAmmo || weapon.magazine}</span>
-                            </div>
-                            ${weapon.loadedAmmoType ? `
-                                <div style="font-size: 0.75rem; color: var(--success); font-family: monospace;">
-                                    ${weapon.loadedAmmoType}
-                                </div>
-                            ` : `
-                                <div style="font-size: 0.75rem; color: var(--muted); font-style: italic;">
-                                    Не заряжено
-                                </div>
-                            `}
-                        </div>
-                    </div>
-                `}
-            ` : ''}
-            
-            ${weapon.examples ? `<div class="weapon-examples" style="font-size: 0.75rem; color: var(--muted); margin-bottom: 0.5rem;"><strong>Примеры:</strong> ${weapon.examples}</div>` : ''}
-            
-            ${weapon.slots > 0 ? `
-                <div class="weapon-modules">
-                    <div style="color: var(--accent); font-weight: 600; margin-bottom: 0.35rem; font-size: 0.85rem;">Слоты для модулей:</div>
-                    <div style="display: flex; gap: 0.35rem; margin-bottom: 0.35rem;">
-                        ${Array.from({length: weapon.slots}, (_, i) => `
-                            <div class="weapon-slot" data-weapon-id="${weapon.id}" data-slot-index="${i}" style="width: 26px; height: 26px; border: 2px solid ${weapon.modules[i] ? 'var(--success)' : 'var(--border)'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; background: ${weapon.modules[i] ? 'rgba(125, 244, 198, 0.3)' : 'transparent'}; font-size: 0.75rem;" onclick="manageWeaponModule('${weapon.id}', ${i})">
-                                ${weapon.modules[i] ? '✓' : '○'}
-                            </div>
-                        `).join('')}
-                    </div>
-                    ${weapon.modules.filter(m => m).map(module => `
-                        <div style="font-size: 0.7rem; color: var(--muted); margin-left: 0.75rem;">
-                            • ${module.name}: ${module.description}
-                        </div>
-                    `).join('')}
-                </div>
-            ` : ''}
-        </div>
-    `).join('');
-}
-
-// Функция обновления дополнительного названия оружия
-function updateWeaponCustomName(weaponId, newName) {
-    const weapon = state.weapons.find(w => w.id === weaponId);
-    if (weapon) {
-        weapon.customName = newName;
-        scheduleSave();
-    }
-}
-
-// Функция перемещения оружия в снаряжение
-function moveWeaponToGear(weaponIndex) {
-    const weapon = state.weapons[weaponIndex];
-    if (!weapon) return;
-    
-    // Создаем описание для снаряжения
-    let description = '';
-    if (weapon.type === 'melee') {
-        description = `Урон: ${weapon.damage} | Можно скрыть: ${weapon.concealable ? 'да' : 'нет'} | Штраф к СКА: ${weapon.stealthPenalty}`;
-        if (weapon.examples) description += ` | Примеры: ${weapon.examples}`;
-    } else {
-        description = `Урон основной: ${weapon.primaryDamage} | Урон альтернативный: ${weapon.altDamage} | Можно скрыть: ${weapon.concealable ? 'да' : 'нет'} | # рук: ${weapon.hands} | СКА: ${weapon.stealth} | Патронов в магазине: ${weapon.magazine}`;
-    }
-    
-    // Добавляем информацию об установленных модулях
-    if (weapon.modules.filter(m => m).length > 0) {
-        description += ` | Установлено: ${weapon.modules.filter(m => m).map(m => m.name).join(', ')}`;
-    }
-    
-    // Добавляем в снаряжение
-    const newGear = {
-        id: generateId('gear'),
-        name: weapon.customName || weapon.name,
-        description: description,
-        price: weapon.price,
-        load: weapon.load,
-        type: 'weapon',
-        weaponData: weapon
-    };
-    
-    state.gear.push(newGear);
-    
-    // Удаляем из оружия
-    state.weapons.splice(weaponIndex, 1);
-    
-    renderWeapons();
-    renderGear();
-    scheduleSave();
-    
-    showModal('Оружие перемещено', `&#x2705; ${weapon.name} перемещено в Снаряжение!`);
-}
-
-// Функция броска урона оружия
-function rollWeaponDamage(damageFormula, weaponName, weaponType, weaponId, damageType) {
-    // Если это оружие ближнего боя, сразу показываем стандартный бросок
-    if (weaponType === 'melee') {
-        showStandardDamageRoll(damageFormula, weaponName, weaponId);
-        return;
-    }
-    
-    // Для огнестрельного оружия показываем выбор боеприпасов
-    showAmmoSelectionModal(damageFormula, weaponName, weaponId, damageType);
-}
-
-function showStandardDamageRoll(damageFormula, weaponName, weaponId) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.id = 'weaponDamageModal';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>&#x2694;&#xFE0F; Атака: ${weaponName}</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body" id="weaponDamageModalBody">
-                <div id="weaponSetupSection">
-                    <div style="margin-bottom: 1rem;">
-                        <p style="margin-bottom: 0.75rem;"><strong>${weaponName}</strong></p>
-                        <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
-                            Формула урона: <strong style="color: var(--accent);">${damageFormula}</strong>
-                        </p>
-                    </div>
-                    
-                    <div style="display: grid; gap: 0.75rem;">
-                        <label class="field">
-                            Модификатор урона
-                            <input type="text" class="input-field" id="damageModifier" value="0" placeholder="0">
-                        </label>
-                    </div>
-                </div>
-                
-                <!-- Секция анимации и результатов -->
-                <div id="weaponDamageAnimation" style="display: none;">
-                    <div style="text-align: center; padding: 2rem 0;">
-                        <div id="weaponDiceDisplay" style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"></div>
-                        <div id="weaponDamageTotal" style="font-size: 2rem; font-weight: 700; color: var(--accent); margin-bottom: 0.5rem;"></div>
-                        <div id="weaponDamageFormula" style="font-size: 0.9rem; color: var(--muted);"></div>
-                        <div id="weaponCriticalMessage" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(255, 0, 0, 0.2); border: 2px solid #ff0000; border-radius: 8px;">
-                            <p style="color: #ff0000; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem;">&#x1FA78; КРИТИЧЕСКАЯ ТРАВМА! &#x1FA78;</p>
-                            <p style="color: var(--text); font-size: 0.9rem;">Ты нанёс Критическую травму! Сообщи Мастеру!</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer" id="weaponDamageFooter">
-                <button class="pill-button primary-button" id="weaponShootButton" onclick="executeMeleeDamageRoll('${damageFormula}', '${weaponName}', '${weaponId}')">
-                    &#x2694;&#xFE0F; Атаковать!
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function executeMeleeDamageRoll(damageFormula, weaponName, weaponId) {
-    const modifier = parseInt(document.getElementById('damageModifier').value) || 0;
-    
-    // Скрываем секцию настройки и показываем анимацию
-    document.getElementById('weaponSetupSection').style.display = 'none';
-    document.getElementById('weaponDamageAnimation').style.display = 'block';
-    document.getElementById('weaponShootButton').style.display = 'none';
-    
-    // Выполняем бросок урона с анимацией
-    performWeaponDamageRoll(damageFormula, weaponName, modifier, null, null, null, weaponId, null, false, 'single');
-}
-
-function showAmmoSelectionModal(damageFormula, weaponName, weaponId, damageType) {
-    // Получаем информацию об оружии
-    const weapon = state.weapons.find(w => w.id === weaponId);
-    if (!weapon) {
-        showModal('Ошибка', 'Оружие не найдено!');
-        return;
-    }
-    
-    // Особая обработка для дробовиков
-    if (weapon.isShotgun) {
-        showShotgunShootingModal(damageFormula, weaponName, weaponId);
-        return;
-    }
-    
-    // Проверяем, есть ли патроны в магазине
-    if (!weapon.currentAmmo || weapon.currentAmmo <= 0 || !weapon.loadedAmmoType) {
-        showModal('Магазин пуст', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Магазин пуст!</p>
-                <p style="color: var(--muted); margin-bottom: 1rem;">Сначала перезарядите оружие</p>
-                <button class="pill-button primary-button" onclick="closeModal(this); setTimeout(() => reloadWeapon('${weaponId}'), 100)">Перезарядить</button>
-            </div>
-        `);
-        return;
-    }
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.id = 'weaponDamageModal';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    // Определяем тип оружия для автоматического огня
-    const weaponTypeForAmmo = getWeaponTypeForAmmo(weaponName);
-    
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>&#x1F52B; Стрельба: ${weaponName}</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body" id="weaponDamageModalBody">
-                <div id="weaponSetupSection">
-                    <div style="margin-bottom: 1rem;">
-                        <p style="margin-bottom: 0.75rem;"><strong>${weaponName}</strong></p>
-                        <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
-                            Формула урона: <strong style="color: var(--accent);">${damageFormula}</strong>
-                        </p>
-                    </div>
-                    
-                    <!-- Информация о заряженных боеприпасах -->
-                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px;">
-                        <p style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">Заряженные боеприпасы:</p>
-                        <p style="color: var(--text); font-size: 0.9rem;">
-                            Тип: <strong>${weapon.loadedAmmoType}</strong> | 
-                            Патронов: <strong>${weapon.currentAmmo}/${weapon.maxAmmo}</strong>
-                        </p>
-                    </div>
-                    
-                    <!-- Режим огня для автоматического оружия -->
-                    ${isAutomaticWeapon(weaponTypeForAmmo) ? `
-                        <div style="margin-bottom: 1rem;">
-                            <label class="input-label">Режим огня</label>
-                            <div style="display: grid; gap: 0.5rem;">
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="radio" name="fireMode" value="single" checked style="margin: 0;">
-                                    <span>Одиночный выстрел (1 патрон)</span>
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="radio" name="fireMode" value="auto" ${getMinAmmoForAuto(weaponTypeForAmmo) > weapon.currentAmmo ? 'disabled' : ''} style="margin: 0;">
-                                    <span style="color: ${getMinAmmoForAuto(weaponTypeForAmmo) > weapon.currentAmmo ? 'var(--muted)' : 'var(--text)'};">Автоматический огонь (${getMinAmmoForAuto(weaponTypeForAmmo)} патронов)</span>
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="radio" name="fireMode" value="suppression" ${getMinAmmoForAuto(weaponTypeForAmmo) > weapon.currentAmmo ? 'disabled' : ''} style="margin: 0;">
-                                    <span style="color: ${getMinAmmoForAuto(weaponTypeForAmmo) > weapon.currentAmmo ? 'var(--muted)' : 'var(--text)'};">Огонь на подавление (${getMinAmmoForAuto(weaponTypeForAmmo)} патронов)</span>
-                                </label>
-                            </div>
-                        </div>
-                    ` : ''}
-                    
-                    <div style="display: grid; gap: 0.75rem;">
-                        <label class="field">
-                            Модификатор урона
-                            <input type="text" class="input-field" id="damageModifier" value="0" placeholder="0">
-                        </label>
-                    </div>
-                </div>
-                
-                <!-- Секция анимации и результатов -->
-                <div id="weaponDamageAnimation" style="display: none;">
-                    <div style="text-align: center; padding: 2rem 0;">
-                        <div id="weaponDiceDisplay" style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;"></div>
-                        <div id="weaponDamageTotal" style="font-size: 2rem; font-weight: 700; color: var(--accent); margin-bottom: 0.5rem;"></div>
-                        <div id="weaponDamageFormula" style="font-size: 0.9rem; color: var(--muted);"></div>
-                        <div id="weaponCriticalMessage" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(255, 0, 0, 0.2); border: 2px solid #ff0000; border-radius: 8px;">
-                            <p style="color: #ff0000; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem;">&#x1FA78; КРИТИЧЕСКАЯ ТРАВМА! &#x1FA78;</p>
-                            <p style="color: var(--text); font-size: 0.9rem;">Ты нанёс Критическую травму! Сообщи Мастеру!</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer" id="weaponDamageFooter">
-                <button class="pill-button primary-button" id="weaponShootButton" onclick="executeRangedWeaponDamageRoll('${damageFormula}', '${weaponName}', '${weaponId}', '${weaponTypeForAmmo}')">
-                    &#x1F52B; Стрелять!
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-// Вспомогательные функции для механики стрельбы
-function getWeaponTypeForAmmo(weaponName) {
-    // Определяем тип оружия по названию для поиска боеприпасов
-    const weaponTypeMappings = {
-        // Пистолеты
-        'Лёгкий пистолет': 'Лёгкий пистолет',
-        'Обычный пистолет': 'Обычный пистолет',
-        'Крупнокалиберный пистолет': 'Крупнокалиберный пистолет',
-        
-        // Пистолеты-пулемёты
-        'Пистолет-пулемёт': 'Пистолет-пулемёт',
-        'Тяжёлый пистолет-пулемёт': 'Тяжёлый пистолет-пулемёт',
-        
-        // Винтовки
-        'Штурмовая винтовка': 'Штурмовая винтовка',
-        'Снайперская винтовка': 'Снайперская винтовка',
-        
-        // Пулемёты
-        'Пулемёт': 'Пулемёт',
-        
-        // Дробовики
-        'Дробовик': 'Дробовик',
-        
-        // Специальное оружие
-        'Оружие с самонаведением': 'Оружие с самонаведением',
-        'Гранатомёт': 'Гранаты',
-        'Ракетомёт': 'Ракеты',
-        
-        // Активная броня
-        'Активная броня (Микроракета)': 'Микроракета',
-        'Активная броня (Микроракеты)': 'Микроракета',
-        'Активная броня (Дробовая)': 'Пиропатрон',
-        'Активная броня (Лазерная)': 'Высоковольтная мини-батарея'
-    };
-    
-    // Сначала ищем точное совпадение
-    if (weaponTypeMappings[weaponName]) {
-        return weaponTypeMappings[weaponName];
-    }
-    
-    // Затем ищем частичное совпадение
-    for (const [key, value] of Object.entries(weaponTypeMappings)) {
-        if (weaponName.includes(key)) {
-            return value;
-        }
-    }
-    
-    // По умолчанию возвращаем обычный пистолет
-    return 'Обычный пистолет';
-}
-
-function isAutomaticWeapon(weaponType) {
-    const automaticTypes = [
-        'Пистолет-пулемёт',
-        'Тяжёлый пистолет-пулемёт', 
-        'Пулемёт',
-        'Штурмовая винтовка'
-    ];
-    return automaticTypes.includes(weaponType);
-}
-
-function getMinAmmoForAuto(weaponType) {
-    return weaponType === 'Пулемёт' ? 50 : 10;
-}
-
-function executeRangedWeaponDamageRoll(damageFormula, weaponName, weaponId, weaponType) {
-    const weapon = state.weapons.find(w => w.id === weaponId);
-    if (!weapon) return;
-    
-    const modifier = parseInt(document.getElementById('damageModifier').value) || 0;
-    
-    // Определяем режим огня
-    const fireModeRadios = document.querySelectorAll('input[name="fireMode"]');
-    let fireMode = 'single';
-    for (const radio of fireModeRadios) {
-        if (radio.checked) {
-            fireMode = radio.value;
-            break;
-        }
-    }
-    
-    // Определяем количество патронов для списания
-    let ammoToConsume = 1;
-    let fireModeText = 'Одиночный выстрел';
-    
-    if (fireMode === 'auto') {
-        ammoToConsume = weaponType === 'Пулемёт' ? 50 : 10;
-        fireModeText = 'Автоматический огонь';
-    } else if (fireMode === 'suppression') {
-        ammoToConsume = weaponType === 'Пулемёт' ? 50 : 10;
-        fireModeText = 'Огонь на подавление';
-    }
-    
-    // Проверяем достаточность патронов в магазине оружия
-    if (weapon.currentAmmo < ammoToConsume) {
-        showModal('Недостаточно патронов', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Недостаточно патронов в магазине!</p>
-                <p style="color: var(--muted);">Требуется: ${ammoToConsume} | В магазине: ${weapon.currentAmmo}</p>
-                <button class="pill-button primary-button" onclick="closeModal(this); setTimeout(() => reloadWeapon('${weaponId}'), 100)">Перезарядить</button>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем патроны из магазина оружия
-    weapon.currentAmmo -= ammoToConsume;
-    renderWeapons();
-    scheduleSave();
-    
-    // Скрываем секцию настройки и показываем анимацию
-    document.getElementById('weaponSetupSection').style.display = 'none';
-    document.getElementById('weaponDamageAnimation').style.display = 'block';
-    document.getElementById('weaponShootButton').style.display = 'none';
-    
-    // Определяем формулу урона в зависимости от режима огня
-    let actualDamageFormula = damageFormula;
-    if (fireMode === 'auto' || fireMode === 'suppression') {
-        actualDamageFormula = '2d6'; // Для автоматического огня и огня на подавление всегда 2d6
-    }
-    
-    // Выполняем бросок урона с анимацией
-    performWeaponDamageRoll(actualDamageFormula, weaponName, modifier, weapon.loadedAmmoType, fireModeText, ammoToConsume, weaponId, weaponType, true, fireMode);
-}
-
-// Универсальная функция для броска урона с анимацией
-function performWeaponDamageRoll(damageFormula, weaponName, modifier, ammoType, fireModeText, ammoConsumed, weaponId, weaponType, isRanged, fireMode) {
-    // Парсим формулу урона
-    const match = damageFormula.match(/(\d+)d(\d+)/);
-    if (!match) {
-        showModal('Ошибка', 'Неверная формула урона!');
-        return;
-    }
-    
-    const diceCount = parseInt(match[1]);
-    const diceSides = parseInt(match[2]);
-    
-    const diceDisplay = document.getElementById('weaponDiceDisplay');
-    const totalDiv = document.getElementById('weaponDamageTotal');
-    const formulaDiv = document.getElementById('weaponDamageFormula');
-    const criticalMessage = document.getElementById('weaponCriticalMessage');
-    const footer = document.getElementById('weaponDamageFooter');
-    
-    // Очищаем предыдущие результаты
-    diceDisplay.innerHTML = '';
-    totalDiv.textContent = '';
-    formulaDiv.textContent = '';
-    criticalMessage.style.display = 'none';
-    
-    // Создаем кубики
-    const diceElements = [];
-    for (let i = 0; i < diceCount; i++) {
-        const wrapper = document.createElement('div');
-        wrapper.style.display = 'flex';
-        wrapper.style.flexDirection = 'column';
-        wrapper.style.alignItems = 'center';
-        
-        const die = document.createElement('div');
-        die.className = 'die';
-        die.style.cssText = `
-            width: 60px;
-            height: 60px;
-            background: var(--accent);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: white;
-            animation: spin 1.2s ease-in-out;
-        `;
-        die.textContent = '?';
-        
-        wrapper.appendChild(die);
-        diceDisplay.appendChild(wrapper);
-        diceElements.push(die);
-    }
-    
-    // Анимация броска
-    let animationStep = 0;
-    const animationInterval = 100;
-    const animationDuration = 1200;
-    const steps = animationDuration / animationInterval;
-    
-    const interval = setInterval(() => {
-        animationStep++;
-        
-        diceElements.forEach(die => {
-            die.textContent = Math.floor(Math.random() * diceSides) + 1;
-        });
-        
-        if (animationStep >= steps) {
-            clearInterval(interval);
-            
-            // Финальные результаты
-            const finalResults = [];
-            for (let i = 0; i < diceCount; i++) {
-                finalResults.push(Math.floor(Math.random() * diceSides) + 1);
-            }
-            
-            // Отображаем результаты
-            diceElements.forEach((die, index) => {
-                die.textContent = finalResults[index];
-                die.style.animation = 'none';
-            });
-            
-            // Проверка критической травмы (2+ кубика с результатом >= 6)
-            const criticalDice = finalResults.filter(result => result >= 6);
-            const isCritical = criticalDice.length >= 2;
-            
-            // Рассчитываем сумму
-            const sum = finalResults.reduce((a, b) => a + b, 0);
-            const total = sum + modifier;
-            
-            // Отображаем результаты
-            totalDiv.textContent = `Σ ${total}`;
-            
-            let formulaText = `Кости: ${finalResults.join(' + ')}`;
-            if (modifier !== 0) {
-                formulaText += ` ${modifier >= 0 ? '+' : ''} ${modifier}`;
-            }
-            formulaText += ` = ${total}`;
-            
-            if (isRanged) {
-                formulaText += `\nБоеприпасы: ${ammoType} | Режим: ${fireModeText} | Потрачено: ${ammoConsumed}`;
-            }
-            
-            formulaDiv.textContent = formulaText;
-            
-            // Показываем критическую травму
-            if (isCritical) {
-                criticalMessage.style.display = 'block';
-                // Красное конфетти
-                createBloodConfetti();
-            }
-            
-            // Меняем кнопки - для автоматического огня и огня на подавление убираем кнопку "Атаковать еще раз"
-            const canRepeatAttack = !isRanged || (fireMode !== 'auto' && fireMode !== 'suppression');
-            
-            footer.innerHTML = `
-                ${canRepeatAttack ? `
-                    <button class="pill-button primary-button" onclick="${isRanged ? `repeatRangedAttack('${damageFormula}', '${weaponName}', '${weaponId}', '${weaponType}')` : `repeatMeleeAttack('${damageFormula}', '${weaponName}', '${weaponId}')`}">
-                        &#x1F504; Атаковать еще раз
-                    </button>
-                ` : ''}
-            `;
-            
-            // Добавляем в лог
-            addToRollLog('weapon_damage', {
-                weaponName: weaponName,
-                formula: `${diceCount}d${diceSides}(${finalResults.join(', ')})${modifier !== 0 ? ` + ${modifier}` : ''}`,
-                dice: finalResults,
-                modifier: modifier,
-                total: total,
-                isCritical: isCritical,
-                ammoType: isRanged ? ammoType : null,
-                fireMode: isRanged ? fireModeText : null
-            });
-        }
-    }, animationInterval);
-}
-
-// Функция создания красного конфетти
-function createBloodConfetti() {
-    const colors = ['#ff0000', '#cc0000', '#990000', '#ff3333', '#cc3333'];
-    const confettiCount = 50;
-    
-    for (let i = 0; i < confettiCount; i++) {
-        const confetti = document.createElement('div');
-        confetti.style.cssText = `
-            position: fixed;
-            width: 10px;
-            height: 10px;
-            background: ${colors[Math.floor(Math.random() * colors.length)]};
-            left: 50%;
-            top: 50%;
-            opacity: 1;
-            pointer-events: none;
-            z-index: 10000;
-            border-radius: 50%;
-        `;
-        
-        document.body.appendChild(confetti);
-        
-        const angle = Math.random() * Math.PI * 2;
-        const velocity = 200 + Math.random() * 200;
-        const vx = Math.cos(angle) * velocity;
-        const vy = Math.sin(angle) * velocity;
-        
-        const duration = 1000 + Math.random() * 500;
-        const startTime = Date.now();
-        
-        const animate = () => {
-            const elapsed = Date.now() - startTime;
-            const progress = elapsed / duration;
-            
-            if (progress < 1) {
-                const x = vx * progress;
-                const y = vy * progress + (progress * progress * 500);
-                confetti.style.transform = `translate(${x}px, ${y}px) rotate(${progress * 720}deg)`;
-                confetti.style.opacity = 1 - progress;
-                requestAnimationFrame(animate);
-            } else {
-                confetti.remove();
-            }
-        };
-        
-        animate();
-    }
-}
-
-// Функция повторной атаки для дальнего боя
-function repeatRangedAttack(damageFormula, weaponName, weaponId, weaponType) {
-    // Закрываем текущий модал
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    // Открываем новый
-    setTimeout(() => {
-        rollWeaponDamage(damageFormula, weaponName, 'ranged', weaponId);
-    }, 100);
-}
-
-// Функция повторной атаки для ближнего боя
-function repeatMeleeAttack(damageFormula, weaponName, weaponId) {
-    // Закрываем текущий модал
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    // Открываем новый
-    setTimeout(() => {
-        rollWeaponDamage(damageFormula, weaponName, 'melee', weaponId);
-    }, 100);
-}
-
-function showRangedDamageRoll(damageFormula, weaponName, ammoType, fireModeText, ammoConsumed) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>&#x1F52B; Стрельба: ${weaponName}</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1rem;">
-                    <p style="margin-bottom: 0.5rem;"><strong>${weaponName}</strong></p>
-                    <p style="color: var(--success); font-size: 0.9rem; margin-bottom: 0.5rem;">
-                        Боеприпасы: <strong>${ammoType}</strong>
-                    </p>
-                    <p style="color: var(--accent); font-size: 0.9rem; margin-bottom: 0.5rem;">
-                        Режим: <strong>${fireModeText}</strong>
-                    </p>
-                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
-                        Потрачено патронов: <strong>${ammoConsumed}</strong>
-                    </p>
-                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
-                        Формула урона: <strong style="color: var(--accent);">${damageFormula}</strong>
-                    </p>
-                </div>
-                
-                <div style="display: grid; gap: 0.75rem;">
-                    <label class="field">
-                        Модификатор урона
-                        <input type="text" class="input-field" id="damageModifier" value="0" placeholder="0">
-                    </label>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="executeWeaponDamageRoll('${damageFormula}', '${weaponName}')">
-                    🎲 Бросить урон
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function executeWeaponDamageRoll(damageFormula, weaponName) {
-    const modifier = parseInt(document.getElementById('damageModifier').value) || 0;
-    
-    // Парсим формулу урона (например, "2d6" или "3d10")
-    const match = damageFormula.match(/(\d+)d(\d+)/);
-    if (!match) {
-        showModal('Ошибка', 'Неверная формула урона!');
-        return;
-    }
-    
-    const diceCount = parseInt(match[1]);
-    const diceSides = parseInt(match[2]);
-    
-    // Бросаем кости
-    const dice = [];
-    for (let i = 0; i < diceCount; i++) {
-        dice.push(Math.floor(Math.random() * diceSides) + 1);
-    }
-    
-    const total = dice.reduce((sum, d) => sum + d, 0) + modifier;
-    
-    // Показываем результат
-    showModal('Результат броска', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--accent); font-size: 1.2rem; margin-bottom: 1rem;">${weaponName}</p>
-            <p style="color: var(--text); font-size: 1.1rem; margin-bottom: 0.5rem;">Урон: ${damageFormula}${modifier !== 0 ? (modifier > 0 ? '+' : '') + modifier : ''}</p>
-            <p style="color: var(--success); font-size: 1.5rem; font-weight: bold; margin-bottom: 0.5rem;">${total}</p>
-            <p style="color: var(--muted); font-size: 0.9rem;">Кости: [${dice.join(', ')}]${modifier !== 0 ? ` + ${modifier}` : ''}</p>
-        </div>
-    `);
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-}
-
-// Функция управления модулями оружия
-function manageWeaponModule(weaponId, slotIndex) {
-    const weapon = state.weapons.find(w => w.id === weaponId);
-    if (!weapon) return;
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    const currentModule = weapon.modules[slotIndex];
-    
-    let slotHTML = `
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>Управление модулем оружия</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="color: var(--muted); margin-bottom: 1rem;">
-                    ${weapon.name} → Слот ${slotIndex + 1}
-                </p>
-    `;
-    
-    if (currentModule) {
-        slotHTML += `
-            <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                <h5 style="color: var(--success); margin-bottom: 0.5rem;">Установленный модуль:</h5>
-                <p style="color: var(--text); font-weight: 600;">${currentModule.name}</p>
-                <p style="color: var(--muted); font-size: 0.9rem;">${currentModule.description}</p>
-                <button class="pill-button danger-button" onclick="removeWeaponModule('${weaponId}', ${slotIndex}); closeModal(this);" style="margin-top: 0.5rem;">Снять модуль</button>
-            </div>
-        `;
-    } else {
-        slotHTML += `
-            <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                <h5 style="color: var(--accent); margin-bottom: 0.5rem;">Свободный слот</h5>
-                <p style="color: var(--muted);">Выберите модуль для установки:</p>
-                <div id="availableWeaponModules" style="max-height: 300px; overflow-y: auto;">
-                    <!-- Модули из снаряжения будут загружены здесь -->
-                </div>
-            </div>
-        `;
-    }
-    
-    slotHTML += `
-            </div>
-            <div class="modal-footer">
-            </div>
-        </div>
-    `;
-    
-    modal.innerHTML = slotHTML;
-    document.body.appendChild(modal);
-    
-    // Загружаем доступные модули
-    loadAvailableWeaponModules(weaponId, slotIndex);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function loadAvailableWeaponModules(weaponId, slotIndex) {
-    const container = document.getElementById('availableWeaponModules');
-    if (!container) return;
-    
-    // Ищем модули в снаряжении
-    const availableModules = state.gear.filter(item => item.type === 'weaponModule');
-    
-    if (availableModules.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem;">Нет доступных модулей в снаряжении</p>';
-        return;
-    }
-    
-    container.innerHTML = availableModules.map((module, index) => `
-        <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem;">
-            <div style="color: var(--text); font-weight: 600;">${module.name}</div>
-            <div style="color: var(--muted); font-size: 0.8rem;">${module.description}</div>
-            <div style="margin-top: 0.5rem;">
-                <button class="pill-button success-button" onclick="installWeaponModule('${weaponId}', ${slotIndex}, ${state.gear.findIndex(item => item === module)}); closeModal(this);" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">
-                    Установить
-                </button>
-            </div>
-        </div>
-    `).join('');
-}
-
-function installWeaponModule(weaponId, slotIndex, gearIndex) {
-    const module = state.gear[gearIndex];
-    if (!module) return;
-    const weapon = state.weapons.find(w => w.id === weaponId);
-    if (!weapon) return;
-
-    const data = module.weaponModuleData || {};
-    const slotsRequired = parseInt(data.slotsRequired || 1);
-
-    // Вспомогательные функции сопоставления сокращений к типам оружия
-    function getWeaponAbbrevFromName(name) {
-        const n = (name || '').toLowerCase();
-        if (n.includes('лёгкий пистолет') || n.includes('легкие пистолет')) return 'ЛП';
-        if (n.includes('обычный пистолет')) return 'ОП';
-        if (n.includes('крупнокалиберный пистолет')) return 'КП';
-        if (n.includes('пистолет-пулемёт') || n.includes('пистоле-пулемёт')) return 'ПП';
-        if (n.includes('тяжёлый пистолет-пулемёт') || n.includes('тяжелый пистолет-пулемёт')) return 'ТПП';
-        if (n.includes('штурмовая винтовка')) return 'ШВ';
-        if (n.includes('снайперская винтовка')) return 'СВ';
-        if (n.includes('пулемёт') || n.includes('пулемет')) return 'ПУЛ';
-        if (n.includes('дробовик') || n.includes('дробовик')) return 'ДР';
-        if (n.includes('оружие с самонаведением')) return 'ОСМ';
-        return '';
-    }
-
-    function isModuleCompatible(weapon, moduleData) {
-        // Категория ближнее/дальнее
-        if (moduleData.category && moduleData.category !== weapon.type) {
-            return false;
-        }
-        // Список сокращений (ЛП, ОП, ПП, ...)
-        if (!moduleData.compatible || moduleData.compatible.toLowerCase().includes('любое')) return true;
-        const set = new Set(moduleData.compatible.split(',').map(s => s.trim().toUpperCase()).filter(Boolean));
-        const weaponAbbrev = getWeaponAbbrevFromName(weapon.name);
-        if (!weaponAbbrev) return true; // если не смогли распознать — не блокируем
-        return set.has(weaponAbbrev);
-    }
-
-    // Проверка категории (melee/ranged)
-    if (!isModuleCompatible(weapon, data)) {
-        showModal('Несовместимо', 'Модуль не подходит для этого оружия.');
-        return;
-    }
-
-    if (slotsRequired === 2) {
-        if (slotIndex + 1 >= weapon.slots) {
-            showModal('Нет места', 'Для этого модуля нужно 2 соседних слота.');
-            return;
-        }
-        if (weapon.modules[slotIndex] || weapon.modules[slotIndex + 1]) {
-            showModal('Занято', 'Один из требуемых слотов уже занят.');
-            return;
-        }
-        // Сохраняем метку о двухслотном модуле: якорь + связанный слот
-        const anchor = Object.assign({}, data, { anchor: true, slotsRequired: 2 });
-        const linked = { linked: true, anchorIndex: slotIndex };
-        weapon.modules[slotIndex] = anchor;
-        weapon.modules[slotIndex + 1] = linked;
-    } else {
-        if (weapon.modules[slotIndex]) {
-            showModal('Занято', 'Слот уже занят.');
-            return;
-        }
-        weapon.modules[slotIndex] = data;
-    }
-
-    // Удаляем модуль из снаряжения
-    state.gear.splice(gearIndex, 1);
-
-    // Обновляем максимум патронов для модулей магазина
-    updateWeaponMagazineCapacity(weapon);
-
-    renderGear();
-    renderWeapons();
-    scheduleSave();
-    showModal('Модуль установлен', `&#x2705; ${module.name} установлен в оружие!`);
-}
-
-function removeWeaponModule(weaponId, slotIndex) {
-    const weapon = state.weapons.find(w => w.id === weaponId);
-    if (!weapon) return;
-    let module = weapon.modules[slotIndex];
-    if (!module) return;
-
-    // Если кликнули по связанному слоту двухслотного модуля — переключаемся на якорь
-    if (module.linked) {
-        slotIndex = module.anchorIndex;
-        module = weapon.modules[slotIndex];
-    }
-
-    const payload = module.anchor ? Object.assign({}, module) : module;
-
-    // Возвращаем модуль в снаряжение (только один предмет)
-    state.gear.push({
-        id: generateId('gear'),
-        name: payload.name,
-        description: payload.description,
-        price: payload.price,
-        load: payload.load,
-        type: 'weaponModule',
-        weaponModuleData: Object.assign({}, payload, { anchor: undefined })
-    });
-
-    // Очищаем слоты
-    if (payload.anchor && payload.slotsRequired === 2) {
-        weapon.modules[slotIndex] = null;
-        if (weapon.modules[slotIndex + 1] && weapon.modules[slotIndex + 1].linked) {
-            weapon.modules[slotIndex + 1] = null;
-        }
-    } else {
-        weapon.modules[slotIndex] = null;
-    }
-
-    // Обновляем максимум патронов для модулей магазина
-    updateWeaponMagazineCapacity(weapon);
-
-    renderGear();
-    renderWeapons();
-    scheduleSave();
-    showModal('Модуль снят', `&#x2705; ${payload.name} возвращен в снаряжение!`);
-}
-
-// Функция обновления вместимости магазина оружия
-function updateWeaponMagazineCapacity(weapon) {
-    if (weapon.type !== 'ranged') return;
-    
-    // Базовая вместимость магазина
-    const baseMagazine = parseInt(weapon.magazine);
-    let multiplier = 1;
-    
-    // Проверяем установленные модули
-    const installedModules = weapon.modules.filter(m => m && !m.linked);
-    
-    for (const module of installedModules) {
-        if (module.name === 'Барабанный магазин' || module.name === 'Увеличенный магазин') {
-            multiplier *= 4; // Каждый модуль умножает на 4
-        }
-    }
-    
-    // Обновляем максимум патронов
-    weapon.maxAmmo = baseMagazine * multiplier;
-    
-    // Если текущее количество патронов превышает новый максимум, обрезаем
-    if (weapon.currentAmmo > weapon.maxAmmo) {
-        const excessAmmo = weapon.currentAmmo - weapon.maxAmmo;
-        weapon.currentAmmo = weapon.maxAmmo;
-        
-        // Возвращаем лишние патроны в блок Боеприпасы
-        if (weapon.loadedAmmoType && excessAmmo > 0) {
-            const weaponTypeForAmmo = getWeaponTypeForAmmo(weapon.name);
-            const existingAmmoIndex = state.ammo.findIndex(a => 
-                a.type === weapon.loadedAmmoType && a.weaponType === weaponTypeForAmmo
-            );
-            
-            if (existingAmmoIndex !== -1) {
-                state.ammo[existingAmmoIndex].quantity += excessAmmo;
-            } else {
-                // Создаем новый тип боеприпасов
-                const newAmmo = {
-                    id: generateId('ammo'),
-                    type: weapon.loadedAmmoType,
-                    weaponType: weaponTypeForAmmo,
-                    quantity: excessAmmo,
-                    price: 0
-                };
-                state.ammo.push(newAmmo);
-            }
-            renderAmmo();
-        }
-    }
-}
-
-// Функция магазина модулей оружия
-function showWeaponModulesShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header">
-                <h3>🔧 Магазин модулей оружия</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button onclick="toggleWeaponModulesFreeMode()" id="weaponModulesFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-            </div>
-            <div class="modal-body">
-                <div style="display: grid; gap: 2rem;">
-                    <!-- Модули для оружия ближнего боя -->
-                    <div>
-                        <h4 style="color: var(--accent); margin-bottom: 1rem;">⚔️ Для оружия ближнего боя</h4>
-                        <div style="display: grid; gap: 1rem;">
-                            ${WEAPON_MODULES.melee.map((module) => `
-                                <div class="property-item">
-                                    <div class="property-header">
-                                        <div class="property-name">${module.name}</div>
-                                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                            <span style="color: var(--muted); font-size: 0.9rem;">Цена: ${module.price} уе | Нагрузка: ${module.load}</span>
-                                            <button class="pill-button primary-button weapon-module-buy-button" onclick="buyWeaponModule('melee', '${module.name}', ${module.price}, ${module.load}, '${module.compatible}', '${module.description.replace(/'/g, "\\'")}')" data-module-type="melee" data-module-name="${module.name}" data-price="${module.price}" data-load="${module.load}" data-compatible="${module.compatible}" data-description="${module.description.replace(/'/g, "\\'")}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                                        </div>
-                                    </div>
-                                    <div class="property-description">
-                                        <div style="font-family: monospace; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem;">
-                                            Для чего подходит: ${module.compatible}
-                                        </div>
-                                        <div style="font-size: 0.9rem;">
-                                            ${module.description}
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    
-                    <!-- Модули для оружия дальнего боя -->
-                    <div>
-                        <h4 style="color: var(--accent); margin-bottom: 1rem;">🔫 Для оружия дальнего боя</h4>
-                        <div style="display: grid; gap: 1rem;">
-                            ${WEAPON_MODULES.ranged.map((module) => `
-                                <div class="property-item">
-                                    <div class="property-header">
-                                        <div class="property-name">${module.name}${module.slotsRequired ? ` (ТРЕБУЕТ ${module.slotsRequired} СЛОТА)` : ''}</div>
-                                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                            <span style="color: var(--muted); font-size: 0.9rem;">Цена: ${module.price} уе | Нагрузка: ${module.load}</span>
-                                            <button class="pill-button primary-button weapon-module-buy-button" onclick="buyWeaponModule('ranged', '${module.name}', ${module.price}, ${module.load}, '${module.compatible}', '${module.description.replace(/'/g, "\\'")}', ${module.slotsRequired || 1})" data-module-type="ranged" data-module-name="${module.name}" data-price="${module.price}" data-load="${module.load}" data-compatible="${module.compatible}" data-description="${module.description.replace(/'/g, "\\'")}" data-slots-required="${module.slotsRequired || 1}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                                        </div>
-                                    </div>
-                                    <div class="property-description">
-                                        <div style="font-family: monospace; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem;">
-                                            Для чего подходит: ${module.compatible}
-                                        </div>
-                                        <div style="font-size: 0.9rem;">
-                                            ${module.description}
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-// Функции покупки модулей оружия
-function buyWeaponModule(category, name, price, load, compatible, description, slotsRequired = 1, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < price) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem; background: var(--danger); color: white; border-radius: 8px;">
-                <p style="font-size: 1.1rem; margin-bottom: 1rem;">Нищим не продаём. Вали отсюда!</p>
-                <button class="pill-button" onclick="closeModal(this)">Понятно</button>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Добавляем модуль в снаряжение
-    const newModule = {
-        id: generateId('gear'),
-        name: name,
-        description: description,
-        price: price,
-        load: load,
-        type: 'weaponModule',
-        weaponModuleData: {
-            name: name,
-            description: description,
-            price: price,
-            load: load,
-            compatible: compatible,
-            category: category,
-            slotsRequired: slotsRequired
-        },
-        catalogPrice: catalogPrice,
-        purchasePrice: price,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    state.gear.push(newModule);
-    renderGear();
-    scheduleSave();
-    
-    showModal('Модуль куплен', `&#x2705; ${name} добавлен в Снаряжение!`);
-}
-
-function getWeaponModuleFree(category, name, load, compatible, description, slotsRequired = 1) {
-    // Добавляем модуль в снаряжение бесплатно
-    const newModule = {
-        id: generateId('gear'),
-        name: name,
-        description: description,
-        price: 0,
-        load: load,
-        type: 'weaponModule',
-        weaponModuleData: {
-            name: name,
-            description: description,
-            price: 0,
-            load: load,
-            compatible: compatible,
-            category: category,
-            slotsRequired: slotsRequired
-        }
-    };
-    
-    state.gear.push(newModule);
-    renderGear();
-    scheduleSave();
-    
-    showModal('Модуль получен', `&#x2705; ${name} добавлен в Снаряжение бесплатно!`);
-}
-
-function toggleWeaponModulesFreeMode() {
-    const buyButtons = document.querySelectorAll('.weapon-module-buy-button');
-    const toggleButton = document.getElementById('weaponModulesFreeModeButton');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    const isFreeMode = toggleButton.textContent === 'Отключить бесплатно';
-    
-    if (isFreeMode) {
-        buyButtons.forEach(btn => {
-            const moduleType = btn.getAttribute('data-module-type');
-            const name = btn.getAttribute('data-module-name');
-            const price = btn.getAttribute('data-price');
-            const load = btn.getAttribute('data-load');
-            const compatible = btn.getAttribute('data-compatible');
-            const description = btn.getAttribute('data-description');
-            const slotsRequired = btn.getAttribute('data-slots-required');
-            btn.setAttribute('onclick', `buyWeaponModule('${moduleType}', '${name}', ${price}, ${load}, '${compatible}', '${description}', ${slotsRequired})`);
-        });
-        
-        toggleButton.textContent = 'Бесплатно';
-        toggleButton.style.background = 'transparent';
-        
-        // Возвращаем обычный фон
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 0, 0, 0.85)';
-        }
-    } else {
-        buyButtons.forEach(btn => {
-            const moduleType = btn.getAttribute('data-module-type');
-            const name = btn.getAttribute('data-module-name');
-            const load = btn.getAttribute('data-load');
-            const compatible = btn.getAttribute('data-compatible');
-            const description = btn.getAttribute('data-description');
-            const slotsRequired = btn.getAttribute('data-slots-required');
-            btn.setAttribute('onclick', `getWeaponModuleFree('${moduleType}', '${name}', ${load}, '${compatible}', '${description}', ${slotsRequired})`);
-        });
-        
-        toggleButton.textContent = 'Отключить бесплатно';
-        toggleButton.style.background = 'linear-gradient(135deg, #7DF4C6, #5b9bff)';
-        
-        // Меняем фон на зеленоватый
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 100, 50, 0.85)';
-        }
-    }
-}
-
-
-function renderGear() {
-    const container = document.getElementById('gearContainer');
-    if (!container) return;
-    
-    if (state.gear.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem;">Снаряжение не добавлено</p>';
-        return;
-    }
-    
-    container.innerHTML = state.gear.map((item, index) => {
-        const gearId = `gear_${item.id}`;
-        const displayName = item.isShield && item.currentHp <= 0 ? 'Щит Сломан' : item.name;
-        
-        return `
-        <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-right: 8rem;">
-                <div style="flex: 1;">
-                    <div style="color: var(--accent); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; cursor: pointer; user-select: none;" onclick="toggleGearDescription('${gearId}')">
-                        ${displayName}
-                    </div>
-                    <div id="${gearId}_description" style="display: block;">
-                        <div style="color: var(--text); font-size: 0.75rem; margin-bottom: 0.25rem; line-height: 1.3;">
-                            ${item.description}
-                        </div>
-                        ${item.isShield ? `
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
-                                <span style="color: var(--accent); font-size: 0.75rem;">ПЗ:</span>
-                                <button onclick="decreaseShieldHP(${index})" style="background: transparent; border: 1px solid var(--accent); color: var(--accent); cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem;">−</button>
-                                <span style="color: var(--text); font-size: 0.75rem; min-width: 20px; text-align: center;">${item.currentHp}</span>
-                                <span style="color: var(--muted); font-size: 0.7rem;">/${item.hp}</span>
-                            </div>
-                        ` : ''}
-                    </div>
-                    ${item.type === 'implant' ? `
-                        <div style="margin-top: 0.5rem;">
-                            <button class="pill-button success-button" onclick="installImplantFromGear(${index})" style="font-size: 0.7rem; padding: 0.3rem 0.6rem;">Установить</button>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-            
-            <!-- Блок Нагрузка и кнопки в правом верхнем углу -->
-            <div style="position: absolute; top: 0.75rem; right: 0.75rem; display: flex; flex-direction: column; align-items: flex-end; gap: 5px;">
-                <div style="background: #001122; border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.85rem; white-space: nowrap; font-weight: 500; text-align: center;">
-                    <span style="color: #cccccc;">Нагрузка:</span> <span style="color: white;">${item.load}</span>
-                </div>
-                <button onclick="removeGear(${index})" style="background: transparent; border: none; cursor: pointer; padding: 0;" title="Удалить">
-                    <img src="https://static.tildacdn.com/tild6166-3331-4338-b038-623539346365/x-button.png" alt="Удалить" style="width: 20px; height: 20px; display: block;">
-                </button>
-                ${item.type === 'weapon' ? `
-                    <button onclick="takeWeaponFromGear(${index})" style="background: transparent; border: none; cursor: pointer; padding: 0;" title="Взять в руки">
-                        <img src="https://static.tildacdn.com/tild3133-3737-4835-a636-353135666661/pistol_1.png" alt="Взять в руки" style="width: 20px; height: 20px; display: block;">
-                    </button>
-                ` : ''}
-            </div>
-        </div>
-        `;
-    }).join('');
-}
-
-function toggleGearDescription(gearId) {
-    const descriptionElement = document.getElementById(`${gearId}_description`);
-    if (descriptionElement) {
-        const isVisible = descriptionElement.style.display !== 'none';
-        descriptionElement.style.display = isVisible ? 'none' : 'block';
-    }
-}
-
-function decreaseShieldHP(gearIndex) {
-    const gear = state.gear[gearIndex];
-    if (!gear || !gear.isShield || gear.currentHp <= 0) return;
-    
-    gear.currentHp = Math.max(0, gear.currentHp - 1);
-    
-    // Если ПЗ стало 0, меняем название на "Щит Сломан"
-    if (gear.currentHp === 0) {
-        gear.name = 'Щит Сломан';
-    }
-    
-    renderGear();
-    scheduleSave();
-}
-
-function installImplantFromGear(gearIndex) {
-    const gear = state.gear[gearIndex];
-    if (!gear || !gear.implantData) return;
-    
-    const implantData = gear.implantData;
-    const lossRoll = rollDiceForAwarenessLoss(implantData.awarenessLoss);
-    
-    // Вычитаем из текущей осознанности
-    let currentAwareness;
-    if (typeof state.awareness === 'object') {
-        currentAwareness = parseInt(state.awareness.current) || 50;
-        state.awareness.current = Math.max(0, currentAwareness - lossRoll);
-    } else {
-        // Для старых сохранений где awareness - число
-        currentAwareness = parseInt(state.awareness) || 50;
-        state.awareness = {
-            current: Math.max(0, currentAwareness - lossRoll),
-            max: parseInt(state.stats.INT || 5) * 10
-        };
-    }
-    
-    const awarenessEl = document.getElementById('awarenessCurrent');
-    if (awarenessEl) awarenessEl.value = state.awareness.current;
-    
-    // Удаляем из снаряжения
-    state.gear.splice(gearIndex, 1);
-    
-    // Обновляем отображение
-    renderGear();
-    scheduleSave();
-    
-    showModal('Имплант установлен', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${implantData.name} успешно установлен!</p>
-            <p style="color: var(--danger); margin-bottom: 1rem;">Потеря осознанности: ${lossRoll}</p>
-            <p style="color: var(--muted);">Текущая осознанность: ${typeof state.awareness === 'object' ? state.awareness.current : state.awareness}</p>
-        </div>
-    `);
-}
-
-function removeGear(index) {
-        const item = state.gear[index];
-        if (item) {
-            // Возвращаем нагрузку
-            state.load.current += item.load || 0;
-            // Удаляем предмет
-            state.gear.splice(index, 1);
-            // Обновляем UI и сохраняем
-            renderGear();
-            updateLoadDisplay();
-            scheduleSave();
-        }
-}
-
-function takeWeaponFromGear(gearIndex) {
-    const gearItem = state.gear[gearIndex];
-    if (!gearItem || gearItem.type !== 'weapon') {
-        console.error('Предмет не является оружием или не найден');
-        return;
-    }
-    
-    // Создаем объект оружия на основе данных из снаряжения
-    const weaponData = gearItem.weaponData || {};
-    
-    const newWeapon = {
-        id: generateId('weapon'),
-        name: gearItem.name,
-        type: weaponData.type || 'melee', // melee или ranged
-        load: gearItem.load || 1,
-        slots: 3, // Стандартное количество слотов
-        modules: [null, null, null], // Пустые слоты для модулей
-        
-        // Для оружия ближнего боя
-        damage: weaponData.damage || '1d6',
-        concealable: weaponData.concealable !== undefined ? (weaponData.concealable ? 'да' : 'нет') : 'нет',
-        stealthPenalty: weaponData.stealthPenalty || '0',
-        examples: weaponData.examples || '',
-        
-        // Для оружия дальнего боя
-        primaryDamage: weaponData.primaryDamage || weaponData.damage || '1d6',
-        altDamage: weaponData.altDamage || weaponData.damage || '1d6',
-        hands: weaponData.hands || 1,
-        stealth: weaponData.stealth || 0,
-        magazine: weaponData.magazine || 10,
-        
-        // Дополнительные данные
-        appearance: weaponData.appearance || '',
-        customDescription: weaponData.customDescription || gearItem.description || '',
-        
-        // Система магазина (только для дальнего боя)
-        maxAmmo: weaponData.type === 'ranged' ? parseInt(weaponData.magazine || 10) : 0,
-        currentAmmo: 0,
-        loadedAmmoType: null,
-        // Особая система для дробовиков
-        isShotgun: gearItem.name.includes('Дробовик'),
-        shotgunAmmo1: { type: null, count: 0 }, // Первый тип патронов (до 3 шт)
-        shotgunAmmo2: { type: null, count: 0 }  // Второй тип патронов (до 3 шт)
-    };
-    
-    // Добавляем оружие в блок "Оружие"
-    state.weapons.push(newWeapon);
-    
-    // Удаляем из снаряжения
-    state.gear.splice(gearIndex, 1);
-    
-    // Обновляем интерфейс
-    renderWeapons();
-    renderGear();
-    scheduleSave();
-    
-    showModal('Оружие взято в руки', `&#x2705; ${newWeapon.name} перемещено в блок "Оружие"!`);
-}
-
-// Функция для перемещения оружия из блока "Оружие" в "Снаряжение"
-function moveWeaponToGear(weaponIndex) {
-    const weapon = state.weapons[weaponIndex];
-    if (!weapon) {
-        console.error('Оружие не найдено');
-        return;
-    }
-    
-    // Возвращаем боеприпасы в блок "Боеприпасы", если они были заряжены
-    if (weapon.type === 'ranged' && weapon.currentAmmo > 0 && weapon.loadedAmmoType) {
-        // Определяем тип боеприпасов для поиска
-        const weaponTypeForAmmo = weapon.isShotgun ? 'Дробовик' : getWeaponTypeForAmmo(weapon.name);
-        
-        // Ищем существующий стак боеприпасов
-        const existingAmmo = state.ammo.find(a => 
-            a.type === weapon.loadedAmmoType && 
-            a.weaponType === weaponTypeForAmmo
-        );
-        
-        if (existingAmmo) {
-            // Добавляем к существующему стаку
-            existingAmmo.quantity += weapon.currentAmmo;
-        } else {
-            // Создаем новый стак
-            const newAmmo = {
-                id: generateId('ammo'),
-                type: weapon.loadedAmmoType,
-                weaponType: weaponTypeForAmmo,
-                quantity: weapon.currentAmmo,
-                price: 0
-            };
-            state.ammo.push(newAmmo);
-        }
-        renderAmmo();
-    }
-    
-    // Создаем объект снаряжения на основе оружия
-    let description = '';
-    if (weapon.type === 'melee') {
-        description = `Урон: ${weapon.damage} | Можно скрыть: ${weapon.concealable} | Штраф к СКА: ${weapon.stealthPenalty}`;
-    } else {
-        description = `Урон основной: ${weapon.primaryDamage} | Урон альтернативный: ${weapon.altDamage} | Можно скрыть: ${weapon.concealable} | # рук: ${weapon.hands} | СКА: ${weapon.stealth} | Патронов в магазине: ${weapon.magazine}`;
-    }
-    
-    const gearItem = {
-        id: generateId('gear'),
-        name: weapon.customName || weapon.name,
-        description: description,
-        price: weapon.price || 0,
-        load: weapon.load || 3,
-        type: 'weapon',
-        weaponData: {
-            type: weapon.type,
-            damage: weapon.damage,
-            primaryDamage: weapon.primaryDamage,
-            altDamage: weapon.altDamage,
-            concealable: weapon.concealable,
-            stealthPenalty: weapon.stealthPenalty,
-            hands: weapon.hands,
-            stealth: weapon.stealth,
-            magazine: weapon.magazine,
-            examples: weapon.examples || '',
-            appearance: weapon.appearance || '',
-            customDescription: weapon.customDescription || ''
-        }
-    };
-    
-    // Добавляем в снаряжение
-    state.gear.push(gearItem);
-    
-    // Удаляем из блока оружия
-    state.weapons.splice(weaponIndex, 1);
-    
-    // Обновляем интерфейс
-    renderWeapons();
-    renderGear();
-    scheduleSave();
-    
-    showModal('Оружие сложено', `&#x2705; ${gearItem.name} перемещено в Снаряжение!`);
-}
-
-// Функции для работы с боеприпасами
-function renderAmmo() {
-    const container = document.getElementById('ammoContainer');
-    if (!container) return;
-    
-    if (state.ammo.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem; font-size: 0.8rem;">Боеприпасы не добавлены</p>';
-        return;
-    }
-    
-    container.innerHTML = state.ammo.map((ammo, index) => `
-        <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-            <div style="flex: 1;">
-                <div style="color: var(--accent); font-weight: 600; font-size: 0.85rem;">${ammo.type}</div>
-                <div style="color: var(--muted); font-size: 0.7rem; font-family: monospace; margin-top: 0.1rem;">${ammo.weaponType}</div>
-            </div>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 0.25rem;">
-                    <button onclick="changeAmmoQuantity(${index}, -1)" style="font-size: 0.75rem; padding: 0.2rem 0.4rem; min-width: 24px; background: transparent; border: none; color: var(--text); cursor: pointer;">−</button>
-                    <span style="color: var(--accent); font-weight: 600; min-width: 35px; text-align: center; font-size: 0.85rem;">${ammo.quantity}</span>
-                </div>
-                <button class="pill-button danger-button" onclick="removeAmmo(${index})" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;">Удалить</button>
-            </div>
-        </div>
-    `).join('');
-}
-
-function showAmmoShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    let shopHTML = `
-        <div class="modal" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h3><img src="https://static.tildacdn.com/tild3334-6338-4439-a262-316631336461/bullets.png" alt="🔫" style="width: 24px; height: 24px; margin-right: 0.5rem; vertical-align: middle;"> Магазин боеприпасов</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button onclick="toggleAmmoFreeMode()" id="ammoFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-            </div>
-            <div class="modal-body" style="overflow-y: auto; flex: 1;">
-                <div style="margin-bottom: 1rem; padding: 1rem; background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px;">
-                    <p style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">ℹ️ Информация о боеприпасах:</p>
-                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 0.25rem;">• 1 пачка патронов = 10 патронов</p>
-                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 0.25rem;">• Гранаты и ракеты продаются по 1 штуке</p>
-                    <p style="color: var(--muted); font-size: 0.9rem;">• Все боеприпасы имеют нагрузку = 1</p>
-                </div>
-                <div style="display: grid; gap: 2rem;" id="ammoShopContent">
-    `;
-    
-    // Проходим по каждому типу боеприпасов
-    for (const ammoType of AMMO_DATA.types) {
-        shopHTML += `
-            <div>
-                <h4 style="color: var(--accent); margin-bottom: 1rem;">${ammoType}</h4>
-                <div style="display: grid; gap: 0.75rem;">
-        `;
-        
-        // Проходим по каждому типу оружия
-        for (const [weaponTypeFull, weaponTypeShort] of Object.entries(AMMO_DATA.weaponTypes)) {
-            const price = AMMO_DATA.prices[ammoType][weaponTypeShort];
-            
-            if (price !== null) {
-                shopHTML += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
-                        <div>
-                            <span style="color: var(--text); font-weight: 600;">${weaponTypeFull}</span>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <span class="ammo-price" style="color: var(--accent); font-size: 0.9rem;" data-original-price="${price}">${price} уе</span>
-                            <button class="pill-button primary-button" onclick="showAmmoQuantityModal('${ammoType}', '${weaponTypeFull}', ${price})" data-ammo-type="${ammoType}" data-weapon-type="${weaponTypeFull}" data-price="${price}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-        
-        shopHTML += `
-                </div>
-            </div>
-        `;
-    }
-    
-    // Добавляем раздел "Активная защита" в самый низ
-    shopHTML += `
-            <div>
-                <h4 style="color: var(--accent); margin-bottom: 1rem;">Активная защита</h4>
-                <div style="display: grid; gap: 0.75rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
-                        <div>
-                            <span style="color: var(--text); font-weight: 600;">Пиропатрон</span>
-                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для дробовой активной защиты (урон 4d4)</div>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <span class="ammo-price" style="color: var(--accent); font-size: 0.9rem;" data-original-price="50">50 уе</span>
-                            <button class="pill-button primary-button" onclick="showAmmoQuantityModal('Активная защита', 'Пиропатрон', 50)" data-ammo-type="Активная защита" data-weapon-type="Активная защита (Пиропатрон)" data-price="50" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
-                        <div>
-                            <span style="color: var(--text); font-weight: 600;">Высоковольтная мини-батарея</span>
-                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для лазерной активной защиты (без урона)</div>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <span class="ammo-price" style="color: var(--accent); font-size: 0.9rem;" data-original-price="250">250 уе</span>
-                            <button class="pill-button primary-button" onclick="showAmmoQuantityModal('Активная защита', 'Высоковольтная мини-батарея', 250)" data-ammo-type="Активная защита" data-weapon-type="Высоковольтная мини-батарея" data-price="250" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
-                        <div>
-                            <span style="color: var(--text); font-weight: 600;">Микроракета</span>
-                            <div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Для микроракетной активной защиты (урон 6d6)</div>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <span class="ammo-price" style="color: var(--accent); font-size: 0.9rem;" data-original-price="500">500 уе</span>
-                            <button class="pill-button primary-button" onclick="showAmmoQuantityModal('Активная защита', 'Микроракета', 500)" data-ammo-type="Активная защита" data-weapon-type="Микроракета" data-price="500" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-    `;
-    
-    modal.innerHTML = shopHTML;
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
+    // Добавляем обработчики клавиатуры для правильной работы Enter
     addModalKeyboardHandlers(modal);
-}
-
-function toggleAmmoFreeMode() {
-    const priceElements = document.querySelectorAll('.ammo-price');
-    const buyButtons = document.querySelectorAll('[data-ammo-type]');
-    const toggleButton = document.getElementById('ammoFreeModeButton');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    // Проверяем текущий режим
-    const isFreeMode = toggleButton.textContent === 'Отключить бесплатно';
-    
-    if (isFreeMode) {
-        // Возвращаем обычные цены
-        priceElements.forEach(el => {
-            const originalPrice = el.getAttribute('data-original-price');
-            el.textContent = `${originalPrice} уе`;
-        });
-        
-        buyButtons.forEach(btn => {
-            const originalPrice = btn.getAttribute('data-price');
-            const ammoType = btn.getAttribute('data-ammo-type');
-            const weaponType = btn.getAttribute('data-weapon-type');
-            btn.setAttribute('onclick', `showAmmoQuantityModal('${ammoType}', '${weaponType}', ${originalPrice})`);
-        });
-        
-        toggleButton.textContent = 'Бесплатно';
-        toggleButton.style.background = 'transparent';
-        
-        // Возвращаем обычный фон
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 0, 0, 0.85)';
-        }
-    } else {
-        // Включаем бесплатный режим
-        priceElements.forEach(el => {
-            el.textContent = '0 уе';
-        });
-        
-        buyButtons.forEach(btn => {
-            const ammoType = btn.getAttribute('data-ammo-type');
-            const weaponType = btn.getAttribute('data-weapon-type');
-            btn.setAttribute('onclick', `showAmmoQuantityModal('${ammoType}', '${weaponType}', 0)`);
-        });
-        
-        toggleButton.textContent = 'Отключить бесплатно';
-        toggleButton.style.background = 'linear-gradient(135deg, #7DF4C6, #5b9bff)';
-        
-        // Меняем фон на зеленоватый
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 100, 50, 0.85)';
-        }
-    }
-}
-
-function showAmmoQuantityModal(ammoType, weaponType, price) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    const isGrenadeOrRocket = weaponType === 'Гранаты' || weaponType === 'Ракеты';
-    const isActiveDefense = ammoType === 'Активная защита';
-    const isSingleUnit = isGrenadeOrRocket || isActiveDefense;
-    const unitText = isSingleUnit ? 'шт.' : 'пачек';
-    const contentText = isSingleUnit ? 'штук' : 'пачек (по 10 патронов)';
-    
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>🛒 Покупка боеприпасов</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1rem;">
-                    <p style="margin-bottom: 0.5rem;"><strong>${ammoType}</strong></p>
-                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
-                        Для: <strong style="color: var(--accent);">${weaponType}</strong>
-                    </p>
-                    <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">
-                        Цена за ${isSingleUnit ? '1 штуку' : '1 пачку'}: <strong style="color: var(--success);">${price} уе</strong>
-                    </p>
-                </div>
-                
-                <div class="input-group">
-                    <label class="input-label">Количество ${contentText}</label>
-                    <input type="number" class="input-field" id="ammoQuantity" value="1" min="1" max="99" onchange="updateAmmoTotal(${price})">
-                </div>
-                
-                <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; text-align: center;">
-                    <div style="color: var(--accent); font-weight: 600;">Итого: <span id="ammoTotalPrice">${price}</span> уе</div>
-                    ${!isSingleUnit ? '<div style="color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem;">Патронов: <span id="ammoTotalBullets">10</span> шт.</div>' : ''}
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="buyAmmoWithQuantity('${ammoType}', '${weaponType}', ${price})">Купить</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
-    addModalKeyboardHandlers(modal);
-    
-    // Фокусируемся на поле количества
-    setTimeout(() => {
-        const input = document.getElementById('ammoQuantity');
-        if (input) input.focus();
-    }, 100);
-}
-
-function updateAmmoTotal(pricePerUnit) {
-    const quantity = parseInt(document.getElementById('ammoQuantity').value) || 1;
-    const totalPrice = quantity * pricePerUnit;
-    
-    const totalPriceEl = document.getElementById('ammoTotalPrice');
-    const totalBulletsEl = document.getElementById('ammoTotalBullets');
-    
-    if (totalPriceEl) {
-        totalPriceEl.textContent = totalPrice;
-    }
-    
-    if (totalBulletsEl) {
-        totalBulletsEl.textContent = quantity * 10;
-    }
-}
-
-function buyAmmoWithQuantity(ammoType, weaponType, pricePerUnit, catalogPrice = null) {
-    const quantity = parseInt(document.getElementById('ammoQuantity').value) || 1;
-    const totalPrice = quantity * pricePerUnit;
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < totalPrice) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem; background: var(--danger); color: white; border-radius: 8px;">
-                <p style="font-size: 1.1rem; margin-bottom: 1rem;">Недостаточно денег!</p>
-                <p style="margin-bottom: 1rem;">Требуется: ${totalPrice} уе | Доступно: ${currentMoney} уе</p>
-                <button class="pill-button" onclick="closeModal(this)">Понятно</button>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money = currentMoney - totalPrice;
-    updateMoneyDisplay();
-    
-    // Определяем количество добавляемых единиц
-    const isGrenadeOrRocket = weaponType === 'Гранаты' || weaponType === 'Ракеты';
-    const isActiveDefense = ammoType === 'Активная защита';
-    const isSingleUnit = isGrenadeOrRocket || isActiveDefense;
-    const addQuantity = isSingleUnit ? quantity : quantity * 10;
-    
-    // Рассчитываем нагрузку (каждые 10 патронов/гранат/ракет/активная защита = 1 нагрузка)
-    const loadToDeduct = isSingleUnit ? quantity : quantity;
-    
-    // Вычитаем нагрузку (без проверок)
-    state.load.current -= loadToDeduct;
-    updateLoadDisplay();
-    
-    // Для активной защиты используем "Активная защита" как базовое название
-    const ammoName = isActiveDefense ? 'Активная защита' : ammoType;
-    
-    // Проверяем, есть ли уже такой тип боеприпасов
-    // Ищем по типу И weaponType для всех боеприпасов
-    const existingAmmoIndex = state.ammo.findIndex(a => {
-        return a.type === ammoName && a.weaponType === weaponType;
-    });
-    
-    if (existingAmmoIndex !== -1) {
-        // Увеличиваем количество
-        state.ammo[existingAmmoIndex].quantity += addQuantity;
-    } else {
-        // Добавляем новый тип боеприпасов
-        const newAmmo = {
-            id: generateId('ammo'),
-            type: ammoName,
-            weaponType: weaponType,
-            quantity: addQuantity,
-            price: pricePerUnit,
-            catalogPrice: catalogPrice,
-            purchasePrice: pricePerUnit,
-            itemType: catalogPrice ? 'free_catalog' : 'purchased'
-        };
-        state.ammo.push(newAmmo);
-    }
-    
-    renderAmmo();
-    scheduleSave();
-    
-    const quantityText = isSingleUnit 
-        ? `${quantity} шт.` 
-        : `${addQuantity} патронов (${quantity} пачек)`;
-    
-    // НЕ закрываем модал покупки - пользователь может продолжить покупки
-    
-    showModal('Боеприпасы куплены', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; Боеприпасы куплены!</p>
-            <p style="color: var(--text); margin-bottom: 0.5rem;"><strong>${ammoName}</strong></p>
-            <p style="color: var(--muted); margin-bottom: 1rem;">Для: ${weaponType}</p>
-            <p style="color: var(--accent); margin-bottom: 1rem;">Получено: ${quantityText}</p>
-            <p style="color: var(--muted);">Потрачено: ${totalPrice} уе</p>
-        </div>
-    `);
-}
-
-function buyAmmo(ammoType, weaponType, price, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < price) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem; background: var(--danger); color: white; border-radius: 8px;">
-                <p style="font-size: 1.1rem; margin-bottom: 1rem;">Недостаточно денег!</p>
-                <button class="pill-button" onclick="closeModal(this)">Понятно</button>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Проверяем, есть ли уже такой тип боеприпасов
-    const existingAmmoIndex = state.ammo.findIndex(a => a.type === ammoType && a.weaponType === weaponType);
-    
-    // Определяем количество добавляемых единиц
-    const addQuantity = (weaponType === 'Гранаты' || weaponType === 'Ракеты') ? 1 : 10;
-    
-    if (existingAmmoIndex !== -1) {
-        // Увеличиваем количество
-        state.ammo[existingAmmoIndex].quantity += addQuantity;
-    } else {
-        // Добавляем новый тип боеприпасов
-        const newAmmo = {
-            id: generateId('ammo'),
-            type: ammoType,
-            weaponType: weaponType,
-            quantity: addQuantity,
-            price: price,
-            catalogPrice: catalogPrice,
-            purchasePrice: price,
-            itemType: catalogPrice ? 'free_catalog' : 'purchased'
-        };
-        state.ammo.push(newAmmo);
-    }
-    
-    renderAmmo();
-    scheduleSave();
-    
-    const quantityText = (weaponType === 'Гранаты' || weaponType === 'Ракеты') 
-        ? '1 шт.' 
-        : '10 патронов';
-    
-    showModal('Боеприпасы куплены', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${ammoType} (${weaponType}) куплены!</p>
-            <p style="color: var(--muted); font-size: 0.9rem;">Куплено: ${quantityText}</p>
-        </div>
-    `);
-}
-
-function changeAmmoQuantity(index, delta) {
-    if (!state.ammo[index]) return;
-    
-    const ammo = state.ammo[index];
-    const oldQuantity = ammo.quantity;
-    const newQuantity = oldQuantity + delta;
-    
-    if (newQuantity < 0) {
-        showModal('Ошибка', 'Количество не может быть отрицательным!');
-        return;
-    }
-    
-    // Рассчитываем изменение нагрузки
-    const isGrenadeOrRocket = (ammo.weaponType === 'Гранаты' || ammo.weaponType === 'Ракеты');
-    
-    if (delta < 0) { // Уменьшаем количество
-        const quantityReduced = Math.abs(delta);
-        let loadToReturn = 0;
-        
-        if (isGrenadeOrRocket) {
-            // Для гранат и ракет: каждая штука = 1 нагрузка
-            loadToReturn = quantityReduced;
-        } else {
-            // Для патронов: каждые 10 патронов = 1 нагрузка
-            const oldLoadUnits = Math.ceil(oldQuantity / 10);
-            const newLoadUnits = Math.ceil(newQuantity / 10);
-            loadToReturn = oldLoadUnits - newLoadUnits;
-        }
-        
-        // Возвращаем нагрузку
-        state.load.current += loadToReturn;
-        updateLoadDisplay();
-    }
-    
-    ammo.quantity = newQuantity;
-    renderAmmo();
-    scheduleSave();
-}
-
-function removeAmmo(index) {
-        const ammo = state.ammo[index];
-        if (ammo) {
-            // Возвращаем нагрузку
-            const isGrenadeOrRocket = (ammo.weaponType === 'Гранаты' || ammo.weaponType === 'Ракеты');
-            const loadToReturn = isGrenadeOrRocket ? ammo.quantity : Math.ceil(ammo.quantity / 10);
-            
-            state.load.current += loadToReturn;
-            updateLoadDisplay();
-        }
-        
-        state.ammo.splice(index, 1);
-        renderAmmo();
-        scheduleSave();
-}
-
-// Функция перезарядки оружия
-function reloadWeapon(weaponId) {
-    const weapon = state.weapons.find(w => w.id === weaponId);
-    if (!weapon || weapon.type !== 'ranged') {
-        showModal('Ошибка', 'Оружие не найдено или не является дальним!');
-        return;
-    }
-    
-    // Определяем тип оружия для поиска подходящих боеприпасов
-    const weaponTypeForAmmo = getWeaponTypeForAmmo(weapon.name);
-    
-    // Находим подходящие боеприпасы
-    const compatibleAmmo = state.ammo.filter(ammo => 
-        ammo.weaponType === weaponTypeForAmmo && ammo.quantity > 0
-    );
-    
-    if (compatibleAmmo.length === 0) {
-        showModal('Нет боеприпасов', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">У вас нет подходящих боеприпасов!</p>
-                <p style="color: var(--muted); margin-bottom: 1rem;">Купите боеприпасы для ${weaponTypeForAmmo}</p>
-            </div>
-        `);
-        return;
-    }
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>🔄 Перезарядка: ${weapon.name}</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1rem;">
-                    <p style="color: var(--text); margin-bottom: 0.5rem;"><strong>Текущее состояние:</strong></p>
-                    <p style="color: var(--muted); font-size: 0.9rem;">
-                        Патронов: ${weapon.currentAmmo}/${weapon.maxAmmo}
-                        ${weapon.loadedAmmoType ? ` | Тип: ${weapon.loadedAmmoType}` : ' | Не заряжено'}
-                    </p>
-                </div>
-                
-                <div style="margin-bottom: 1rem;">
-                    <label class="input-label">Выберите тип боеприпасов</label>
-                    <select class="input-field" id="reloadAmmoType">
-                        ${compatibleAmmo.map((ammo, index) => `
-                            <option value="${index}">${ammo.type} (${ammo.quantity} шт.)</option>
-                        `).join('')}
-                    </select>
-                </div>
-                
-                <div id="reloadWarning" style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(255, 165, 0, 0.1); border: 1px solid orange; border-radius: 8px; display: none;">
-                    <p style="color: orange; font-size: 0.9rem; margin-bottom: 0.5rem;">&#x26A0;&#xFE0F; Внимание!</p>
-                    <p style="color: var(--text); font-size: 0.8rem;" id="reloadWarningText">
-                        В магазине есть патроны другого типа. При перезарядке они будут возвращены в блок Боеприпасы.
-                    </p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="executeReload('${weaponId}')">
-                    🔄 Перезарядить
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Добавляем обработчик изменения типа боеприпасов
-    setTimeout(() => {
-        const ammoSelect = document.getElementById('reloadAmmoType');
-        const warningDiv = document.getElementById('reloadWarning');
-        const warningText = document.getElementById('reloadWarningText');
-        
-        function checkAmmoTypeChange() {
-            const selectedIndex = parseInt(ammoSelect.value);
-            const selectedAmmo = compatibleAmmo[selectedIndex];
-            
-            if (weapon.currentAmmo > 0 && weapon.loadedAmmoType && weapon.loadedAmmoType !== selectedAmmo.type) {
-                warningDiv.style.display = 'block';
-                warningText.textContent = `В магазине есть патроны типа "${weapon.loadedAmmoType}" (${weapon.currentAmmo} шт.). При перезарядке они будут возвращены в блок Боеприпасы.`;
-            } else {
-                warningDiv.style.display = 'none';
-            }
-        }
-        
-        ammoSelect.addEventListener('change', checkAmmoTypeChange);
-        checkAmmoTypeChange(); // Проверяем при открытии
-    }, 100);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
-    addModalKeyboardHandlers(modal);
-}
-
-function executeReload(weaponId) {
-    const weapon = state.weapons.find(w => w.id === weaponId);
-    if (!weapon) return;
-    
-    const selectedAmmoIndex = parseInt(document.getElementById('reloadAmmoType').value);
-    const weaponTypeForAmmo = getWeaponTypeForAmmo(weapon.name);
-    const compatibleAmmo = state.ammo.filter(ammo => 
-        ammo.weaponType === weaponTypeForAmmo && ammo.quantity > 0
-    );
-    const selectedAmmo = compatibleAmmo[selectedAmmoIndex];
-    
-    if (!selectedAmmo) {
-        showModal('Ошибка', 'Выбранные боеприпасы не найдены!');
-        return;
-    }
-    
-    // Если в магазине есть патроны другого типа, возвращаем их в блок Боеприпасы
-    if (weapon.currentAmmo > 0 && weapon.loadedAmmoType && weapon.loadedAmmoType !== selectedAmmo.type) {
-        const existingAmmoIndex = state.ammo.findIndex(a => 
-            a.type === weapon.loadedAmmoType && a.weaponType === weaponTypeForAmmo
-        );
-        
-        if (existingAmmoIndex !== -1) {
-            state.ammo[existingAmmoIndex].quantity += weapon.currentAmmo;
-        } else {
-            // Создаем новый тип боеприпасов
-            const newAmmo = {
-                id: generateId('ammo'),
-                type: weapon.loadedAmmoType,
-                weaponType: weaponTypeForAmmo,
-                quantity: weapon.currentAmmo,
-                price: 0
-            };
-            state.ammo.push(newAmmo);
-        }
-    }
-    
-    // Рассчитываем сколько патронов нужно для полной перезарядки
-    const ammoNeeded = weapon.maxAmmo - (weapon.loadedAmmoType === selectedAmmo.type ? weapon.currentAmmo : 0);
-    const ammoToTake = Math.min(ammoNeeded, selectedAmmo.quantity);
-    
-    // Находим индекс в основном массиве боеприпасов
-    const realAmmoIndex = state.ammo.findIndex(ammo => ammo.id === selectedAmmo.id);
-    
-    if (realAmmoIndex !== -1) {
-        // Вычитаем патроны из блока Боеприпасы
-        state.ammo[realAmmoIndex].quantity -= ammoToTake;
-        
-        // Заряжаем оружие
-        weapon.currentAmmo = (weapon.loadedAmmoType === selectedAmmo.type ? weapon.currentAmmo : 0) + ammoToTake;
-        weapon.loadedAmmoType = selectedAmmo.type;
-        
-        renderAmmo();
-        renderWeapons();
-        scheduleSave();
-        
-        closeModal(document.querySelector('.modal-overlay .icon-button'));
-        
-        const reloadMessage = ammoToTake === ammoNeeded ? 
-            'Магазин полностью заряжен!' : 
-            `Заряжено ${ammoToTake} из ${ammoNeeded} патронов (не хватило боеприпасов)`;
-        
-        showModal('Перезарядка завершена', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${weapon.name}</p>
-                <p style="color: var(--text); margin-bottom: 0.5rem;">${reloadMessage}</p>
-                <p style="color: var(--muted); font-size: 0.9rem;">Тип: ${selectedAmmo.type} | Патронов: ${weapon.currentAmmo}/${weapon.maxAmmo}</p>
-            </div>
-        `);
-    }
-}
-
-function reloadShotgun(weaponId) {
-    const weapon = state.weapons.find(w => w.id === weaponId);
-    if (!weapon || !weapon.isShotgun) {
-        showModal('Ошибка', 'Оружие не найдено или не является дробовиком!');
-        return;
-    }
-    
-    // Находим подходящие боеприпасы для дробовика
-    const compatibleAmmo = state.ammo.filter(ammo => 
-        ammo.weaponType === 'Дробовик' && ammo.quantity > 0
-    );
-    
-    if (compatibleAmmo.length === 0) {
-        showModal('Нет боеприпасов', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">У вас нет патронов для дробовика!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3>&#x1F504; Перезарядка дробовика: ${weapon.name}</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1rem;">
-                    <p style="color: var(--text); margin-bottom: 0.5rem;"><strong>Текущее состояние:</strong></p>
-                    <div style="display: grid; gap: 0.5rem; margin-bottom: 1rem;">
-                        <p style="color: var(--muted); font-size: 0.9rem;">
-                            Слот 1: ${weapon.shotgunAmmo1.count}/3 ${weapon.shotgunAmmo1.type ? `(${weapon.shotgunAmmo1.type})` : '(пусто)'}
-                        </p>
-                        <p style="color: var(--muted); font-size: 0.9rem;">
-                            Слот 2: ${weapon.shotgunAmmo2.count}/3 ${weapon.shotgunAmmo2.type ? `(${weapon.shotgunAmmo2.type})` : '(пусто)'}
-                        </p>
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 1rem;">
-                    <label class="input-label">Выберите слот для перезарядки</label>
-                    <select class="input-field" id="shotgunSlot">
-                        <option value="1">Слот 1 (${weapon.shotgunAmmo1.count}/3)</option>
-                        <option value="2">Слот 2 (${weapon.shotgunAmmo2.count}/3)</option>
-                    </select>
-                </div>
-                
-                <div style="margin-bottom: 1rem;">
-                    <label class="input-label">Выберите тип боеприпасов</label>
-                    <select class="input-field" id="shotgunAmmoType">
-                        ${compatibleAmmo.map((ammo, index) => `
-                            <option value="${index}">${ammo.type} (${ammo.quantity} шт.)</option>
-                        `).join('')}
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="executeShotgunReload('${weaponId}')">
-                    &#x1F504; Перезарядить
-                </button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Добавляем универсальные обработчики клавиш
-    addModalKeyboardHandlers(modal);
-}
-
-function executeShotgunReload(weaponId) {
-    const weapon = state.weapons.find(w => w.id === weaponId);
-    if (!weapon) return;
-    
-    const selectedSlot = parseInt(document.getElementById('shotgunSlot').value);
-    const selectedAmmoIndex = parseInt(document.getElementById('shotgunAmmoType').value);
-    
-    const compatibleAmmo = state.ammo.filter(ammo => 
-        ammo.weaponType === 'Дробовик' && ammo.quantity > 0
-    );
-    const selectedAmmo = compatibleAmmo[selectedAmmoIndex];
-    
-    if (!selectedAmmo) {
-        showModal('Ошибка', 'Выбранные боеприпасы не найдены!');
-        return;
-    }
-    
-    const slotData = selectedSlot === 1 ? weapon.shotgunAmmo1 : weapon.shotgunAmmo2;
-    
-    // Если в слоте есть патроны другого типа, возвращаем их в блок Боеприпасы
-    if (slotData.count > 0 && slotData.type && slotData.type !== selectedAmmo.type) {
-        const existingAmmoIndex = state.ammo.findIndex(a => 
-            a.type === slotData.type && a.weaponType === 'Дробовик'
-        );
-        
-        if (existingAmmoIndex !== -1) {
-            state.ammo[existingAmmoIndex].quantity += slotData.count;
-        } else {
-            const newAmmo = {
-                id: generateId('ammo'),
-                type: slotData.type,
-                weaponType: 'Дробовик',
-                quantity: slotData.count,
-                price: 0
-            };
-            state.ammo.push(newAmmo);
-        }
-    }
-    
-    // Рассчитываем сколько патронов нужно для полной перезарядки слота
-    const ammoNeeded = 3 - (slotData.type === selectedAmmo.type ? slotData.count : 0);
-    const ammoToTake = Math.min(ammoNeeded, selectedAmmo.quantity);
-    
-    // Находим индекс в основном массиве боеприпасов
-    const realAmmoIndex = state.ammo.findIndex(ammo => ammo.id === selectedAmmo.id);
-    
-    if (realAmmoIndex !== -1) {
-        // Вычитаем патроны из блока Боеприпасы
-        state.ammo[realAmmoIndex].quantity -= ammoToTake;
-        
-        // Заряжаем слот дробовика
-        slotData.count = (slotData.type === selectedAmmo.type ? slotData.count : 0) + ammoToTake;
-        slotData.type = selectedAmmo.type;
-        
-        renderAmmo();
-        renderWeapons();
-        scheduleSave();
-        
-        closeModal(document.querySelector('.modal-overlay .icon-button'));
-        
-        const reloadMessage = ammoToTake === ammoNeeded ? 
-            `Слот ${selectedSlot} полностью заряжен!` : 
-            `В слот ${selectedSlot} заряжено ${ammoToTake} из ${ammoNeeded} патронов`;
-        
-        showModal('Перезарядка завершена', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${weapon.name}</p>
-                <p style="color: var(--text); margin-bottom: 0.5rem;">${reloadMessage}</p>
-                <p style="color: var(--muted); font-size: 0.9rem;">Тип: ${selectedAmmo.type} | Патронов: ${slotData.count}/3</p>
-            </div>
-        `);
-    }
 }
 
 // Особая механика стрельбы для дробовиков
@@ -9121,7 +2186,7 @@ function showShotgunShootingModal(damageFormula, weaponName, weaponId) {
     if (totalAmmo <= 0) {
         showModal('Дробовик пуст', `
             <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Дробовик не заряжен!</p>
+                <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 1rem;">Дробовик не заряжен!</p>
                 <p style="color: var(--muted); margin-bottom: 1rem;">Сначала перезарядите дробовик</p>
                 <button class="pill-button primary-button" onclick="closeModal(this); setTimeout(() => reloadShotgun('${weaponId}'), 100)">Перезарядить</button>
             </div>
@@ -9151,12 +2216,12 @@ function showShotgunShootingModal(damageFormula, weaponName, weaponId) {
                         <p style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">Заряженные патроны:</p>
                         <div style="display: grid; gap: 0.25rem;">
                             ${weapon.shotgunAmmo1.count > 0 ? `
-                                <p style="color: var(--text); font-size: 0.9rem;">
+                                <p style="color: ${getThemeColors().text}; font-size: 0.9rem;">
                                     Слот 1: <strong>${weapon.shotgunAmmo1.type}</strong> (${weapon.shotgunAmmo1.count}/3)
                                 </p>
                             ` : ''}
                             ${weapon.shotgunAmmo2.count > 0 ? `
-                                <p style="color: var(--text); font-size: 0.9rem;">
+                                <p style="color: ${getThemeColors().text}; font-size: 0.9rem;">
                                     Слот 2: <strong>${weapon.shotgunAmmo2.type}</strong> (${weapon.shotgunAmmo2.count}/3)
                                 </p>
                             ` : ''}
@@ -9203,7 +2268,7 @@ function showShotgunShootingModal(damageFormula, weaponName, weaponId) {
                         <div id="weaponDamageFormula" style="font-size: 0.9rem; color: var(--muted);"></div>
                         <div id="weaponCriticalMessage" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(255, 0, 0, 0.2); border: 2px solid #ff0000; border-radius: 8px;">
                             <p style="color: #ff0000; font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem;">&#x1FA78; КРИТИЧЕСКАЯ ТРАВМА! &#x1FA78;</p>
-                            <p style="color: var(--text); font-size: 0.9rem;">Ты нанёс Критическую травму! Сообщи Мастеру!</p>
+                            <p style="color: ${getThemeColors().text}; font-size: 0.9rem;">Ты нанёс Критическую травму! Сообщи Мастеру!</p>
                         </div>
                     </div>
                 </div>
@@ -9223,6 +2288,9 @@ function showShotgunShootingModal(damageFormula, weaponName, weaponId) {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем обработчики клавиатуры для правильной работы Enter
+    addModalKeyboardHandlers(modal);
 }
 
 function executeShotgunShoot(weaponId) {
@@ -9267,1323 +2335,7 @@ function executeShotgunShoot(weaponId) {
     performWeaponDamageRoll(actualDamageFormula, weapon.name, modifier, slotData.type, fireTypeText, 1, weaponId, 'Дробовик', true, 'shotgun');
 }
 
-// Функции для работы с профессиональными навыками
-function addProfessionalSkill() {
-    const name = prompt('Введите название профессионального навыка:');
-        if (!name) return;
-        
-    const description = prompt('Введите описание навыка:');
-            if (!description) return;
-            
-    const level = prompt('Введите уровень навыка (0-10):');
-                const skillLevel = Math.max(0, Math.min(10, parseInt(level) || 0));
-                
-                // Проверяем, не добавлен ли уже этот навык
-                if (state.professionalSkills.find(s => s.name === name)) {
-                    showModal('Ошибка', 'Этот профессиональный навык уже добавлен!');
-                    return;
-                }
-                
-                const newSkill = {
-                    id: generateId('proSkill'),
-                    name: name,
-                    description: description,
-                    level: skillLevel
-                };
-                
-                state.professionalSkills.push(newSkill);
-                renderProfessionalSkills();
-                scheduleSave();
-}
-
-function updateProfessionalSkillLevel(skillId, newLevel) {
-    const skill = state.professionalSkills.find(s => s.id === skillId);
-    if (skill) {
-        skill.level = Math.max(0, Math.min(10, parseInt(newLevel)));
-        renderProfessionalSkills();
-        scheduleSave();
-    }
-}
-
-function removeProfessionalSkill(skillId) {
-    state.professionalSkills = state.professionalSkills.filter(s => s.id !== skillId);
-    renderProfessionalSkills();
-    scheduleSave();
-}
-
-function renderProfessionalSkills() {
-    const container = document.getElementById('professionalSkillsContainer');
-    if (!container) return;
-    
-    if (state.professionalSkills.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 2rem;">Профессиональные навыки не добавлены</p>';
-        return;
-    }
-    
-    container.innerHTML = state.professionalSkills.map(skill => `
-        <div class="card" style="margin-bottom: 1rem;">
-            <div class="card-header">
-                <div class="card-title">${skill.name}</div>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <input type="number" class="stat-input" value="${skill.level}" min="0" max="10" onchange="updateProfessionalSkillLevel('${skill.id}', this.value)" style="width: 50px;">
-                    <button class="pill-button danger-button" onclick="removeProfessionalSkill('${skill.id}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;"><img src="https://static.tildacdn.com/tild6166-3331-4338-b038-623539346365/x-button.png" style="width: 16px; height: 16px;"></button>
-                </div>
-            </div>
-            <div class="card-content">
-                ${skill.description}
-            </div>
-        </div>
-    `).join('');
-}
-
-function showAddProfessionalSkillModal() {
-    const modal = createModal('Добавить профессиональный навык', `
-        <div class="modal-content">
-            <div class="input-group">
-                <label class="input-label">Название навыка</label>
-                <input type="text" class="input-field" id="proSkillName" placeholder="Например: Киберхирургия">
-            </div>
-            <div class="input-group">
-                <label class="input-label">Описание</label>
-                <textarea class="input-field" id="proSkillDescription" rows="3" placeholder="Подробное описание навыка..."></textarea>
-            </div>
-            <div class="input-group">
-                <label class="input-label">Уровень (0-10)</label>
-                <input type="number" class="input-field" id="proSkillLevel" value="0" min="0" max="10">
-            </div>
-            <div class="modal-actions">
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-                <button class="pill-button primary-button" onclick="addProfessionalSkillFromModal(); closeModal(this);">Добавить</button>
-            </div>
-        </div>
-    `);
-}
-
-function addProfessionalSkillFromModal() {
-    const name = document.getElementById('proSkillName').value;
-    const description = document.getElementById('proSkillDescription').value;
-    const level = parseInt(document.getElementById('proSkillLevel').value) || 0;
-    
-    if (!name || !description) {
-        showModal('Ошибка', 'Заполните все поля!');
-        return;
-    }
-    
-    // Проверяем, не добавлен ли уже этот навык
-    if (state.professionalSkills.find(s => s.name === name)) {
-        showModal('Ошибка', 'Этот профессиональный навык уже добавлен!');
-        return;
-    }
-    
-    const newSkill = {
-        id: generateId('proSkill'),
-        name: name,
-        description: description,
-        level: Math.max(0, Math.min(10, level))
-    };
-    
-    state.professionalSkills.push(newSkill);
-    renderProfessionalSkills();
-    scheduleSave();
-}
-
-// Функции для работы с критическими травмами
-function addCriticalInjury() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>&#x1F494; Добавить критическую травму</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="input-group">
-                    <label class="input-label">Описание травмы</label>
-                    <textarea class="input-field" id="injuryDescription" rows="3" placeholder="Опишите критическую травму..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="saveCriticalInjury()">Добавить</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-    
-    // Фокусируемся на поле ввода
-    setTimeout(() => {
-        const input = document.getElementById('injuryDescription');
-        if (input) input.focus();
-    }, 100);
-}
-
-function saveCriticalInjury() {
-    const description = document.getElementById('injuryDescription').value.trim();
-    
-    if (!description) {
-        showModal('Ошибка', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger);">Введите описание травмы!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    const newInjury = {
-        id: generateId('injury'),
-        description: description,
-        date: new Date().toLocaleDateString('ru-RU')
-    };
-    
-    state.criticalInjuries.push(newInjury);
-    renderCriticalInjuries();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-}
-
-function removeCriticalInjury(injuryId) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 400px;">
-            <div class="modal-header">
-                <h3>Подтверждение</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="text-align: center; color: var(--text); font-size: 1rem;">Удалить эту критическую травму?</p>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button danger-button" onclick="confirmRemoveCriticalInjury('${injuryId}')">Удалить</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function confirmRemoveCriticalInjury(injuryId) {
-    state.criticalInjuries = state.criticalInjuries.filter(injury => injury.id !== injuryId);
-    renderCriticalInjuries();
-    scheduleSave();
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-}
-
-function renderCriticalInjuries() {
-    const container = document.getElementById('injuriesList');
-    if (!container) return;
-    
-    if (state.criticalInjuries.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); font-size: 0.9rem; margin-top: 0.5rem;">Травмы не добавлены</p>';
-        return;
-    }
-    
-    container.innerHTML = state.criticalInjuries.map(injury => `
-        <div class="injury-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(0,0,0,0.2); border: 1px solid rgba(182, 103, 255, 0.2); border-radius: 6px; margin-bottom: 0.5rem;">
-            <div style="flex: 1;">
-                <div style="color: var(--text); font-size: 0.9rem;">${injury.description}</div>
-                <div style="color: var(--muted); font-size: 0.8rem;">${injury.date}</div>
-            </div>
-            <button class="pill-button danger-button" onclick="removeCriticalInjury('${injury.id}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;"><img src="https://static.tildacdn.com/tild6166-3331-4338-b038-623539346365/x-button.png" style="width: 16px; height: 16px;"></button>
-        </div>
-    `).join('');
-}
-
-// Функции для работы с препаратами
-function showDrugsShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    let shopHTML = `
-        <div class="modal" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
-            <div class="modal-header">
-                <h3><img src="https://static.tildacdn.com/tild3532-3565-4033-a136-653464353038/drugs.png" alt="💊" style="width: 24px; height: 24px; margin-right: 0.5rem; vertical-align: middle;"> Магазин препаратов</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button onclick="toggleDrugsFreeMode()" id="drugsFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-            </div>
-            <div class="modal-body" style="overflow-y: auto; flex: 1;">
-    `;
-    
-    // Проходим по всем категориям препаратов
-    for (const [category, drugs] of Object.entries(DRUGS_LIBRARY)) {
-        shopHTML += `
-            <div class="category-section" style="margin-bottom: 2rem;">
-                <div class="category-title" style="color: var(--accent); font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">${category}</div>
-                <div style="display: grid; gap: 1rem;">
-                    ${drugs.map((drug) => `
-                        <div class="property-item">
-                            <div class="property-header">
-                                <div class="property-name">${drug.name}</div>
-                                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                                    <span class="drug-price" style="color: var(--muted); font-size: 0.9rem;" data-original-price="${drug.price}">Цена: ${drug.price} уе</span>
-                                    <button class="pill-button primary-button drug-buy-button" onclick="buyDrug('${drug.name}', ${drug.price}, '${drug.description.replace(/'/g, "\\'")}', '${drug.effect ? drug.effect.replace(/'/g, "\\'") : ''}', '${drug.category}', ${drug.difficulty || 0}, '${drug.secondaryEffect ? drug.secondaryEffect.replace(/'/g, "\\'") : ''}')" data-drug-name="${drug.name}" data-price="${drug.price}" data-description="${drug.description.replace(/'/g, "\\'")}" data-effect="${drug.effect ? drug.effect.replace(/'/g, "\\'") : ''}" data-category="${drug.category}" data-difficulty="${drug.difficulty || 0}" data-secondary-effect="${drug.secondaryEffect ? drug.secondaryEffect.replace(/'/g, "\\'") : ''}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
-                                </div>
-                            </div>
-                            <div class="property-description">
-                                <div style="font-size: 0.9rem; margin-bottom: 0.5rem;">
-                                    <strong>Описание:</strong> ${drug.description}
-                                </div>
-                                <div style="font-size: 0.9rem; color: var(--success); margin-bottom: 0.5rem;">
-                                    <strong>Эффект:</strong> ${drug.effect || drug.description}
-                                </div>
-                                ${drug.difficulty ? `<div style="font-size: 0.9rem; color: var(--accent); margin-bottom: 0.5rem;"><strong>СЛ:</strong> ${drug.difficulty}</div>` : ''}
-                                ${drug.secondaryEffect ? `<div style="font-size: 0.9rem; color: var(--danger);"><strong>Вторичный эффект:</strong> ${drug.secondaryEffect}</div>` : ''}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    shopHTML += `
-            </div>
-        </div>
-    `;
-    
-    modal.innerHTML = shopHTML;
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function buyDrug(name, price, description, effect, category, difficulty, secondaryEffect, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    if (currentMoney < price) {
-        showModal('Недостаточно денег', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Не хватает денег!</p>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Добавляем препарат
-    const newDrug = {
-        id: generateId('drug'),
-        name: name,
-        description: description,
-        effect: effect,
-        category: category,
-        difficulty: difficulty,
-        secondaryEffect: secondaryEffect,
-        price: price,
-        purchaseDate: new Date().toLocaleDateString('ru-RU'),
-        catalogPrice: catalogPrice,
-        purchasePrice: price,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    state.drugs.push(newDrug);
-    renderDrugs();
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: name,
-        price: price,
-        category: 'Препараты'
-    });
-    
-    showModal('Препарат куплен', `&#x2705; ${name} добавлен в коллекцию препаратов!`);
-}
-
-function getDrugFree(name, description, effect, category, difficulty, secondaryEffect) {
-    // Добавляем препарат бесплатно
-    const newDrug = {
-        id: generateId('drug'),
-        name: name,
-        description: description,
-        effect: effect,
-        category: category,
-        difficulty: difficulty,
-        secondaryEffect: secondaryEffect,
-        price: 0,
-        purchaseDate: new Date().toLocaleDateString('ru-RU')
-    };
-    
-    state.drugs.push(newDrug);
-    renderDrugs();
-    scheduleSave();
-    
-    showModal('Препарат получен', `&#x2705; ${name} добавлен в коллекцию препаратов бесплатно!`);
-}
-
-function removeDrug(drugId) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 400px;">
-            <div class="modal-header">
-                <h3>Подтверждение</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="text-align: center; color: var(--text); font-size: 1rem;">Принять этот препарат (удалить из списка)?</p>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="confirmRemoveDrug('${drugId}')">Принять</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function confirmRemoveDrug(drugId) {
-    state.drugs = state.drugs.filter(drug => drug.id !== drugId);
-    renderDrugs();
-    scheduleSave();
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-}
-
-function toggleDrugsFreeMode() {
-    const priceElements = document.querySelectorAll('.drug-price');
-    const buyButtons = document.querySelectorAll('.drug-buy-button');
-    const toggleButton = document.getElementById('drugsFreeModeButton');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    const isFreeMode = toggleButton.textContent === 'Отключить бесплатно';
-    
-    if (isFreeMode) {
-        priceElements.forEach(el => {
-            const originalPrice = el.getAttribute('data-original-price');
-            el.textContent = `Цена: ${originalPrice} уе`;
-        });
-        
-        buyButtons.forEach(btn => {
-            const price = btn.getAttribute('data-price');
-            const name = btn.getAttribute('data-drug-name');
-            const description = btn.getAttribute('data-description');
-            const effect = btn.getAttribute('data-effect');
-            const category = btn.getAttribute('data-category');
-            const difficulty = btn.getAttribute('data-difficulty');
-            const secondaryEffect = btn.getAttribute('data-secondary-effect');
-            btn.setAttribute('onclick', `buyDrug('${name}', ${price}, '${description}', '${effect}', '${category}', ${difficulty}, '${secondaryEffect}')`);
-        });
-        
-        toggleButton.textContent = 'Бесплатно';
-        toggleButton.style.background = 'transparent';
-        
-        // Возвращаем обычный фон
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 0, 0, 0.85)';
-        }
-    } else {
-        priceElements.forEach(el => {
-            el.textContent = 'Цена: 0 уе';
-        });
-        
-        buyButtons.forEach(btn => {
-            const name = btn.getAttribute('data-drug-name');
-            const description = btn.getAttribute('data-description');
-            const effect = btn.getAttribute('data-effect');
-            const category = btn.getAttribute('data-category');
-            const difficulty = btn.getAttribute('data-difficulty');
-            const secondaryEffect = btn.getAttribute('data-secondary-effect');
-            btn.setAttribute('onclick', `buyDrug('${name}', 0, '${description}', '${effect}', '${category}', ${difficulty}, '${secondaryEffect}')`);
-        });
-        
-        toggleButton.textContent = 'Отключить бесплатно';
-        toggleButton.style.background = 'linear-gradient(135deg, #7DF4C6, #5b9bff)';
-        
-        // Меняем фон на зеленоватый
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 100, 50, 0.85)';
-        }
-    }
-}
-
-function renderDrugs() {
-    const container = document.getElementById('drugsContainer');
-    if (!container) return;
-    
-    if (state.drugs.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 2rem;">Препараты не добавлены</p>';
-        return;
-    }
-    
-    // Группируем препараты по категориям и названиям
-    const drugsByCategory = {
-        'street': {},
-        'clinical': {},
-        'drugs': {}
-    };
-    
-    state.drugs.forEach(drug => {
-        if (!drugsByCategory[drug.category][drug.name]) {
-            drugsByCategory[drug.category][drug.name] = [];
-        }
-        drugsByCategory[drug.category][drug.name].push(drug);
-    });
-    
-    const categoryNames = {
-        'street': 'Уличные препараты',
-        'clinical': 'Клинические препараты', 
-        'drugs': 'Уличные наркотики'
-    };
-    
-    let html = '';
-    
-    for (const [category, drugGroups] of Object.entries(drugsByCategory)) {
-        if (Object.keys(drugGroups).length === 0) continue;
-        
-        html += `
-            <div style="margin-bottom: 1.5rem;">
-                <h4 style="color: var(--accent); font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem;">${categoryNames[category]}</h4>
-        `;
-        
-        for (const [drugName, drugList] of Object.entries(drugGroups)) {
-            const firstDrug = drugList[0]; // Берем первый экземпляр для отображения
-            const count = drugList.length;
-            const drugId = `drug_${category}_${drugName.replace(/\s+/g, '_')}`;
-            
-            html += `
-                <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-right: 2rem;">
-                        <div style="flex: 1;">
-                            <div style="color: var(--accent); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; cursor: pointer; user-select: none;" onclick="toggleDrugDescription('${drugId}')">
-                                ${firstDrug.name} <span style="color: var(--muted); font-size: 0.8rem;">${count > 1 ? `(${count} шт.)` : ''}</span>
-                            </div>
-                            <div id="${drugId}_description" style="display: block;">
-                                <div style="color: var(--text); font-size: 0.75rem; margin-bottom: 0.25rem; line-height: 1.3;">
-                                    <strong>Описание:</strong> ${firstDrug.description}
-                                </div>
-                                <div style="color: var(--success); font-size: 0.75rem; margin-bottom: 0.25rem; line-height: 1.3;">
-                                    <strong>Эффект:</strong> ${firstDrug.effect}
-                                </div>
-                                ${firstDrug.difficulty > 0 ? `<div style="color: var(--accent); font-size: 0.75rem; margin-bottom: 0.25rem;"><strong>СЛ:</strong> ${firstDrug.difficulty}</div>` : ''}
-                                ${firstDrug.secondaryEffect ? `<div style="color: var(--danger); font-size: 0.75rem; margin-bottom: 0.25rem; line-height: 1.3;"><strong>Вторичный эффект:</strong> ${firstDrug.secondaryEffect}</div>` : ''}
-                                <div style="color: var(--muted); font-size: 0.75rem; margin-top: 0.25rem;">
-                                    Куплено: ${firstDrug.purchaseDate} | Цена: ${firstDrug.price} уе
-                                </div>
-                            </div>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            ${count > 1 ? `<span style="color: var(--muted); font-size: 0.8rem; font-weight: 600;">×${count} шт.</span>` : ''}
-                            <button onclick="removeDrug('${firstDrug.id}')" style="font-size: 0.9rem; background: transparent; border: none; color: var(--text); cursor: pointer;" title="Принять препарат">💊</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        html += `</div>`;
-    }
-    
-    container.innerHTML = html;
-}
-
-function toggleDrugDescription(drugId) {
-    const description = document.getElementById(`${drugId}_description`);
-    if (description) {
-        if (description.style.display === 'none') {
-            description.style.display = 'block';
-        } else {
-            description.style.display = 'none';
-        }
-    }
-}
-
-// Функции для работы с транспортом
-function renderVehicles() {
-    const container = document.getElementById('vehiclesContainer');
-    if (!container) return;
-    
-    if (state.property.vehicles.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 2rem;">Транспорт не добавлен</p>';
-        return;
-    }
-    
-    container.innerHTML = state.property.vehicles.map(vehicle => `
-        <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-right: 2rem;">
-                <div style="flex: 1;">
-                    <div style="color: var(--accent); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">
-                        ${vehicle.name}
-                    </div>
-                    <div style="color: var(--text); font-size: 0.75rem; margin-bottom: 0.25rem; line-height: 1.3;">
-                        <strong>Описание:</strong> ${vehicle.description}
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.7rem; color: var(--muted);">
-                        <div><strong>ПЗ:</strong> ${vehicle.currentHp}/${vehicle.hp}</div>
-                        <div><strong>Места:</strong> ${vehicle.seats}</div>
-                        <div><strong>Скорость:</strong> ${vehicle.mechanicalSpeed}</div>
-                        <div><strong>Макс. скорость:</strong> ${vehicle.narrativeSpeed}</div>
-                    </div>
-                    ${vehicle.modules.length > 0 ? `
-                        <div style="margin-top: 0.5rem;">
-                            <div style="color: var(--accent); font-size: 0.7rem; font-weight: 600; margin-bottom: 0.25rem;">Установленные модули:</div>
-                            <div style="font-size: 0.7rem; color: var(--muted);">
-                                ${vehicle.modules.map(module => module.name).join(', ')}
-                            </div>
-                        </div>
-                    ` : ''}
-                </div>
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <button onclick="sellVehicle('${vehicle.id}')" style="font-size: 0.8rem; background: transparent; border: none; color: var(--danger); cursor: pointer;" title="Продать транспорт"><img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"></button>
-                    <button onclick="manageVehicleModules('${vehicle.id}')" style="font-size: 0.8rem; background: transparent; border: none; color: var(--accent); cursor: pointer;" title="Управление модулями">&#x2699;&#xFE0F;</button>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-function showVehicleShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    let shopHTML = `
-        <div class="modal" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header">
-                <h3><img src="https://static.tildacdn.com/tild3130-6637-4132-a334-663633373435/car.png" alt="🚗" style="width: 24px; height: 24px; margin-right: 0.5rem; vertical-align: middle;"> Магазин транспорта</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button onclick="toggleVehiclesFreeMode()" id="vehiclesFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-            </div>
-            <div class="modal-body">
-    `;
-    
-    // Проходим по всем категориям транспорта
-    for (const [category, vehicles] of Object.entries(VEHICLES_LIBRARY)) {
-        shopHTML += `
-            <div style="margin-bottom: 2rem;">
-                <h4 style="color: var(--accent); font-size: 1rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">${category}</h4>
-                <div style="display: grid; gap: 1rem;">
-                    ${vehicles.map((vehicle) => `
-                        <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                                <div style="flex: 1;">
-                                    <div style="color: var(--accent); font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem;">${vehicle.name}</div>
-                                    <div style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.75rem;">${vehicle.description.replace(/"/g, '&quot;')}</div>
-                                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; font-size: 0.8rem; color: var(--text); margin-bottom: 0.75rem;">
-                                        <div><strong>ПЗ:</strong> ${vehicle.hp}</div>
-                                        <div><strong>Места:</strong> ${vehicle.seats}</div>
-                                        <div><strong>Скорость:</strong> ${vehicle.mechanicalSpeed}</div>
-                                        <div><strong>Макс. скорость:</strong> ${vehicle.narrativeSpeed}</div>
-                                    </div>
-                                    <div class="vehicle-price-display" style="color: var(--success); font-weight: 600; font-size: 1rem;" data-original-price="${vehicle.price}">Цена: ${vehicle.price} уе</div>
-                                </div>
-                                <div style="margin-left: 1rem;">
-                                    <button class="pill-button primary-button vehicle-buy-button" onclick="buyVehicle('${vehicle.name.replace(/'/g, "\\'")}', '${vehicle.description.replace(/'/g, "\\'")}', ${vehicle.hp}, ${vehicle.seats}, ${vehicle.mechanicalSpeed}, '${vehicle.narrativeSpeed}', ${vehicle.price}, '${vehicle.category}', null)" data-vehicle-name="${vehicle.name.replace(/'/g, "\\'")}" data-description="${vehicle.description.replace(/'/g, "\\'")}" data-hp="${vehicle.hp}" data-seats="${vehicle.seats}" data-mechanical-speed="${vehicle.mechanicalSpeed}" data-narrative-speed="${vehicle.narrativeSpeed}" data-price="${vehicle.price}" data-category="${vehicle.category}" style="font-size: 0.85rem; padding: 0.5rem 1rem;">Купить</button>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    shopHTML += `
-            </div>
-        </div>
-    `;
-    
-    modal.innerHTML = shopHTML;
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function buyVehicle(name, description, hp, seats, mechanicalSpeed, narrativeSpeed, price, category, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    
-    // Проверяем навык "Транспорт" для скидки
-    const transportSkill = state.skills.find(s => s.name === 'Транспорт' || s.customName?.includes('Транспорт'));
-    const skillLevel = transportSkill ? transportSkill.level : 0;
-    const discount = skillLevel >= 4 ? 0.1 : 0; // 10% скидка при навыке 4+
-    const finalPrice = Math.floor(price * (1 - discount));
-    
-    if (currentMoney < finalPrice) {
-        showModal('Недостаточно денег', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Не хватает Еши!</p>
-                <p style="color: var(--muted);">Нужно: ${finalPrice} уе</p>
-                <p style="color: var(--muted);">Доступно: ${currentMoney} уе</p>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money = currentMoney - finalPrice;
-    updateMoneyDisplay();
-    
-    // Добавляем транспорт
-    const newVehicle = {
-        id: generateId('vehicle'),
-        name: name,
-        description: description,
-        hp: hp,
-        currentHp: hp,
-        seats: seats,
-        mechanicalSpeed: mechanicalSpeed,
-        narrativeSpeed: narrativeSpeed,
-        price: catalogPrice || price,  // Используем каталожную цену если есть
-        catalogPrice: catalogPrice,     // Сохраняем каталожную цену отдельно
-        purchasePrice: finalPrice,      // Сохраняем цену покупки (с учётом скидки)
-        itemType: finalPrice === 0 && catalogPrice > 0 ? 'free_catalog' : 'catalog',  // Маркер для скупщика
-        category: category,
-        modules: [],
-        isDefault: false
-    };
-    
-    state.property.vehicles.push(newVehicle);
-    renderVehicles();
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: name,
-        price: finalPrice,
-        category: 'Транспорт'
-    });
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    const discountText = discount > 0 ? `<p style="color: var(--success); margin-bottom: 0.5rem;">Скидка ${discount * 100}% благодаря навыку "Транспорт"!</p>` : '';
-    
-    showModal('Транспорт куплен', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${name} куплен!</p>
-            ${discountText}
-            <p style="color: var(--muted);">Списано: ${finalPrice} уе</p>
-        </div>
-    `);
-}
-
-function toggleVehiclesFreeMode() {
-    const buyButtons = document.querySelectorAll('.vehicle-buy-button');
-    const priceDisplays = document.querySelectorAll('.vehicle-price-display');
-    const toggleButton = document.getElementById('vehiclesFreeModeButton');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    const isFreeMode = toggleButton.textContent === 'Отключить бесплатно';
-    
-    if (isFreeMode) {
-        buyButtons.forEach(btn => {
-            const name = btn.getAttribute('data-vehicle-name');
-            const description = btn.getAttribute('data-description');
-            const hp = btn.getAttribute('data-hp');
-            const seats = btn.getAttribute('data-seats');
-            const mechanicalSpeed = btn.getAttribute('data-mechanical-speed');
-            const narrativeSpeed = btn.getAttribute('data-narrative-speed');
-            const price = btn.getAttribute('data-price');
-            const category = btn.getAttribute('data-category');
-            btn.setAttribute('onclick', `buyVehicle('${name}', '${description}', ${hp}, ${seats}, ${mechanicalSpeed}, '${narrativeSpeed}', ${price}, '${category}', null)`);
-        });
-        
-        // Возвращаем обычные цены визуально
-        priceDisplays.forEach(display => {
-            const originalPrice = display.getAttribute('data-original-price');
-            display.textContent = `Цена: ${originalPrice} уе`;
-        });
-        
-        toggleButton.textContent = 'Бесплатно';
-        toggleButton.style.background = 'transparent';
-        
-        // Возвращаем обычный фон
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 0, 0, 0.85)';
-        }
-    } else {
-        buyButtons.forEach(btn => {
-            const name = btn.getAttribute('data-vehicle-name');
-            const description = btn.getAttribute('data-description');
-            const hp = btn.getAttribute('data-hp');
-            const seats = btn.getAttribute('data-seats');
-            const mechanicalSpeed = btn.getAttribute('data-mechanical-speed');
-            const narrativeSpeed = btn.getAttribute('data-narrative-speed');
-            const category = btn.getAttribute('data-category');
-            btn.setAttribute('onclick', `buyVehicle('${name}', '${description}', ${hp}, ${seats}, ${mechanicalSpeed}, '${narrativeSpeed}', 0, '${category}', ${btn.getAttribute('data-price')})`);
-        });
-        
-        // Меняем цены визуально на 0
-        priceDisplays.forEach(display => {
-            display.textContent = `Цена: 0 уе`;
-        });
-        
-        toggleButton.textContent = 'Отключить бесплатно';
-        toggleButton.style.background = 'linear-gradient(135deg, #7DF4C6, #5b9bff)';
-        
-        // Меняем фон на зеленоватый
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 100, 50, 0.85)';
-        }
-    }
-}
-
-function sellVehicle(vehicleId) {
-    const vehicle = state.property.vehicles.find(v => v.id === vehicleId);
-    if (!vehicle) return;
-    
-    // Для стартового микромобиля цена продажи фиксированная 7500уе
-    const sellPrice = vehicle.isDefault ? 7500 : Math.floor(vehicle.price * 0.5);
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>Продать транспорт</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="text-align: center; color: var(--text); font-size: 1rem; margin-bottom: 1rem;">
-                    Продать <strong>${vehicle.name}</strong> за <span style="color: var(--success);">${sellPrice} уе</span>?
-                </p>
-                <p style="text-align: center; color: var(--muted); font-size: 0.85rem;">
-                    (50% от стоимости покупки)
-                </p>
-            </div>
-            <div class="modal-footer">
-                <button class="pill-button primary-button" onclick="confirmSellVehicle('${vehicleId}', ${sellPrice})">Продать</button>
-                <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function confirmSellVehicle(vehicleId, sellPrice) {
-    state.property.vehicles = state.property.vehicles.filter(v => v.id !== vehicleId);
-    state.money = parseInt(state.money) + sellPrice;
-    updateMoneyDisplay();
-    renderVehicles();
-    scheduleSave();
-    
-    // Логируем продажу транспорта как получение денег
-    addToRollLog('transaction', {
-        amount: sellPrice,
-        source: 'Продажа транспорта',
-        taxPaid: 0
-    });
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    showModal('Транспорт продан', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; Транспорт продан!</p>
-            <p style="color: var(--muted);">Получено: ${sellPrice} уе</p>
-        </div>
-    `);
-}
-
-function showVehicleModulesShop() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    let shopHTML = `
-        <div class="modal" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header">
-                <h3>&#x2699;&#xFE0F; Магазин модулей транспорта</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button onclick="toggleVehicleModulesFreeMode()" id="vehicleModulesFreeModeButton" style="background: transparent; border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Бесплатно</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-            </div>
-            <div class="modal-body">
-    `;
-    
-    // Проходим по всем категориям модулей
-    const categories = {
-        'ground': 'Модули для наземного транспорта',
-        'air': 'Модули для воздушного транспорта',
-        'water': 'Модули для водного транспорта'
-    };
-    
-    for (const [category, categoryName] of Object.entries(categories)) {
-        const modules = VEHICLE_MODULES_LIBRARY[category] || [];
-        if (modules.length === 0) continue;
-        
-        shopHTML += `
-            <div style="margin-bottom: 2rem;">
-                <h4 style="color: var(--accent); font-size: 1rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">${categoryName}</h4>
-                <div style="display: grid; gap: 1rem;">
-                    ${modules.map((module) => `
-                        <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                                <div style="flex: 1;">
-                                    <div style="color: var(--accent); font-weight: 600; font-size: 1rem; margin-bottom: 0.5rem;">${module.name}</div>
-                                    <div style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.75rem;">${module.description}</div>
-                                    ${module.requirements && module.requirements.length > 0 ? `
-                                        <div style="color: var(--danger); font-size: 0.8rem; margin-bottom: 0.5rem;">
-                                            <strong>Требования:</strong> ${module.requirements.join(', ')}
-                                        </div>
-                                    ` : ''}
-                                    <div class="vehicle-module-price-display" style="color: var(--success); font-weight: 600; font-size: 1rem;" data-original-price="${module.price}">Цена: ${module.price} уе</div>
-                                </div>
-                                <div style="margin-left: 1rem;">
-                                    <button class="pill-button primary-button vehicle-module-buy-button" onclick="buyVehicleModule('${module.name.replace(/'/g, "\\'")}', '${module.description.replace(/'/g, "\\'")}', ${module.price}, '${module.category}', '${JSON.stringify(module.requirements || []).replace(/'/g, "\\'")}' )" data-module-name="${module.name.replace(/'/g, "\\'")}" data-description="${module.description.replace(/'/g, "\\'")}" data-price="${module.price}" data-category="${module.category}" data-requirements="${JSON.stringify(module.requirements || []).replace(/'/g, "\\'")}" style="font-size: 0.85rem; padding: 0.5rem 1rem;">Купить</button>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
-    shopHTML += `
-            </div>
-        </div>
-    `;
-    
-    modal.innerHTML = shopHTML;
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function getVehicleModuleFree(name, description, category, requirementsStr) {
-    const requirements = JSON.parse(requirementsStr);
-    
-    // Добавляем модуль в снаряжение бесплатно
-    const newGear = {
-        id: generateId('gear'),
-        name: name,
-        description: description,
-        price: 0,
-        load: 5,
-        type: 'vehicle_module',
-        moduleData: {
-            category: category,
-            requirements: requirements
-        }
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    showModal('Модуль получен', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${name} получен!</p>
-            <p style="color: var(--muted); margin-bottom: 0.5rem;">Модуль добавлен в снаряжение.</p>
-            <p style="color: var(--muted);">Установите его через меню управления модулями транспорта.</p>
-        </div>
-    `);
-}
-
-function toggleVehicleModulesFreeMode() {
-    const buyButtons = document.querySelectorAll('.vehicle-module-buy-button');
-    const priceDisplays = document.querySelectorAll('.vehicle-module-price-display');
-    const toggleButton = document.getElementById('vehicleModulesFreeModeButton');
-    const modalOverlay = document.querySelector('.modal-overlay');
-    
-    const isFreeMode = toggleButton.textContent === 'Отключить бесплатно';
-    
-    if (isFreeMode) {
-        buyButtons.forEach(btn => {
-            const name = btn.getAttribute('data-module-name');
-            const description = btn.getAttribute('data-description');
-            const price = btn.getAttribute('data-price');
-            const category = btn.getAttribute('data-category');
-            const requirements = btn.getAttribute('data-requirements');
-            btn.setAttribute('onclick', `buyVehicleModule('${name}', '${description}', ${price}, '${category}', '${requirements}')`);
-        });
-        
-        // Возвращаем обычные цены визуально
-        priceDisplays.forEach(display => {
-            const originalPrice = display.getAttribute('data-original-price');
-            display.textContent = `Цена: ${originalPrice} уе`;
-        });
-        
-        toggleButton.textContent = 'Бесплатно';
-        toggleButton.style.background = 'transparent';
-        
-        // Возвращаем обычный фон
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 0, 0, 0.85)';
-        }
-    } else {
-        buyButtons.forEach(btn => {
-            const name = btn.getAttribute('data-module-name');
-            const description = btn.getAttribute('data-description');
-            const category = btn.getAttribute('data-category');
-            const requirements = btn.getAttribute('data-requirements');
-            btn.setAttribute('onclick', `getVehicleModuleFree('${name}', '${description}', '${category}', '${requirements}')`);
-        });
-        
-        // Меняем цены визуально на 0
-        priceDisplays.forEach(display => {
-            display.textContent = `Цена: 0 уе`;
-        });
-        
-        toggleButton.textContent = 'Отключить бесплатно';
-        toggleButton.style.background = 'linear-gradient(135deg, #7DF4C6, #5b9bff)';
-        
-        // Меняем фон на зеленоватый
-        if (modalOverlay) {
-            modalOverlay.style.background = 'rgba(0, 100, 50, 0.85)';
-        }
-    }
-}
-
-function buyVehicleModule(name, description, price, category, requirementsStr, catalogPrice = null) {
-    const currentMoney = parseInt(state.money) || 0;
-    const requirements = JSON.parse(requirementsStr);
-    
-    if (currentMoney < price) {
-        showModal('Недостаточно денег', `
-            <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Не хватает Еши!</p>
-                <p style="color: var(--muted);">Нужно: ${price} уе</p>
-                <p style="color: var(--muted);">Доступно: ${currentMoney} уе</p>
-            </div>
-        `);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money = currentMoney - price;
-    updateMoneyDisplay();
-    
-    // Добавляем модуль в снаряжение
-    const newGear = {
-        id: generateId('gear'),
-        name: name,
-        description: description,
-        price: price,
-        load: 5,
-        type: 'vehicle_module',
-        moduleData: {
-            category: category,
-            requirements: requirements
-        },
-        catalogPrice: catalogPrice,
-        purchasePrice: price,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    state.gear.push(newGear);
-    renderGear();
-    scheduleSave();
-    
-    // Добавляем в лог
-    addToRollLog('purchase', {
-        item: name,
-        price: price,
-        category: 'Модуль транспорта'
-    });
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    showModal('Модуль куплен', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${name} куплен!</p>
-            <p style="color: var(--muted); margin-bottom: 0.5rem;">Модуль добавлен в снаряжение.</p>
-            <p style="color: var(--muted);">Установите его через меню управления модулями транспорта.</p>
-        </div>
-    `);
-}
-
-function manageVehicleModules(vehicleId) {
-    const vehicle = state.property.vehicles.find(v => v.id === vehicleId);
-    if (!vehicle) return;
-    
-    // Получаем доступные модули из снаряжения
-    const availableModules = state.gear.filter(item => 
-        item.type === 'vehicle_module' && 
-        item.moduleData.category === vehicle.category
-    );
-    
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 700px;">
-            <div class="modal-header">
-                <h3>&#x2699;&#xFE0F; Управление модулями: ${vehicle.name}</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 1.5rem;">
-                    <h4 style="color: var(--accent); font-size: 0.95rem; margin-bottom: 0.75rem;">Установленные модули:</h4>
-                    ${vehicle.modules.length > 0 ? `
-                        <div style="display: grid; gap: 0.75rem;">
-                            ${vehicle.modules.map((module, index) => `
-                                <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <div style="color: var(--success); font-weight: 600; font-size: 0.9rem;">${module.name}</div>
-                                        <div style="color: var(--muted); font-size: 0.75rem;">${module.description}</div>
-                                    </div>
-                                    <button class="pill-button danger-button" onclick="removeVehicleModule('${vehicleId}', ${index})" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Удалить</button>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : '<p style="color: var(--muted); text-align: center; padding: 1rem;">Модули не установлены</p>'}
-                </div>
-                
-                <div>
-                    <h4 style="color: var(--accent); font-size: 0.95rem; margin-bottom: 0.75rem;">Доступные модули в снаряжении:</h4>
-                    ${availableModules.length > 0 ? `
-                        <div style="display: grid; gap: 0.75rem;">
-                            ${availableModules.map(module => `
-                                <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <div style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">${module.name}</div>
-                                        <div style="color: var(--muted); font-size: 0.75rem;">${module.description}</div>
-                                        ${module.moduleData.requirements && module.moduleData.requirements.length > 0 ? `
-                                            <div style="color: var(--danger); font-size: 0.7rem; margin-top: 0.25rem;">
-                                                Требует: ${module.moduleData.requirements.join(', ')}
-                                            </div>
-                                        ` : ''}
-                                    </div>
-                                    <button class="pill-button primary-button" onclick="installVehicleModule('${vehicleId}', '${module.id}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Установить</button>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : '<p style="color: var(--muted); text-align: center; padding: 1rem;">Нет доступных модулей для этого типа транспорта</p>'}
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function installVehicleModule(vehicleId, moduleId) {
-    const vehicle = state.property.vehicles.find(v => v.id === vehicleId);
-    const moduleItem = state.gear.find(g => g.id === moduleId);
-    
-    if (!vehicle || !moduleItem) return;
-    
-    // Проверяем требования модуля сначала
-    const requirements = moduleItem.moduleData.requirements || [];
-    if (requirements.length > 0) {
-        const hasRequiredModules = requirements.every(req => 
-            vehicle.modules.some(m => m.name === req)
-        );
-        
-        if (!hasRequiredModules) {
-            showModal('Требования не выполнены', `
-                <div style="text-align: center; padding: 1rem;">
-                    <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Не выполнены требования!</p>
-                    <p style="color: var(--muted);">Для установки требуется: ${requirements.join(', ')}</p>
-                </div>
-            `);
-            return;
-        }
-    }
-    
-    // Проверяем навык "Транспорт"
-    const transportSkill = state.skills.find(s => s.name === 'Транспорт' || s.customName?.includes('Транспорт'));
-    const skillLevel = transportSkill ? transportSkill.level : 0;
-    
-    if (skillLevel < 4) {
-        // Нужно заплатить 500 уе за установку - показываем окно подтверждения
-        const installCost = 500;
-        const currentMoney = parseInt(state.money) || 0;
-        
-        if (currentMoney < installCost) {
-            showModal('Недостаточно денег', `
-                <div style="text-align: center; padding: 1rem;">
-                    <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Недостаточно средств для установки!</p>
-                    <p style="color: var(--muted);">У вас навык "Транспорт" < 4, поэтому установка стоит ${installCost} уе</p>
-                    <p style="color: var(--muted);">Доступно: ${currentMoney} уе</p>
-                </div>
-            `);
-            return;
-        }
-        
-        // Показываем окно подтверждения оплаты
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        const existingModals = document.querySelectorAll('.modal-overlay');
-        modal.style.zIndex = 1000 + (existingModals.length * 100);
-        modal.innerHTML = `
-            <div class="modal" style="max-width: 500px;">
-                <div class="modal-header">
-                    <h3>Оплата установки</h3>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
-                </div>
-                <div class="modal-body">
-                    <p style="text-align: center; color: var(--text); font-size: 1rem; margin-bottom: 1rem;">
-                        Установить <strong>${moduleItem.name}</strong>?
-                    </p>
-                    <p style="text-align: center; color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem;">
-                        У вас навык "Транспорт" < 4
-                    </p>
-                    <p style="text-align: center; color: var(--danger); font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">
-                        Стоимость установки: ${installCost} уе
-                    </p>
-                    <p style="text-align: center; color: var(--muted); font-size: 0.85rem;">
-                        Доступно: ${currentMoney} уе
-                    </p>
-                </div>
-                <div class="modal-footer">
-                    <button class="pill-button primary-button" onclick="confirmInstallVehicleModule('${vehicleId}', '${moduleId}', ${installCost})">Оплатить и установить</button>
-                    <button class="pill-button" onclick="closeModal(this)">Отмена</button>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                closeModal(modal.querySelector('.icon-button'));
-            }
-        });
-        
-        return;
-    }
-    
-    // Если навык >= 4, устанавливаем бесплатно
-    confirmInstallVehicleModule(vehicleId, moduleId, 0);
-}
-
-function confirmInstallVehicleModule(vehicleId, moduleId, installCost) {
-    const vehicle = state.property.vehicles.find(v => v.id === vehicleId);
-    const moduleItem = state.gear.find(g => g.id === moduleId);
-    
-    if (!vehicle || !moduleItem) return;
-    
-    // Списываем деньги если нужно
-    if (installCost > 0) {
-        state.money = parseInt(state.money) - installCost;
-        updateMoneyDisplay();
-    }
-    
-    // Устанавливаем модуль
-    vehicle.modules.push({
-        name: moduleItem.name,
-        description: moduleItem.description,
-        price: moduleItem.price
-    });
-    
-    // Удаляем модуль из снаряжения
-    state.gear = state.gear.filter(g => g.id !== moduleId);
-    
-    renderVehicles();
-    renderGear();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    const installText = installCost > 0 ? 
-        `<p style="color: var(--muted);">Списано: ${installCost} уе за установку</p>` : 
-        '<p style="color: var(--success);">Установка бесплатна благодаря навыку "Транспорт" ≥ 4</p>';
-    
-    showModal('Модуль установлен', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${moduleItem.name} установлен!</p>
-            ${installText}
-        </div>
-    `);
-}
-
-function removeVehicleModule(vehicleId, moduleIndex) {
-    const vehicle = state.property.vehicles.find(v => v.id === vehicleId);
-    if (!vehicle) return;
-    
-    const module = vehicle.modules[moduleIndex];
-    if (!module) return;
-    
-    // Возвращаем модуль в снаряжение
-    state.gear.push({
-        id: generateId('gear'),
-        name: module.name,
-        description: module.description,
-        price: module.price,
-        load: 5,
-        type: 'vehicle_module',
-        moduleData: {
-            category: vehicle.category,
-            requirements: []
-        }
-    });
-    
-    // Удаляем модуль из транспорта
-    vehicle.modules.splice(moduleIndex, 1);
-    
-    renderVehicles();
-    renderGear();
-    scheduleSave();
-    
-    closeModal(document.querySelector('.modal-overlay .icon-button'));
-    
-    showModal('Модуль удалён', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${module.name} возвращён в снаряжение!</p>
-        </div>
-    `);
-}
+// Дубли функций критических травм удалены (первое определение на строке 1227)
 
 // Генератор предыстории
 function generateBackstory() {
@@ -10766,7 +2518,7 @@ function generateBackstory() {
                 "Хочу известности на весь мир",
                 "Ненавижу их, из-за них все проблемы",
                 "Люди, как люди. Без них нельзя, но мне на них плевать",
-                "Они не знают, но сам не человек. Я не знаю как сюда попал. Нельзя, чтобы они узнали мою тайну."
+                "Они не знают, но я сам не человек. Я не знаю как сюда попал. Нельзя, чтобы они узнали мою тайну."
             ]
         },
         recentEvent: {
@@ -10793,56 +2545,424 @@ function generateBackstory() {
     for (const [key, table] of Object.entries(backstoryTables)) {
         const randomIndex = Math.floor(Math.random() * table.options.length);
         const selectedOption = table.options[randomIndex];
-        backstoryText += `${table.title}: ${selectedOption}\n\n`;
+        backstoryText += `${table.title}: ${selectedOption}. `;
     }
     
-    // Записываем в textarea
+    // Записываем в textarea и обновляем отображение
     const textarea = document.getElementById('backstoryText');
     if (textarea) {
         textarea.value = backstoryText.trim();
         state.backstory = backstoryText.trim();
+        updateBackstoryDisplay(); // Обновляем красивое отображение
         scheduleSave();
     }
 }
 
+// Функция для ручного выбора предыстории
+function showManualBackstorySelection() {
+    document.body.style.overflow = 'hidden';
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+    `;
+    
+    // Данные для выбора предыстории
+    const backstoryTables = {
+        birth: {
+            title: "Ты родился",
+            options: [
+                "Среди бедняков (+1 предмет)",
+                "Среди военных (+1 Навык ОДБ)",
+                "На улице (+1 Навык ОББ)",
+                "С вольным народом (+1 Вождение)",
+                "Беспризорник (+1 к Поиску)",
+                "Тебя нашли на улице (+1 Выживание)",
+                "Тебя подкинули богатой семье (+1 Бюрократия)",
+                "Тебя украли из лаборатории (+1 Техническое чудо)",
+                "Среди Технолибертарианцев",
+                "Ты не помнишь (+1 Удача)",
+                "В богатой обеспеченной семье (+1 Внешний вид)",
+                "Во время войны (+1 Уклонение)"
+            ]
+        },
+        childhood: {
+            title: "Ты рос",
+            options: [
+                "С дворовыми пацанами",
+                "В гиперзаботе и гиперопеке",
+                "Спокойно и без приключений",
+                "Постоянно расшибал коленки и всем было плевать",
+                "Почему-то был голоден и воровал еду",
+                "В постоянных разъездах или командировках",
+                "В тире, среди бородатых мужиков с ружьями",
+                "Где-то в дикой природе в палатке",
+                "В дорогой престижной школе, смотря на мир из окон небоскрёба",
+                "Сколотил подростковую банду",
+                "Избивал бомжей на видео и выкладывал это в Сеть",
+                "Был нелюдимым ребенком, смотрел мультики, избегал других детей"
+            ]
+        },
+        teenEvent: {
+            title: "Что-то важное случилось в подростковом возрасте",
+            options: [
+                "Нет, не случилось (+1 ЛВК)",
+                "Нашёл кучу денег (+1 УДАЧА)",
+                "Потерял важного человека (+1 ВОЛЯ)",
+                "Крайне неудачная первая любовь (+1 ХАР)",
+                "Угнал не ту тачку (+1 ТЕХ)",
+                "Связался с плохими людьми (+1 ТЕЛО)",
+                "Подсел на наркоту (+1 зависимость)",
+                "Любовь изменила твою жизнь (+1 ХАР)",
+                "Потерял доверенное тебе (-1 репутация)",
+                "Случайно кого-то убил (+1 РЕА)",
+                "Познакомился с важной шишкой (+1000уе в крипте)",
+                "Пытался сделать бизнес и прогорел (10 000уе долга перед инвесторами)"
+            ]
+        },
+        love: {
+            title: "История любви с... (выбери или придумай персонажа)",
+            options: [
+                "Всегда по-настоящему любил только себя",
+                "Были знакомы с самого детства",
+                "Случайно пересеклись в толпе",
+                "Познакомились на работе",
+                "Какая-то фанатка бегает за мной много лет",
+                "Бегал за ней много лет, и она сжалилась",
+                "Вечная френдзона, но я добьюсь",
+                "Отбил у друга",
+                "Отбил у врага",
+                "Зашел в магазин, а там он/-а на кассе",
+                "Светлая любовь с первого взгляда",
+                "Меня никто не любит"
+            ]
+        },
+        enemy: {
+            title: "История вражды с... (выбери или придумай персонажа)",
+            options: [
+                "С детства ненавидим друг друга",
+                "...задел плечом в топле",
+                "...увёл любовь",
+                "...украл что-то",
+                "...враг семьи",
+                "...убил кого-то важного",
+                "...забрал себе работу",
+                "...подставил перед законом",
+                "\"Срёт в кашу сколько его помню\"",
+                "Просто лицо у ... слишком мерзкое/милое",
+                "...подставил перед бандитами",
+                "У меня нет врагов"
+            ]
+        },
+        guilt: {
+            title: "Кто на самом деле виноват в вашей вражде",
+            options: [
+                "Конечно он",
+                "Какое-то третье лицо",
+                "Его друг",
+                "Мой друг",
+                "Случайность",
+                "Конечно я"
+            ]
+        },
+        revenge: {
+            title: "Как произойдет месть обидчику",
+            options: [
+                "Придёт толпа народу с битами",
+                "Унизит в Сети",
+                "Постарается подставить в тяжком преступлении",
+                "Один на один на ножах",
+                "Ждёт серьёзный разговор",
+                "Периодически появляется и делает мелкие пакости",
+                "Наймёт киллера. Или двух…или сколько потребуется",
+                "Будет пытаться сорвать работу",
+                "Будет шпионить и предупреждать врагов… если они его не пристрелят",
+                "Постарается убить в самый неподходящий момент (задавить машиной/застрелить/прислать вирус через Сеть и пр.)",
+                "Простит и продолжить жить дальше",
+                "Не станет марать руки, но не простит"
+            ]
+        },
+        reason: {
+            title: "Почему ты здесь",
+            options: [
+                "Нужна работа",
+                "Дома скучно",
+                "Долги напоминают о себе",
+                "Хочу купить что-то дорогое",
+                "Устал жить терпилой",
+                "Потому что я — БЕЗУМЕЦ",
+                "Позвали в приложении знакомств сюда",
+                "Потому что я должен быть тут",
+                "Это моя работа",
+                "Хочу показать себя для (указать персонажа)",
+                "Долг зовёт (это важно для тебя с моральной точки зрения)",
+                "Я до сих пор сам не понимаю"
+            ]
+        },
+        meeting: {
+            title: "Как ты познакомился с… (Выбери одного из группы и укажи отношения с ним)",
+            options: [
+                "Я должен доказать, что я лучше, чем…",
+                "…требуется моя защита.",
+                "Отдаю … долг.",
+                "Я поклялся себе защищать …",
+                "Я хочу затащить в постель …",
+                "Я хочу помочь с работой … а потом удрать с его бабками.",
+                "Я просто не могу отпустить … одну/одного.",
+                "Почувствовал, что … грозит опасность.",
+                "У меня заказ на голову … Но это должен выглядеть, как несчастный случаей.",
+                "Узнал, что за голову … награда и должен защитить.",
+                "Однажды Эрнест Хэмингуэй поспорил...",
+                "Да я плевал на всех них. Работа есть работа, если они все помрут, я и глазом не моргну."
+            ]
+        },
+        moneyAttitude: {
+            title: "Твоё отношение к деньгам",
+            options: [
+                "Мусор",
+                "Инструмент",
+                "Цель в жизни",
+                "Необходимость",
+                "У меня их, как грязи",
+                "Готов убить за них",
+                "Честь превыше денег",
+                "За разумную цену могу всё",
+                "Хочу все деньги мира",
+                "Ненавижу их, из-за них все проблемы",
+                "Деньги, как деньги. Без них нельзя, но они не сама цель",
+                "Деньги нужно уничтожить!"
+            ]
+        },
+        peopleAttitude: {
+            title: "Твоё отношение к людям",
+            options: [
+                "Мусор",
+                "Инструмент",
+                "Хочу нравиться всем",
+                "Общение с людьми не более чем необходимость",
+                "Я душа кампании",
+                "Готов на всё, если человек в опасности",
+                "Моя жизнь важнее",
+                "Если человек выгоден мне – я выгоден ему",
+                "Хочу известности на весь мир",
+                "Ненавижу их, из-за них все проблемы",
+                "Люди, как люди. Без них нельзя, но мне на них плевать",
+                "Они не знают, но я сам не человек. Я не знаю как сюда попал. Нельзя, чтобы они узнали мою тайну."
+            ]
+        },
+        recentEvent: {
+            title: "Внезапное событие на прошлой неделе",
+            options: [
+                "Потерял состояние (у тебя нет стартовых денег)",
+                "Убили близкого (выбери персонажа/человека из предыстории, который по твоему мнению сейчас мёртв)",
+                "Украли любимую вещь (выбери любую вещь стоимостью до 5000 уе, которую у тебя украли и ты можешь её вернуть)",
+                "Угнали любимую машину (твою стартовую машину угнали)",
+                "Убили любимую собаку (ты получаешь бесплатный дробовик, пачку зажигательных и ненависть)",
+                "Обнесли жилье (в твоей квартире ничего не осталось, кроме 1 комплекта одежды, в котором ты сейчас, и компьютера, вмонтированного в стену)",
+                "Нашел труп корпората в мусорке (получи корпоративную ID-карточку и самонаводящйся пистолет, являющийся собственностью этой корпорации)",
+                "Нашёл загадочный чип (получи щепку с ИИ, этот ИИ может использоваться Мастер, как еще 1 персонаж)",
+                "Жёстко проебался на деле, но вынес \"трофей\" (пропиши себе любой нарративный предмет стоимость 5000уе, за владельца этой вещи — тебя — назначена награда, но никто не знает у кого она)",
+                "Нашел загадочный чемодан с ДНК замком, который Сёрфер не смог открыть (у тебя есть закрытый ДНК-замком противоударный кейс. Все попытки его взломать или открыть — проваливаются. Что внутри не ясно, кто владелец — тоже, на ящике может быть логотип корпорации или узнаваемого человека)",
+                "Нашёл чип с крупной суммой денег (если ты его вставишь себе в порт, то получи бонусные 20.000 уе на старте, но после перевода твоя ЦНС как-то странно барахлит)",
+                "Ничего особенного не происходило"
+            ]
+        }
+    };
+    
+    // Состояние выбора
+    let currentStep = 0;
+    const steps = Object.keys(backstoryTables);
+    const selectedOptions = {};
+    
+    // Функция для выделения бонусов в тексте
+    function highlightBonuses(text) {
+        // Регулярное выражение для поиска бонусов в скобках
+        return text.replace(/\(([^)]+)\)/g, (match, bonus) => {
+            // Определяем цвет в зависимости от типа бонуса
+            let color = 'var(--accent)'; // По умолчанию фиолетовый
+            
+            if (bonus.includes('+') && !bonus.includes('-')) {
+                // Положительные бонусы - зеленый
+                color = 'var(--success)';
+            } else if (bonus.includes('-')) {
+                // Отрицательные бонусы - красный
+                color = 'var(--danger)';
+            } else if (bonus.toLowerCase().includes('уе') || bonus.toLowerCase().includes('долг')) {
+                // Деньги/долги - желтый
+                color = 'var(--warning)';
+            } else if (bonus.toLowerCase().includes('предмет') || bonus.toLowerCase().includes('вещь') || bonus.toLowerCase().includes('чип') || bonus.toLowerCase().includes('пистолет') || bonus.toLowerCase().includes('кейс')) {
+                // Предметы - синий
+                color = '#3b82f6';
+            } else if (bonus.toLowerCase().includes('зависимость')) {
+                // Зависимости - оранжевый
+                color = '#f97316';
+            }
+            
+            return `<span style="color: ${color}; font-weight: 600; background: rgba(0,0,0,0.1); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.9em;">(${bonus})</span>`;
+        });
+    }
+    
+    function renderStep() {
+        const stepKey = steps[currentStep];
+        const stepData = backstoryTables[stepKey];
+        
+        modal.innerHTML = `
+            <div class="modal" style="max-width: 600px; width: 90%;">
+                <div class="modal-header">
+                    <h3>Выбор предыстории (${currentStep + 1}/${steps.length})</h3>
+                    <button class="icon-button" onclick="closeModal(this)">×</button>
+                </div>
+                <div class="modal-body">
+                    <div style="background: ${getThemeColors().accentLight}; border: 1px solid ${getThemeColors().accent}; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                        <h4 style="color: ${getThemeColors().accent}; margin-bottom: 0.5rem;">${stepData.title}</h4>
+                        <p style="color: ${getThemeColors().muted}; font-size: 0.9rem;">Выберите один из вариантов:</p>
+                    </div>
+                    
+                    <div style="display: grid; gap: 0.5rem; max-height: 400px; overflow-y: auto;">
+                        ${stepData.options.map((option, index) => `
+                            <button class="backstory-option-button" onclick="selectBackstoryOption('${stepKey}', '${option.replace(/'/g, "\\'")}', ${index})" style="background: ${getThemeColors().accentLight}; border: 1px solid ${getThemeColors().accent}; border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s ease; text-align: left; color: ${getThemeColors().text};">
+                                <div style="font-weight: 500;">${highlightBonuses(option)}</div>
+                            </button>
+                        `).join('')}
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
+                        <button class="pill-button muted-button" onclick="closeModal(this)" style="font-size: 0.9rem;">Отмена</button>
+                        <div style="display: flex; gap: 0.5rem;">
+                            ${currentStep > 0 ? `<button class="pill-button primary-button" onclick="previousBackstoryStep()" style="font-size: 0.9rem;">Назад</button>` : ''}
+                            ${currentStep < steps.length - 1 ? `<button class="pill-button success-button" onclick="nextBackstoryStep()" style="font-size: 0.9rem;" ${!selectedOptions[stepKey] ? 'disabled' : ''}>Далее</button>` : ''}
+                            ${currentStep === steps.length - 1 ? `<button class="pill-button success-button" onclick="finishBackstorySelection()" style="font-size: 0.9rem;" ${!selectedOptions[stepKey] ? 'disabled' : ''}>Завершить</button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Добавляем эффекты наведения
+        const optionButtons = modal.querySelectorAll('.backstory-option-button');
+        optionButtons.forEach(button => {
+            button.addEventListener('mouseenter', () => {
+                button.style.background = getThemeColors().accentLight;
+                button.style.transform = 'translateY(-2px)';
+            });
+            button.addEventListener('mouseleave', () => {
+                button.style.background = getThemeColors().accentLight;
+                button.style.transform = 'translateY(0)';
+            });
+        });
+    }
+    
+    // Функции для управления шагами
+    window.selectBackstoryOption = function(stepKey, option, index) {
+        selectedOptions[stepKey] = option;
+        
+        // Обновляем кнопки
+        const optionButtons = modal.querySelectorAll('.backstory-option-button');
+        optionButtons.forEach((btn, i) => {
+            if (i === index) {
+                btn.style.background = getThemeColors().successLight;
+                btn.style.borderColor = getThemeColors().success;
+            } else {
+                btn.style.background = getThemeColors().accentLight;
+                btn.style.borderColor = getThemeColors().accent;
+            }
+        });
+        
+        // Активируем кнопку "Далее" или "Завершить"
+        const nextButton = modal.querySelector('button[onclick*="nextBackstoryStep"], button[onclick*="finishBackstorySelection"]');
+        if (nextButton) {
+            nextButton.disabled = false;
+            nextButton.style.opacity = '1';
+        }
+    };
+    
+    window.nextBackstoryStep = function() {
+        if (currentStep < steps.length - 1) {
+            currentStep++;
+            renderStep();
+        }
+    };
+    
+    window.previousBackstoryStep = function() {
+        if (currentStep > 0) {
+            currentStep--;
+            renderStep();
+        }
+    };
+    
+    window.finishBackstorySelection = function() {
+        // Формируем текст предыстории
+        let backstoryText = "";
+        for (const [key, option] of Object.entries(selectedOptions)) {
+            const stepData = backstoryTables[key];
+            backstoryText += `${stepData.title}: ${option}. `;
+        }
+        
+        // Записываем в textarea и обновляем отображение
+        const textarea = document.getElementById('backstoryText');
+        if (textarea) {
+            textarea.value = backstoryText.trim();
+            state.backstory = backstoryText.trim();
+            updateBackstoryDisplay(); // Обновляем красивое отображение
+            scheduleSave();
+        }
+        
+        // Закрываем модал
+        modal.remove();
+        document.body.style.overflow = '';
+        
+        // Показываем уведомление
+        showToast('Предыстория выбрана вручную!', 2000);
+    };
+    
+    document.body.appendChild(modal);
+    renderStep();
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+            document.body.style.overflow = '';
+        }
+    });
+}
+
 // Функции для работы с аватаром
 function initAvatarUpload() {
-    console.log('initAvatarUpload called');
     const avatarInput = document.getElementById('avatarInput');
     const removeAvatarButton = document.getElementById('removeAvatarButton');
     
     if (avatarInput) {
         avatarInput.addEventListener('change', handleAvatarUpload);
-        console.log('Avatar input listener attached');
     }
     
     if (removeAvatarButton) {
         removeAvatarButton.addEventListener('click', handleAvatarRemove);
-        console.log('Remove avatar button listener attached');
     }
     
     // Загружаем существующий аватар при инициализации
-    console.log('Current state.avatar:', state.avatar ? state.avatar.substring(0, 50) + '...' : 'empty');
     loadAvatarFromState();
 }
 
 function handleAvatarUpload(event) {
-    console.log('handleAvatarUpload called');
     const file = event.target.files[0];
     if (!file) {
-        console.log('No file selected');
         return;
     }
-    
-    console.log('File selected:', file.name, 'Original size:', file.size, 'bytes');
     
     // Создаем временный Image для сжатия
     const reader = new FileReader();
     reader.onload = function(e) {
         const img = new Image();
         img.onload = function() {
-            console.log('Original image dimensions:', img.width, 'x', img.height);
-            
             // Создаем canvas для ресайза
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -10876,14 +2996,10 @@ function handleAvatarUpload(event) {
             // Конвертируем в Base64 с качеством 0.7
             const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
             
-            console.log('Compressed image dimensions:', width, 'x', height);
-            console.log('Compressed size:', Math.round(compressedBase64.length * 0.75), 'bytes');
-            
             // Сохраняем сжатое изображение
             state.avatar = compressedBase64;
             displayAvatar(compressedBase64);
             saveState();
-            console.log('Avatar saved to state and localStorage');
         };
         img.src = e.target.result;
     };
@@ -10891,15 +3007,12 @@ function handleAvatarUpload(event) {
 }
 
 function handleAvatarRemove() {
-    console.log('handleAvatarRemove called');
     state.avatar = '';
     displayAvatar('');
     saveState();
-    console.log('Avatar removed from state and localStorage');
 }
 
 function loadAvatarFromState() {
-    console.log('loadAvatarFromState called, state.avatar:', state.avatar ? 'exists' : 'empty');
     if (state.avatar) {
         displayAvatar(state.avatar);
     } else {
@@ -10908,19 +3021,15 @@ function loadAvatarFromState() {
 }
 
 function displayAvatar(imageData) {
-    console.log('displayAvatar called with:', imageData ? 'image data' : 'no data');
     const avatarDisplay = document.getElementById('avatarDisplay');
     if (!avatarDisplay) {
-        console.error('avatarDisplay element not found!');
         return;
     }
     
     if (imageData) {
         avatarDisplay.innerHTML = `<img src="${imageData}" alt="Аватар персонажа" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" />`;
-        console.log('Avatar displayed');
     } else {
         avatarDisplay.innerHTML = '🤖';
-        console.log('Default avatar icon displayed');
     }
 }
 
@@ -10936,7 +3045,7 @@ function checkScreenSize() {
         screenWidthSpan.textContent = screenWidth;
     }
     
-    if (screenWidth < 1024) {
+    if (screenWidth < 100) {
         if (mobileWarning) {
             mobileWarning.style.display = 'flex';
         }
@@ -11112,40 +3221,52 @@ function changeNumericValue(input, delta) {
 }
 
 
-// Функции для профессиональных навыков
-function updateProfessionalSkill(index, name, level) {
-    if (!state.professionalSkills) {
-        state.professionalSkills = [];
-    }
-    
-    if (!state.professionalSkills[index]) {
-        state.professionalSkills[index] = { name: '', level: 0 };
-    }
-    
-    state.professionalSkills[index].name = name;
-    state.professionalSkills[index].level = parseInt(level) || 0;
-    
-    scheduleSave();
-}
+// Функции для профессиональных навыков (старые функции удалены, см. новые функции выше)
 
 function loadProfessionalSkills() {
     if (!state.professionalSkills) {
-        state.professionalSkills = [
-            { name: '', level: 0 },
-            { name: '', level: 0 },
-            { name: '', level: 0 },
-            { name: '', level: 0 }
-        ];
+        state.professionalSkills = [null, null, null, null];
     }
     
-    for (let i = 0; i < 4; i++) {
-        const nameInput = document.getElementById(`professionalSkillName${i}`);
-        const levelInput = document.getElementById(`professionalSkillLevel${i}`);
-        
-        if (nameInput && levelInput && state.professionalSkills[i]) {
-            nameInput.value = state.professionalSkills[i].name || '';
-            levelInput.value = state.professionalSkills[i].level || 0;
-        }
+    // Убеждаемся, что массив содержит 4 элемента
+    while (state.professionalSkills.length < 4) {
+        state.professionalSkills.push(null);
+    }
+    
+    // Проверяем и добавляем навыки "Торг" и "Медицина" при загрузке
+    checkAndAddAutoSkills();
+    
+    // Вызываем рендеринг профессиональных навыков
+    renderProfessionalSkills();
+}
+
+// Проверить и добавить автоматические навыки при загрузке
+function checkAndAddAutoSkills() {
+    // Проверяем наличие "Решала"
+    const hasFixerSkill = state.professionalSkills && state.professionalSkills.some(skill => 
+        skill && skill.name === 'Решала'
+    );
+    
+    // Проверяем наличие медицинских навыков
+    const medicSkills = ['Фармацевт', 'Инженер криосистем', 'Специалист по клонированию'];
+    const hasMedicSkill = state.professionalSkills && state.professionalSkills.some(skill => 
+        skill && medicSkills.includes(skill.name)
+    );
+    
+    // Добавляем "Торг" если есть "Решала"
+    if (hasFixerSkill) {
+        if (typeof autoAddBargainSkill === 'function') autoAddBargainSkill();
+    } else {
+        // Удаляем "Торг" если нет "Решала"
+        if (typeof autoRemoveBargainSkill === 'function') autoRemoveBargainSkill();
+    }
+    
+    // Добавляем "Медицина" если есть медицинский навык
+    if (hasMedicSkill) {
+        if (typeof autoAddMedicineSkill === 'function') autoAddMedicineSkill();
+    } else {
+        // Удаляем "Медицина" если нет медицинских навыков
+        if (typeof autoRemoveMedicineSkill === 'function') autoRemoveMedicineSkill();
     }
 }
 
@@ -11542,514 +3663,546 @@ function loadNotes() {
     }
 }
 
-// Функции для работы с броней
-function increaseArmorOS(part) {
-    const input = document.getElementById(`armor${part.charAt(0).toUpperCase() + part.slice(1)}OS`);
-    if (input) {
-        const currentValue = parseInt(input.value) || 0;
-        const newValue = Math.min(99, currentValue + 1);
-        input.value = newValue;
-        state.armor[part].os = newValue;
-        
-        // Устанавливаем тип брони на основе ОС
-        if (newValue > 0) {
-            if (newValue <= 2) {
-                state.armor[part].type = 'Лёгкая';
-            } else if (newValue <= 4) {
-                state.armor[part].type = 'Средняя';
-            } else if (newValue <= 6) {
-                state.armor[part].type = 'Тяжёлая';
-            } else {
-                state.armor[part].type = 'Титаническая';
-            }
-        } else {
-            state.armor[part].type = 'Лёгкая';
-        }
-        
-        updateArmorPenalty();
-        scheduleSave();
-    }
-}
+// ============================================
+// СЧЕТЧИКИ - Механический счетчик
+// ============================================
 
-function decreaseArmorOS(part) {
-    const input = document.getElementById(`armor${part.charAt(0).toUpperCase() + part.slice(1)}OS`);
-    if (input) {
-        const currentValue = parseInt(input.value) || 0;
-        const newValue = Math.max(0, currentValue - 1);
-        input.value = newValue;
-        state.armor[part].os = newValue;
-        
-        // Устанавливаем тип брони на основе ОС
-        if (newValue > 0) {
-            if (newValue <= 2) {
-                state.armor[part].type = 'Лёгкая';
-            } else if (newValue <= 4) {
-                state.armor[part].type = 'Средняя';
-            } else if (newValue <= 6) {
-                state.armor[part].type = 'Тяжёлая';
-            } else {
-                state.armor[part].type = 'Титаническая';
-            }
-        } else {
-            state.armor[part].type = 'Лёгкая';
-        }
-        
-        updateArmorPenalty();
-        scheduleSave();
-    }
-}
+let counters = [];
+let counterWindows = [];
+let counterZIndex = 3000;
 
-function updateArmorPenalty() {
-    const penaltyText = document.getElementById('armorPenaltyText');
-    if (!penaltyText) return;
-
-    // Определяем максимальный тип брони
-    const armorTypes = ['Лёгкая', 'Средняя', 'Тяжёлая', 'Титаническая'];
-    const armorLevels = {
-        'Лёгкая': 0,
-        'Средняя': 1,
-        'Тяжёлая': 2,
-        'Титаническая': 3
-    };
-
-    let maxLevel = 0;
-    let maxType = 'Лёгкая';
-    let hasAnyArmor = false;
-
-    // Проверяем все части тела (только с типом брони, отличным от "Лёгкая")
-    for (const part of ['head', 'body', 'arms', 'legs']) {
-        const type = state.armor[part].type || 'Лёгкая';
-        // Проверяем только тип брони, а не ОС, так как штрафы зависят от типа
-        if (type !== 'Лёгкая') {
-            hasAnyArmor = true;
-            const level = armorLevels[type] || 0;
-            if (level > maxLevel) {
-                maxLevel = level;
-                maxType = type;
-            }
-        }
-    }
-
-    // Если нет брони тяжелее лёгкой, то нет и штрафа
-    if (!hasAnyArmor) {
-        penaltyText.textContent = 'Без штрафа';
-        return;
-    }
-
-    // Определяем штрафы
-    let penaltyText_content = '';
-    switch (maxType) {
-        case 'Лёгкая':
-            penaltyText_content = 'Без штрафа';
-            break;
-        case 'Средняя':
-            penaltyText_content = '-1 СКО, РЕА и ЛВК (не влияет на СКО)';
-            break;
-        case 'Тяжёлая':
-            penaltyText_content = '-3 РЕА и ЛВК (не влияет на СКО) до минимум 1; -3 СКО, если ТЕЛО менее 8 до минимум 1';
-            break;
-        case 'Титаническая':
-            penaltyText_content = '-6 СКО, РЕА и ЛВК (не влияет на СКО)';
-            break;
-    }
-
-    penaltyText.textContent = penaltyText_content;
-}
-
-// Функция для уменьшения ОС брони
-function decreaseArmorOS(part) {
-    const currentOS = parseInt(state.armor[part].os) || 0;
-    if (currentOS > 0) {
-        state.armor[part].os = currentOS - 1;
-        document.getElementById(`armor${part.charAt(0).toUpperCase() + part.slice(1)}OS`).value = state.armor[part].os;
-        // Не вызываем updateArmorPenalty(), так как изменение ОС не влияет на штрафы
-        scheduleSave();
-    }
-}
-
-// Магазин брони
-function showArmorShop() {
+function showCountersModal() {
     const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    // Проверяем режим бесплатно
-    const isFreeMode = window.armorShopFreeMode || false;
-    
-    // Устанавливаем фон в зависимости от режима
-    if (isFreeMode) {
-        modal.style.background = 'rgba(0, 100, 50, 0.85)';
-    }
-    
+    modal.className = 'counters-modal-overlay';
     modal.innerHTML = `
-        <div class="modal" style="max-width: 700px;">
-            <div class="modal-header">
-                <h3><img src="https://static.tildacdn.com/tild3531-3730-4631-a438-353361653361/bulletproof-vest.png" alt="🛡️" style="width: 24px; height: 24px; margin-right: 0.5rem; vertical-align: middle;"> Магазин брони</h3>
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
-                    <button class="pill-button ${isFreeMode ? 'success-button' : 'muted-button'}" onclick="toggleArmorShopFreeMode()" style="font-size: 0.7rem; padding: 0.3rem 0.6rem;">${isFreeMode ? 'Бесплатно' : 'Бесплатно'}</button>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
+        <div class="counters-modal">
+            <div class="counters-modal-header">
+                <h3 class="counters-modal-title">🔢 Счетчики</h3>
+                <button class="pill-button" onclick="closeCountersModal(this)">Закрыть</button>
+            </div>
+            <div class="counters-modal-content">
+                <div class="counters-list" id="countersList">
+                    ${counters.length > 0 ? counters.map((counter, index) => `
+                        <div class="counter-item">
+                            <div class="counter-item-info">
+                                <div class="counter-item-title">${counter.title || 'Без названия'}</div>
+                                <div class="counter-item-value">${formatCounterValue(counter.value)}</div>
+                            </div>
+                            <div class="counter-item-actions">
+                                <button class="pill-button primary-button" onclick="openCounterWindow(${index})" style="font-size: 0.7rem; padding: 0.2rem 0.4rem;">Открыть</button>
+                                <button class="pill-button danger-button" onclick="deleteCounter(${index})" style="font-size: 0.7rem; padding: 0.2rem 0.4rem;">Удалить</button>
+                            </div>
+                        </div>
+                    `).join('') : '<p style="color: var(--muted); text-align: center; padding: 2rem;">Счетчики не созданы</p>'}
+                </div>
+                <div class="counters-actions">
+                    <button class="pill-button primary-button" onclick="createNewCounter()">+ Создать счетчик</button>
                 </div>
             </div>
-            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
-                <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid #ffc107; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                    <div style="color: #ffc107; font-weight: 600; margin-bottom: 0.5rem;">📝 Памятка:</div>
-                    <div style="color: var(--text); font-size: 0.9rem; line-height: 1.4;">
-                        Броня всегда покупается отдельно для <strong>Головы</strong> и <strong>Тела</strong>. 
-                        Руки и Ноги уже входят в стоимость брони для Тела.
-                    </div>
+        </div>
+    `;
+    
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    };
+    
+    document.body.appendChild(modal);
+}
+
+function closeCountersModal(button) {
+    const modal = button.closest('.counters-modal-overlay');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function createNewCounter() {
+    const newCounter = {
+        id: Date.now(),
+        title: 'Новый счетчик',
+        value: 0,
+        x: 150 + (counters.length * 30),
+        y: 150 + (counters.length * 30),
+        width: 190
+    };
+    
+    counters.push(newCounter);
+    openCounterWindow(counters.length - 1);
+    saveCounters();
+}
+
+function openCounterWindow(counterIndex) {
+    const counter = counters[counterIndex];
+    if (!counter) return;
+    
+    // Проверяем, не открыт ли уже этот счетчик
+    const existingWindow = counterWindows.find(w => w.dataset.counterId === counter.id.toString());
+    if (existingWindow) {
+        existingWindow.style.zIndex = counterZIndex++;
+        return;
+    }
+    
+    // Закрываем модал счетчиков
+    const modal = document.querySelector('.counters-modal-overlay');
+    if (modal) {
+        modal.remove();
+    }
+    
+    const counterWindow = document.createElement('div');
+    counterWindow.className = 'counter-window';
+    counterWindow.dataset.counterId = counter.id;
+    counterWindow.style.left = counter.x + 'px';
+    counterWindow.style.top = counter.y + 'px';
+    counterWindow.style.width = counter.width + 'px';
+    counterWindow.style.zIndex = counterZIndex++;
+    
+    counterWindow.innerHTML = `
+        <div class="counter-header" onmousedown="startDrag(event, this.parentElement)">
+            <input type="text" class="counter-title-input" value="${counter.title}" onchange="updateCounterTitle(${counter.id}, this.value)" placeholder="Название счетчика">
+            <button class="counter-control-btn counter-minimize-btn" onclick="minimizeCounterToTaskbar(${counter.id})" title="Свернуть">−</button>
+        </div>
+        <div class="counter-content">
+            <div class="counter-display" id="counterDisplay${counter.id}">
+                ${generateCounterDigits(counter.value, counter.id)}
+            </div>
+            <div class="counter-buttons">
+                <button class="counter-btn counter-btn-minus" onclick="decrementCounter(${counter.id})">−</button>
+                <button class="counter-reset-btn" onclick="resetCounter(${counter.id})" title="Сбросить">⟲</button>
+                <button class="counter-btn counter-btn-plus" onclick="incrementCounter(${counter.id})">+</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(counterWindow);
+    counterWindows.push(counterWindow);
+}
+
+function generateCounterDigits(value, counterId) {
+    // Преобразуем значение в строку и дополняем нулями до 5 цифр
+    const valueStr = Math.abs(value).toString().padStart(5, '0');
+    const digits = valueStr.split('').slice(-6); // Максимум 6 цифр
+    const sign = value < 0 ? '−' : '';
+    
+    let html = '';
+    
+    // Добавляем знак минус, если число отрицательное
+    if (sign) {
+        html += `
+            <div class="counter-digit">
+                <div class="counter-digit-inner">
+                    <div class="counter-digit-value">${sign}</div>
                 </div>
+            </div>
+        `;
+    }
+    
+    // Генерируем цифры с возможностью редактирования
+    digits.forEach((digit, index) => {
+        html += `
+            <div class="counter-digit counter-digit-editable" data-counter-id="${counterId}" data-digit-index="${index}" onclick="editCounterDigit(${counterId}, ${index}, this)">
+                <div class="counter-digit-inner">
+                    <div class="counter-digit-value">${digit}</div>
+                </div>
+            </div>
+        `;
+    });
+    
+    return html;
+}
+
+function formatCounterValue(value) {
+    return value.toString().padStart(5, '0');
+}
+
+function editCounterDigit(counterId, digitIndex, digitElement) {
+    const counter = counters.find(c => c.id === counterId);
+    if (!counter) return;
+    
+    // Создаем временное поле ввода
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 1;
+    input.value = digitElement.querySelector('.counter-digit-value').textContent;
+    input.className = 'counter-digit-input';
+    input.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(91, 155, 255, 0.3);
+        border: 2px solid #5b9bff;
+        color: #00ffff;
+        text-align: center;
+        font-family: 'Courier New', monospace;
+        font-size: 1.2rem;
+        font-weight: 900;
+        text-shadow: 0 0 5px rgba(0, 255, 255, 0.8);
+        outline: none;
+        z-index: 100;
+    `;
+    
+    digitElement.style.position = 'relative';
+    digitElement.appendChild(input);
+    input.focus();
+    input.select();
+    
+    // Обработка ввода
+    input.addEventListener('input', (e) => {
+        // Разрешаем только цифры
+        e.target.value = e.target.value.replace(/[^0-9]/g, '');
+    });
+    
+    input.addEventListener('blur', () => {
+        applyDigitEdit(counterId, digitIndex, input.value, digitElement);
+    });
+    
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            applyDigitEdit(counterId, digitIndex, input.value, digitElement);
+        } else if (e.key === 'Escape') {
+            input.remove();
+        }
+    });
+}
+
+function applyDigitEdit(counterId, digitIndex, newDigitValue, digitElement) {
+    const counter = counters.find(c => c.id === counterId);
+    if (!counter) return;
+    
+    // Получаем текущее значение счетчика
+    const currentValueStr = Math.abs(counter.value).toString().padStart(5, '0').slice(-6);
+    const digits = currentValueStr.split('');
+    
+    // Заменяем цифру
+    if (newDigitValue !== '' && !isNaN(newDigitValue)) {
+        digits[digitIndex] = newDigitValue;
+    }
+    
+    // Преобразуем обратно в число
+    const newValue = parseInt(digits.join(''), 10);
+    const finalValue = counter.value < 0 ? -newValue : newValue;
+    
+    // Обновляем счетчик
+    const oldValue = counter.value;
+    counter.value = finalValue;
+    
+    // Ограничиваем значение
+    if (counter.value > 999999) counter.value = 999999;
+    if (counter.value < -999999) counter.value = -999999;
+    
+    updateCounterDisplay(counterId, oldValue, counter.value, counter.value > oldValue ? 'up' : 'down');
+    saveCounters();
+    
+    // Удаляем поле ввода
+    const input = digitElement.querySelector('.counter-digit-input');
+    if (input) {
+        input.remove();
+    }
+}
+
+function updateCounterTitle(counterId, title) {
+    const counter = counters.find(c => c.id === counterId);
+    if (counter) {
+        counter.title = title;
+        saveCounters();
+        
+        // Обновляем заголовок в минимизированной панели, если счетчик там
+        const minimizedItem = document.querySelector(`[data-minimized-counter-id="${counterId}"]`);
+        if (minimizedItem) {
+            const titleElement = minimizedItem.querySelector('.minimized-note-title');
+            if (titleElement) {
+                titleElement.textContent = title || 'Без названия';
+            }
+        }
+    }
+}
+
+function incrementCounter(counterId) {
+    const counter = counters.find(c => c.id === counterId);
+    if (!counter) return;
+    
+    const oldValue = counter.value;
+    counter.value++;
+    
+    // Ограничиваем максимальное значение 999999
+    if (counter.value > 999999) {
+        counter.value = 999999;
+    }
+    
+    updateCounterDisplay(counterId, oldValue, counter.value, 'up');
+    saveCounters();
+}
+
+function decrementCounter(counterId) {
+    const counter = counters.find(c => c.id === counterId);
+    if (!counter) return;
+    
+    const oldValue = counter.value;
+    counter.value--;
+    
+    // Ограничиваем минимальное значение -999999
+    if (counter.value < -999999) {
+        counter.value = -999999;
+    }
+    
+    updateCounterDisplay(counterId, oldValue, counter.value, 'down');
+    saveCounters();
+}
+
+function setCounterValue(counterId, newValue) {
+    const counter = counters.find(c => c.id === counterId);
+    if (!counter) return;
+    
+    const oldValue = counter.value;
+    
+    // Ограничиваем значение
+    if (newValue > 999999) newValue = 999999;
+    if (newValue < -999999) newValue = -999999;
+    
+    counter.value = newValue;
+    
+    const direction = newValue > oldValue ? 'up' : 'down';
+    updateCounterDisplay(counterId, oldValue, counter.value, direction);
+    saveCounters();
+}
+
+function resetCounter(counterId) {
+    const counter = counters.find(c => c.id === counterId);
+    if (!counter) return;
+    
+    const oldValue = counter.value;
+    counter.value = 0;
+    
+    updateCounterDisplay(counterId, oldValue, 0, oldValue > 0 ? 'down' : 'up');
+    saveCounters();
+}
+
+function updateCounterDisplay(counterId, oldValue, newValue, direction) {
+    const display = document.getElementById(`counterDisplay${counterId}`);
+    
+    // Обновляем значение в минимизированной панели, если счетчик там
+    const minimizedItem = document.querySelector(`[data-minimized-counter-id="${counterId}"]`);
+    if (minimizedItem) {
+        const valueElement = minimizedItem.querySelector('.minimized-note-value');
+        if (valueElement) {
+            valueElement.textContent = formatCounterValue(newValue);
+        }
+    }
+    
+    if (!display) return;
+    
+    // Получаем старые и новые цифры
+    const oldStr = Math.abs(oldValue).toString().padStart(5, '0').slice(-6);
+    const newStr = Math.abs(newValue).toString().padStart(5, '0').slice(-6);
+    
+    // Находим изменившиеся цифры
+    const digits = display.querySelectorAll('.counter-digit');
+    
+    // Пропускаем первый digit, если это знак минуса
+    let startIndex = 0;
+    if (digits[0] && digits[0].querySelector('.counter-digit-value').textContent === '−') {
+        startIndex = 1;
+        // Проверяем, нужен ли знак минуса
+        if (newValue >= 0 && oldValue < 0 || newValue < 0 && oldValue >= 0) {
+            // Перерисовываем полностью, если изменился знак
+            display.innerHTML = generateCounterDigits(newValue, counterId);
+            return;
+        }
+    }
+    
+    // Анимируем только изменившиеся цифры
+    for (let i = 0; i < newStr.length; i++) {
+        if (oldStr[i] !== newStr[i]) {
+            const digitElement = digits[i + startIndex];
+            if (digitElement) {
+                const valueElement = digitElement.querySelector('.counter-digit-value');
                 
-                <div style="display: grid; gap: 0.75rem;">
-                    <div class="armor-shop-item" onclick="buyArmor('Простые шмотки', 10, 0, 'Лёгкая')" style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s ease;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="flex: 1;">
-                                <div style="color: var(--accent); font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;">Простые шмотки</div>
-                                <div style="color: var(--text); font-size: 0.85rem;">ОС: 0 | Обычная одежда</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="color: var(--success); font-weight: 600; font-size: 1.1rem;">${isFreeMode ? 'Бесплатно' : '10 уе'}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="armor-shop-item" onclick="buyArmor('Лёгкая', 100, 10, 'Лёгкая')" style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s ease;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="flex: 1;">
-                                <div style="color: var(--accent); font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;">Лёгкая броня</div>
-                                <div style="color: var(--text); font-size: 0.85rem;">ОС: 10 | Без штрафов</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="color: var(--success); font-weight: 600; font-size: 1.1rem;">${isFreeMode ? 'Бесплатно' : '100 уе'}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="armor-shop-item" onclick="buyArmor('Средняя', 500, 15, 'Средняя')" style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s ease;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="flex: 1;">
-                                <div style="color: var(--accent); font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;">Средняя броня</div>
-                                <div style="color: var(--text); font-size: 0.85rem;">ОС: 15 | Штраф: -1 СКО, РЕА, ЛВК</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="color: var(--success); font-weight: 600; font-size: 1.1rem;">${isFreeMode ? 'Бесплатно' : '500 уе'}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="armor-shop-item" onclick="buyArmor('Тяжёлая', 2500, 18, 'Тяжёлая')" style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s ease;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="flex: 1;">
-                                <div style="color: var(--accent); font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;">Тяжёлая броня</div>
-                                <div style="color: var(--text); font-size: 0.85rem;">ОС: 18 | Штраф: -3 РЕА, ЛВК, СКО</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="color: var(--success); font-weight: 600; font-size: 1.1rem;">${isFreeMode ? 'Бесплатно' : '2 500 уе'}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="armor-shop-item" onclick="buyArmor('Титаническая', 20000, 25, 'Титаническая')" style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s ease;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="flex: 1;">
-                                <div style="color: var(--accent); font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;">Титаническая броня</div>
-                                <div style="color: var(--text); font-size: 0.85rem;">ОС: 25 | Штраф: -6 СКО, РЕА, ЛВК</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="color: var(--success); font-weight: 600; font-size: 1.1rem;">${isFreeMode ? 'Бесплатно' : '20 000 уе'}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="armor-shop-item" onclick="buyActiveArmor()" style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s ease;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="flex: 1;">
-                                <div style="color: var(--accent); font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;">Активная броня</div>
-                                <div style="color: var(--text); font-size: 0.85rem;">Защищает от неожиданных угроз</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="color: var(--success); font-weight: 600; font-size: 1.1rem;">${isFreeMode ? 'Бесплатно' : '500 уе'}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="armor-shop-item" onclick="buyBallisticShield()" style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; cursor: pointer; transition: all 0.2s ease;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="flex: 1;">
-                                <div style="color: var(--accent); font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;">Пуленепробиваемый щит</div>
-                                <div style="color: var(--text); font-size: 0.85rem;">20 ПЗ | Требует 1 руку | Снаряжение</div>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="color: var(--success); font-weight: 600; font-size: 1.1rem;">${isFreeMode ? 'Бесплатно' : '100 уе'}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
+                // Добавляем класс анимации
+                digitElement.classList.remove('flip-up', 'flip-down');
+                digitElement.classList.add(direction === 'up' ? 'flip-up' : 'flip-down');
+                
+                // Обновляем значение
+                valueElement.textContent = newStr[i];
+                
+                // Убираем класс анимации после завершения
+                setTimeout(() => {
+                    digitElement.classList.remove('flip-up', 'flip-down');
+                }, 400);
+            }
         }
-    });
-    
-    // Добавляем эффекты наведения
-    const items = modal.querySelectorAll('.armor-shop-item');
-    items.forEach(item => {
-        item.addEventListener('mouseenter', () => {
-            item.style.background = 'rgba(182, 103, 255, 0.2)';
-            item.style.transform = 'translateY(-2px)';
-        });
-        item.addEventListener('mouseleave', () => {
-            item.style.background = 'rgba(182, 103, 255, 0.1)';
-            item.style.transform = 'translateY(0)';
-        });
-    });
-}
-
-// Функции для магазина брони
-function toggleArmorShopFreeMode() {
-    window.armorShopFreeMode = !window.armorShopFreeMode;
-    
-    // Закрываем текущий модал и открываем новый с обновленными ценами
-    const currentModal = document.querySelector('.modal-overlay');
-    if (currentModal) {
-        currentModal.remove();
-        showArmorShop();
     }
 }
 
-function buyArmor(name, price, os, type, catalogPrice = null) {
-    const isFreeMode = window.armorShopFreeMode || false;
-    const actualPrice = isFreeMode ? 0 : price;
+function deleteCounter(counterIndex) {
+    const counter = counters[counterIndex];
+    if (!counter) return;
     
-    // Проверяем, достаточно ли денег
-    if (state.money < actualPrice) {
-        showModal('Недостаточно средств', `У вас ${state.money} уе, а нужно ${actualPrice} уе для покупки ${name}.`);
+    // Удаляем из панели минимизированных, если там есть
+    removeCounterFromMinimizedPanel(counter.id);
+    
+    // Находим и удаляем окно, если оно открыто
+    const counterWindow = counterWindows.find(w => w.dataset.counterId === counter.id.toString());
+    if (counterWindow) {
+        counterWindow.remove();
+        const windowIndex = counterWindows.indexOf(counterWindow);
+        if (windowIndex > -1) {
+            counterWindows.splice(windowIndex, 1);
+        }
+    }
+    
+    // Удаляем из массива счетчиков
+    counters.splice(counterIndex, 1);
+    saveCounters();
+    
+    // Обновляем модал
+    const modal = document.querySelector('.counters-modal-overlay');
+    if (modal) {
+        modal.remove();
+        showCountersModal();
+    }
+}
+
+function closeCounterWindow(counterWindow) {
+    const counterId = parseInt(counterWindow.dataset.counterId);
+    const counter = counters.find(c => c.id === counterId);
+    if (counter) {
+        // Сохраняем позицию окна
+        counter.x = parseInt(counterWindow.style.left);
+        counter.y = parseInt(counterWindow.style.top);
+        counter.width = parseInt(counterWindow.style.width);
+        saveCounters();
+    }
+    
+    // Удаляем окно из DOM и массива
+    counterWindow.remove();
+    const index = counterWindows.indexOf(counterWindow);
+    if (index > -1) {
+        counterWindows.splice(index, 1);
+    }
+}
+
+function minimizeCounterToTaskbar(counterId) {
+    const counter = counters.find(c => c.id === counterId);
+    if (!counter) return;
+    
+    // Находим окно счетчика
+    const counterWindow = counterWindows.find(w => w.dataset.counterId === counterId.toString());
+    if (!counterWindow) return;
+    
+    // Сохраняем позицию и размер
+    counter.x = parseInt(counterWindow.style.left);
+    counter.y = parseInt(counterWindow.style.top);
+    counter.width = parseInt(counterWindow.style.width);
+    counter.minimized = true;
+    
+    // Закрываем окно
+    counterWindow.remove();
+    const index = counterWindows.indexOf(counterWindow);
+    if (index > -1) {
+        counterWindows.splice(index, 1);
+    }
+    
+    // Добавляем в панель минимизированных
+    addCounterToMinimizedPanel(counterId);
+    saveCounters();
+}
+
+function addCounterToMinimizedPanel(counterId) {
+    const counter = counters.find(c => c.id === counterId);
+    if (!counter) return;
+    
+    // Проверяем, есть ли уже панель минимизированных окон
+    let panel = document.getElementById('minimizedNotesPanel');
+    if (!panel) {
+        // Создаем панель, если её нет
+        panel = document.createElement('div');
+        panel.id = 'minimizedNotesPanel';
+        panel.className = 'minimized-notes-panel';
+        document.body.appendChild(panel);
+    }
+    
+    // Проверяем, не добавлен ли уже этот счетчик
+    if (document.querySelector(`[data-minimized-counter-id="${counterId}"]`)) {
         return;
     }
     
-    // Списываем деньги
-    state.money -= actualPrice;
-    updateMoneyDisplay();
-    
-    // Логируем покупку
-    if (actualPrice > 0) {
-        addToRollLog('purchase', {
-            item: name,
-            price: actualPrice,
-            category: 'Броня'
-        });
-    } else {
-        addToRollLog('purchase', {
-            item: name,
-            price: 0,
-            category: 'Броня (бесплатно)'
-        });
-    }
-    
-    // Закрываем магазин
-    const currentModal = document.querySelector('.modal-overlay');
-    if (currentModal) {
-        currentModal.remove();
-    }
-    
-    // Показываем уведомление
-    showModal('Покупка завершена', `✅ ${name} куплена! Деньги списаны с вашего счета.`);
-    
-    scheduleSave();
-}
-
-function buyActiveArmor(catalogPrice = null) {
-    const isFreeMode = window.armorShopFreeMode || false;
-    const actualPrice = isFreeMode ? 0 : 500;
-    
-    // Проверяем, достаточно ли денег
-    if (state.money < actualPrice) {
-        showModal('Недостаточно средств', `У вас ${state.money} уе, а нужно ${actualPrice} уе для покупки Активной брони.`);
-        return;
-    }
-    
-    // Списываем деньги
-    state.money -= actualPrice;
-    updateMoneyDisplay();
-    
-    // Логируем покупку
-    if (actualPrice > 0) {
-        addToRollLog('purchase', {
-            item: 'Активная броня',
-            price: actualPrice,
-            category: 'Броня'
-        });
-    } else {
-        addToRollLog('purchase', {
-            item: 'Активная броня',
-            price: 0,
-            category: 'Броня (бесплатно)'
-        });
-    }
-    
-    // Закрываем магазин
-    const currentModal = document.querySelector('.modal-overlay');
-    if (currentModal) {
-        currentModal.remove();
-    }
-    
-    // Показываем выбор типа ракет
-    showActiveArmorTypeSelection();
-    
-    scheduleSave();
-}
-
-function showActiveArmorTypeSelection() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    const existingModals = document.querySelectorAll('.modal-overlay');
-    modal.style.zIndex = 1000 + (existingModals.length * 100);
-    
-    modal.innerHTML = `
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3>Выберите тип ракет для Активной брони</h3>
-                <button class="icon-button" onclick="closeModal(this)">×</button>
-            </div>
-            <div class="modal-body">
-                <div style="display: grid; gap: 1rem;">
-                    <button class="pill-button primary-button" onclick="createActiveArmor('Микроракеты')" style="font-size: 1rem; padding: 1rem;">
-                        Микроракеты
-                    </button>
-                    <button class="pill-button primary-button" onclick="createActiveArmor('Дробовая')" style="font-size: 1rem; padding: 1rem;">
-                        Дробовая
-                    </button>
-                    <button class="pill-button primary-button" onclick="createActiveArmor('Лазерная')" style="font-size: 1rem; padding: 1rem;">
-                        Лазерная
-                    </button>
-                </div>
-            </div>
-        </div>
+    // Создаем элемент минимизированного счетчика
+    const minimizedItem = document.createElement('div');
+    minimizedItem.className = 'minimized-note';
+    minimizedItem.dataset.minimizedCounterId = counterId;
+    minimizedItem.innerHTML = `
+        <div class="minimized-note-icon">🔢</div>
+        <div class="minimized-note-title">${counter.title || 'Без названия'}</div>
+        <div class="minimized-note-value" style="font-family: 'Courier New', monospace; color: #00ffff; font-size: 0.8rem; margin-left: 0.5rem;">${formatCounterValue(counter.value)}</div>
     `;
-    
-    document.body.appendChild(modal);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal(modal.querySelector('.icon-button'));
-        }
-    });
-}
-
-function createActiveArmor(rocketType) {
-    // Закрываем модал выбора
-    const currentModal = document.querySelector('.modal-overlay');
-    if (currentModal) {
-        currentModal.remove();
-    }
-    
-    // Определяем урон в зависимости от типа ракет
-    let damage = '6d6'; // По умолчанию для микроракет
-    if (rocketType === 'Дробовая') {
-        damage = '4d4'; // Пиропатрон наносит урон 4d4
-    } else if (rocketType === 'Лазерная') {
-        damage = '0'; // Лазер просто попадает без урона
-    }
-    
-    // Создаем оружие "Активная броня" с правильными характеристиками
-    const activeArmorWeapon = {
-        id: generateId('weapon'),
-        name: `Активная броня (${rocketType})`,
-        customName: '',
-        type: 'ranged',
-        primaryDamage: damage,
-        altDamage: null, // Нет альтернативного режима
-        concealable: false, // Можно скрыть: нет
-        hands: 0, // # рук: 0
-        stealth: 1, // СКА: 1
-        magazine: 1, // Патронов в магазине: 1
-        price: 500,
-        load: 2,
-        modules: [],
-        slots: 0, // Нет слотов для модулей
-        // Система магазина
-        maxAmmo: 1,
-        currentAmmo: 0, // Создается без боеприпасов внутри
-        loadedAmmoType: null,
-        // Не дробовик
-        isShotgun: false,
-        shotgunAmmo1: { type: null, count: 0 },
-        shotgunAmmo2: { type: null, count: 0 },
-        canRemove: true // Можно выкинуть
+    minimizedItem.onclick = function() {
+        restoreCounterFromTaskbar(counterId);
     };
     
-    state.weapons.push(activeArmorWeapon);
-    renderWeapons();
-    
-    showModal('Оружие добавлено', `✅ Активная броня (${rocketType}) добавлена в блок Оружие!`);
-    scheduleSave();
+    panel.appendChild(minimizedItem);
 }
 
-function buyBallisticShield(catalogPrice = null) {
-    const isFreeMode = window.armorShopFreeMode || false;
-    const actualPrice = isFreeMode ? 0 : 100;
+function restoreCounterFromTaskbar(counterId) {
+    const counter = counters.find(c => c.id === counterId);
+    if (!counter) return;
     
-    // Проверяем, достаточно ли денег
-    if (state.money < actualPrice) {
-        showModal('Недостаточно средств', `У вас ${state.money} уе, а нужно ${actualPrice} уе для покупки Пуленепробиваемого щита.`);
-        return;
+    counter.minimized = false;
+    
+    // Удаляем из панели минимизированных
+    const minimizedItem = document.querySelector(`[data-minimized-counter-id="${counterId}"]`);
+    if (minimizedItem) {
+        minimizedItem.remove();
     }
     
-    // Списываем деньги
-    state.money -= actualPrice;
-    updateMoneyDisplay();
-    
-    // Логируем покупку
-    if (actualPrice > 0) {
-        addToRollLog('purchase', {
-            item: 'Пуленепробиваемый щит',
-            price: actualPrice,
-            category: 'Броня'
-        });
-    } else {
-        addToRollLog('purchase', {
-            item: 'Пуленепробиваемый щит',
-            price: 0,
-            category: 'Броня (бесплатно)'
-        });
+    // Проверяем, нужно ли скрыть панель
+    const panel = document.getElementById('minimizedNotesPanel');
+    if (panel && panel.children.length === 0) {
+        panel.remove();
     }
     
-    // Добавляем щит в снаряжение
-    const shield = {
-        id: generateId('gear'),
-        name: 'Пуленепробиваемый щит',
-        description: 'Щит, служащий укрытием, через которое можно смотреть. Требует 1 руку. Имеет 20 ПЗ.',
-        load: 5,
-        type: 'gear',
-        hp: 20,
-        currentHp: 20,
-        isShield: true,
-        catalogPrice: catalogPrice,
-        purchasePrice: actualPrice,
-        itemType: catalogPrice ? 'free_catalog' : 'purchased'
-    };
-    
-    state.gear.push(shield);
-    renderGear();
-    updateLoadDisplay();
-    
-    // Закрываем магазин
-    const currentModal = document.querySelector('.modal-overlay');
-    if (currentModal) {
-        currentModal.remove();
+    // Открываем окно счетчика
+    const counterIndex = counters.findIndex(c => c.id === counterId);
+    if (counterIndex !== -1) {
+        openCounterWindow(counterIndex);
     }
     
-    // Показываем уведомление
-    showModal('Покупка завершена', `✅ Пуленепробиваемый щит куплен и добавлен в снаряжение!`);
-    
-    scheduleSave();
+    saveCounters();
 }
+
+function removeCounterFromMinimizedPanel(counterId) {
+    const minimizedItem = document.querySelector(`[data-minimized-counter-id="${counterId}"]`);
+    if (minimizedItem) {
+        minimizedItem.remove();
+    }
+    
+    // Проверяем, нужно ли скрыть панель
+    const panel = document.getElementById('minimizedNotesPanel');
+    if (panel && panel.children.length === 0) {
+        panel.remove();
+    }
+}
+
+function saveCounters() {
+    localStorage.setItem('ezyCyberCounters', JSON.stringify(counters));
+}
+
+function loadCounters() {
+    const saved = localStorage.getItem('ezyCyberCounters');
+    if (saved) {
+        counters = JSON.parse(saved);
+        
+        // Восстанавливаем свернутые счетчики в панель
+        counters.forEach((counter) => {
+            if (counter.minimized) {
+                addCounterToMinimizedPanel(counter.id);
+            }
+        });
+    }
+}
+
 
 function showAtmError(title, message) {
     const modal = document.createElement('div');
@@ -12079,6 +4232,9 @@ function showAtmError(title, message) {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем обработчики клавиатуры для правильной работы Enter
+    addModalKeyboardHandlers(modal);
 }
 
 function showAtmSuccess(title, content) {
@@ -12109,6 +4265,9 @@ function showAtmSuccess(title, content) {
             closeModal(modal.querySelector('.icon-button'));
         }
     });
+    
+    // Добавляем обработчики клавиатуры для правильной работы Enter
+    addModalKeyboardHandlers(modal);
 }
 
 // Функции банкомата YenEuro
@@ -12438,7 +4597,7 @@ function initializeNumericInputs() {
     // Здоровье
     createNumericInput('healthCurrent', 0, 999);
     
-    // Очки опыта и ролевые очки
+    // Очки обучения и ролевые очки
     createNumericInput('experiencePoints', 0, 9999);
     createNumericInput('roleplayPoints', 0, 9999);
     
@@ -12476,10 +4635,19 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function showExitConfirmation() {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     
     modal.innerHTML = `
         <div class="modal atm-style" style="max-width: 300px; background: #0066CC; border: 2px solid #004080; border-radius: 12px;">
@@ -12514,41 +4682,24 @@ function exitAtmTransaction() {
     delete window.currentIncomeSource;
 }
 
-// Функции для работы с недвижимостью (жильем)
-function renderHousing() {
-    const container = document.getElementById('housingContainer');
-    if (!container) return;
-    
-    if (!state.property || !state.property.housing || state.property.housing.length === 0) {
-        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem;">Жилье не добавлено</p>';
-        return;
-    }
-    
-    container.innerHTML = state.property.housing.map(housing => `
-        <div class="property-item" style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-            <div class="property-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                <div style="flex: 1;">
-                    <div class="property-name" style="color: var(--success); font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;">${housing.name}</div>
-                    <div class="property-description" style="color: var(--text); font-size: 0.9rem; margin-bottom: 0.5rem;">${housing.description || 'Без описания'}</div>
-                    <div style="color: var(--muted); font-size: 0.75rem;">Добавлено: ${housing.addedDate}</div>
-                </div>
-                <button onclick="removeHousing('${housing.id}')" style="font-size: 1.2rem; background: transparent; border: none; color: var(--danger); cursor: pointer; margin-left: 0.5rem;" title="Удалить">×</button>
-            </div>
-            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
-                <button class="pill-button primary-button" onclick="payRent('${housing.id}')" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;"><img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"> Заплатить за аренду</button>
-            </div>
-        </div>
-    `).join('');
-}
 
 function payRent(housingId) {
     const housing = state.property.housing.find(h => h.id === housingId);
     if (!housing) return;
     
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     
     modal.innerHTML = `
         <div class="modal" style="max-width: 500px;">
@@ -12557,7 +4708,7 @@ function payRent(housingId) {
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body">
-                <p style="text-align: center; color: var(--text); margin-bottom: 1rem;">
+                <p style="text-align: center; color: ${getThemeColors().text}; margin-bottom: 1rem;">
                     Оплата аренды за: <strong>${housing.name}</strong>
                 </p>
                 <div class="input-group">
@@ -12614,10 +4765,10 @@ function confirmPayRent(housingId) {
         const shortage = rentAmount - currentMoney;
         showModal('Недостаточно денег', `
             <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">Не хватает денег!</p>
+                <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 1rem;">Не хватает денег!</p>
                 <p style="color: var(--muted);">Нужно: ${rentAmount} уе</p>
                 <p style="color: var(--muted);">Доступно: ${currentMoney} уе</p>
-                <p style="color: var(--danger); font-weight: 600; margin-top: 0.5rem;">Не хватает: ${shortage} уе</p>
+                <p style="color: ${getThemeColors().danger}; font-weight: 600; margin-top: 0.5rem;">Не хватает: ${shortage} уе</p>
             </div>
         `);
         return;
@@ -12721,55 +4872,9 @@ function decreaseSkillLevel(skillId) {
     }
 }
 
-// Функции для управления профессиональными навыками
-function increaseProfessionalSkillLevel(index) {
-    const input = document.getElementById(`professionalSkillLevel${index}`);
-    if (input) {
-        const currentValue = parseInt(input.value) || 0;
-        const newValue = Math.min(15, currentValue + 1);
-        input.value = newValue;
-        updateProfessionalSkill(index, document.getElementById(`professionalSkillName${index}`).value, newValue);
-    }
-}
+// Функции для управления профессиональными навыками (перенесены в новую систему выше)
 
-function decreaseProfessionalSkillLevel(index) {
-    const input = document.getElementById(`professionalSkillLevel${index}`);
-    if (input) {
-        const currentValue = parseInt(input.value) || 0;
-        const newValue = Math.max(0, currentValue - 1);
-        input.value = newValue;
-        updateProfessionalSkill(index, document.getElementById(`professionalSkillName${index}`).value, newValue);
-    }
-}
-
-// Функция для обновления вычисляемых характеристик
-function updateDerivedStats() {
-    // Обновляем ВОС (Врождённая Останавливающая Сила)
-    const derivedArmor = document.getElementById('derivedArmor');
-    if (derivedArmor) {
-        // ВОС = ТЕЛО / 3, округлено вниз, но не менее 1
-        const body = state.stats.BODY || 5;
-        const armor = Math.max(1, Math.floor(body / 3));
-        derivedArmor.textContent = armor;
-    }
-    
-    // Обновляем Скорость Перемещения
-    const derivedSpeed = document.getElementById('derivedSpeed');
-    if (derivedSpeed) {
-        // Скорость = ЛВК
-        const speed = state.stats.DEX || 5;
-        derivedSpeed.textContent = speed;
-    }
-    
-    // Обновляем Скорость Рукопашной Атаки
-    const derivedAttackSpeed = document.getElementById('derivedAttackSpeed');
-    if (derivedAttackSpeed) {
-        // Скорость атаки = ЛВК / 2, округлено вниз, минимум 1
-        const attackSpeed = Math.max(1, Math.floor((state.stats.DEX || 5) / 2));
-        derivedAttackSpeed.textContent = attackSpeed;
-    }
-}
-
+// Дубль updateDerivedStats удален (первое определение на строке 220)
 
 // Функция для отображения боеприпасов
 function renderAmmo() {
@@ -12782,23 +4887,23 @@ function renderAmmo() {
     }
     
     container.innerHTML = state.ammo.map((ammo, index) => `
-        <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+        <div style="background: ${getThemeColors().accentLight}; border: 1px solid ${getThemeColors().accent}; border-radius: 8px; padding: 0.75rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
             <div style="flex: 1;">
-                <div style="color: var(--accent); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">
+                <div style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">
                     ${ammo.type} (${ammo.weaponType})
                 </div>
-                <div style="color: var(--text); font-size: 0.8rem; margin-bottom: 0.25rem;">
+                <div style="color: ${getThemeColors().text}; font-size: 0.8rem; margin-bottom: 0.25rem;">
                     Количество: ${ammo.quantity} ${ammo.weaponType === 'Гранаты' || ammo.weaponType === 'Ракеты' ? 'шт.' : 'патронов'}
                 </div>
-                <div style="color: var(--muted); font-size: 0.75rem;">
+                <div style="color: ${getThemeColors().muted}; font-size: 0.75rem;">
                     Цена: ${ammo.price} уе | Нагрузка: ${ammo.weaponType === 'Гранаты' || ammo.weaponType === 'Ракеты' ? ammo.quantity : Math.ceil(ammo.quantity / 10)}
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <button onclick="changeAmmoQuantity(${index}, -1)" style="background: transparent; border: none; color: var(--text); cursor: pointer; font-size: 1rem;" title="Уменьшить количество">-</button>
-                <span style="color: var(--text); font-weight: 600; min-width: 30px; text-align: center;">${ammo.quantity}</span>
-                <button onclick="changeAmmoQuantity(${index}, 1)" style="background: transparent; border: none; color: var(--text); cursor: pointer; font-size: 1rem;" title="Увеличить количество">+</button>
-                <button onclick="removeAmmo(${index})" style="background: transparent; border: none; color: var(--danger); cursor: pointer; margin-left: 0.5rem;" title="Удалить">
+                <button onclick="changeAmmoQuantity(${index}, -1)" style="background: transparent; border: none; color: ${getThemeColors().text}; cursor: pointer; font-size: 1rem;" title="Уменьшить количество">-</button>
+                <span style="color: ${getThemeColors().text}; font-weight: 600; min-width: 30px; text-align: center;">${ammo.quantity}</span>
+                <button onclick="changeAmmoQuantity(${index}, 1)" style="background: transparent; border: none; color: ${getThemeColors().text}; cursor: pointer; font-size: 1rem;" title="Увеличить количество">+</button>
+                <button onclick="removeAmmo(${index})" style="background: transparent; border: none; color: ${getThemeColors().danger}; cursor: pointer; margin-left: 0.5rem;" title="Удалить">
                     <img src="https://static.tildacdn.com/tild6166-3331-4338-b038-623539346365/x-button.png" style="width: 16px; height: 16px;">
                 </button>
             </div>
@@ -12815,10 +4920,13 @@ function toggleBargainEnabled(enabled) {
     state.bargainEnabled = enabled;
     scheduleSave();
     
+    // Перерисовываем навыки, чтобы обновить чекбокс
+    renderSkills();
+    
     const statusText = enabled ? 'включён' : 'отключён';
     showModal('Торг ' + statusText, `
         <div style="text-align: center; padding: 1rem;">
-            <p style="color: var(--text); font-size: 1rem; margin-bottom: 0.5rem;">
+            <p style="color: ${getThemeColors().text}; font-size: 1rem; margin-bottom: 0.5rem;">
                 Навык "Торг" ${statusText} для покупок и продаж.
             </p>
             ${!enabled ? '<p style="color: var(--muted); font-size: 0.85rem;">Вы можете использовать торг только 1 раз за сцену.</p>' : ''}
@@ -12882,10 +4990,14 @@ function exportData() {
             // Модули оружия
             weaponModules: [...state.weaponModules],
             
+            // Модули транспорта
+            vehicleModules: [...(state.vehicleModules || [])],
+            
             // Имущество
             property: {
                 vehicles: [...state.property.vehicles],
-                realEstate: [...state.property.realEstate]
+                housing: [...(state.property.housing || [])],
+                commercialProperty: [...(state.property.commercialProperty || [])]
             },
             
             // Препараты
@@ -12903,6 +5015,9 @@ function exportData() {
             // Заметки
             notes: state.notes || '',
             
+            // Счетчики
+            counters: [...(state.counters || [])],
+            
             // Критические травмы
             criticalInjuries: [...state.criticalInjuries],
             
@@ -12912,8 +5027,34 @@ function exportData() {
             // Имплантаты
             implants: [...state.implants],
             
+            // Установленные модули имплантов
+            installedModules: [...(state.installedModules || [])],
+            
+            // Броня по зонам
+            armor: { ...state.armor },
+            
+            // Титаническая броня
+            titanicArmorConnected: state.titanicArmorConnected || false,
+            
+            // Лог транзакций
+            transactionLog: [...(state.transactionLog || [])],
+            
+            // Графы предыстории
+            backstoryGraphs: { ...state.backstoryGraphs },
+            
+            // Настройки интерфейса
+            uiSettings: { ...state.uiSettings },
+            
+            // Размеры и порядок секций
+            sectionSizes: { ...state.sectionSizes },
+            layoutOrder: [...(state.layoutOrder || [])],
+            
             // Недвижимость
-            housing: [...state.housing],
+            property: {
+                vehicles: [...state.property.vehicles],
+                housing: [...state.property.housing],
+                commercialProperty: [...state.property.commercialProperty]
+            },
             
             // Версия экспорта
             exportVersion: '1.0',
@@ -12937,7 +5078,7 @@ function exportData() {
         showModal('Персонаж сохранён', `
             <div style="text-align: center; padding: 1rem;">
                 <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 0.5rem;">✓ Персонаж успешно сохранён!</p>
-                <p style="color: var(--text); font-size: 0.9rem;">
+                <p style="color: ${getThemeColors().text}; font-size: 0.9rem;">
                     Файл: <strong>${a.download}</strong>
                 </p>
                 <p style="color: var(--muted); font-size: 0.8rem; margin-top: 0.5rem;">
@@ -12950,8 +5091,8 @@ function exportData() {
         console.error('Ошибка при экспорте данных:', error);
         showModal('Ошибка экспорта', `
             <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при сохранении!</p>
-                <p style="color: var(--text); font-size: 0.9rem;">
+                <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при сохранении!</p>
+                <p style="color: ${getThemeColors().text}; font-size: 0.9rem;">
                     Не удалось сохранить персонажа. Попробуйте ещё раз.
                 </p>
             </div>
@@ -12978,8 +5119,8 @@ function importData() {
                 if (!importedData.exportVersion) {
                     showModal('Ошибка импорта', `
                         <div style="text-align: center; padding: 1rem;">
-                            <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Неверный формат файла!</p>
-                            <p style="color: var(--text); font-size: 0.9rem;">
+                            <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Неверный формат файла!</p>
+                            <p style="color: ${getThemeColors().text}; font-size: 0.9rem;">
                                 Файл не является сохранением персонажа EZY Cyber.
                             </p>
         </div>
@@ -12990,7 +5131,7 @@ function importData() {
                 // Подтверждение импорта
                 showModal('Подтверждение импорта', `
                     <div style="text-align: center; padding: 1rem;">
-                        <p style="color: var(--text); font-size: 1rem; margin-bottom: 1rem;">
+                        <p style="color: ${getThemeColors().text}; font-size: 1rem; margin-bottom: 1rem;">
                             Загрузить персонажа <strong>${importedData.characterName || 'Без имени'}</strong>?
                         </p>
                         <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem;">
@@ -13010,8 +5151,8 @@ function importData() {
                 console.error('Ошибка при импорте данных:', error);
                 showModal('Ошибка импорта', `
                     <div style="text-align: center; padding: 1rem;">
-                        <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при загрузке!</p>
-                        <p style="color: var(--text); font-size: 0.9rem;">
+                        <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при загрузке!</p>
+                        <p style="color: ${getThemeColors().text}; font-size: 0.9rem;">
                             Файл повреждён или имеет неверный формат.
                         </p>
                     </div>
@@ -13038,6 +5179,14 @@ function confirmImport() {
         // Загружаем импортированные данные
         Object.assign(state, importedData);
         
+        // Загружаем счетчики из импортированных данных
+        if (importedData.counters && Array.isArray(importedData.counters)) {
+            state.counters = [...importedData.counters];
+            if (typeof saveCounters === 'function') {
+                saveCounters();
+            }
+        }
+        
         // Обновляем отображение
         updateAllDisplays();
         
@@ -13049,7 +5198,7 @@ function confirmImport() {
         showModal('Персонаж загружен', `
             <div style="text-align: center; padding: 1rem;">
                 <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 0.5rem;">✓ Персонаж успешно загружен!</p>
-                <p style="color: var(--text); font-size: 0.9rem;">
+                <p style="color: ${getThemeColors().text}; font-size: 0.9rem;">
                     Все данные персонажа восстановлены.
                 </p>
             </div>
@@ -13062,8 +5211,8 @@ function confirmImport() {
         console.error('Ошибка при подтверждении импорта:', error);
         showModal('Ошибка импорта', `
             <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при загрузке!</p>
-                <p style="color: var(--text); font-size: 0.9rem;">
+                <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при загрузке!</p>
+                <p style="color: ${getThemeColors().text}; font-size: 0.9rem;">
                     Не удалось загрузить персонажа.
                 </p>
             </div>
@@ -13076,8 +5225,8 @@ function clearAllData(skipConfirmation = false) {
     if (!skipConfirmation) {
         showModal('Подтверждение очистки', `
             <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 1rem;">⚠️ ВНИМАНИЕ!</p>
-                <p style="color: var(--text); font-size: 1rem; margin-bottom: 1rem;">
+                <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 1rem;">⚠️ ВНИМАНИЕ!</p>
+                <p style="color: ${getThemeColors().text}; font-size: 1rem; margin-bottom: 1rem;">
                     Вы действительно хотите удалить <strong>ВСЕ</strong> данные персонажа?
                 </p>
                 <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem;">
@@ -13121,7 +5270,7 @@ function performClearAllData() {
             BODY: 5,    // Телосложение
             REA: 5,     // Реакция
             TECH: 5,    // Техника
-            CHA: 5      // Харизма
+            CHA: 5      // Характер
         };
         
         // Удача
@@ -13171,11 +5320,24 @@ function performClearAllData() {
         // Снаряжение
         state.gear = [];
         
+        // Добавляем стартовый Хронотом (Дешевый)
+        state.gear.push({
+            id: generateId('gear'),
+            name: 'ХРОНОТОМ (ДЕШЁВЫЙ)',
+            description: 'Устройство с AR-режимом, встроенной рекламой и базовым функционалом связи.',
+            price: 0,
+            load: 0,
+            isDefault: true
+        });
+        
         // Оружие
         state.weapons = [];
         
         // Боеприпасы
         state.ammo = [];
+        
+        // Инвентарь брони
+        state.armorInventory = [];
         
         // Программы деки
         state.deckPrograms = [];
@@ -13189,10 +5351,14 @@ function performClearAllData() {
         // Модули оружия
         state.weaponModules = [];
         
-        // Имущество
+        // Модули транспорта
+        state.vehicleModules = [];
+        
+        // Имущество (будет заполнено ниже)
         state.property = {
             vehicles: [],
-            realEstate: []
+            housing: [],
+            commercialProperty: []
         };
         
         // Добавляем стартовый транспорт - Компактный Микромобиль
@@ -13210,6 +5376,7 @@ function performClearAllData() {
             purchasePrice: 0, // Бесплатно для пользователя
             category: "ground",
             modules: [],
+            trunk: [], // Багажник транспорта
             isDefault: true,
             itemType: 'free_default'
         });
@@ -13234,35 +5401,149 @@ function performClearAllData() {
         // Заметки
         state.notes = '';
         
+        // Счетчики
+        state.counters = [];
+        
         // Критические травмы
         state.criticalInjuries = [];
         
         // Щепки памяти
         state.deckChips = [];
         
-        // Имплантаты
-        state.implants = [];
+        // Имплантаты (правильная структура как в data.js)
+        state.implants = {
+            head: {
+                installed: false,
+                parts: { main: null }
+            },
+            arms: {
+                installed: false,
+                parts: {
+                    wristLeft: null, wristRight: null,
+                    forearmLeft: null, forearmRight: null,
+                    shoulderLeft: null, shoulderRight: null
+                }
+            },
+            legs: {
+                installed: false,
+                parts: {
+                    footLeft: null, footRight: null,
+                    shinLeft: null, shinRight: null,
+                    thighLeft: null, thighRight: null
+                }
+            },
+            spine: {
+                installed: false,
+                parts: {
+                    cervical: null, thoracicLeft: null,
+                    thoracicRight: null, lumbar: null, sacral: null
+                }
+            },
+            organs: {
+                installed: false,
+                parts: { main: null }
+            },
+            neuromodule: {
+                installed: false,
+                parts: { main: null }
+            }
+        };
         
-        // Недвижимость
-        state.housing = [];
+        // Установленные модули имплантов
+        state.installedModules = [];
         
-        // Обновляем отображение
-        updateAllDisplays();
+        // Броня по зонам
+        state.armor = {
+            head: { os: 0, type: 'Лёгкая', activeDefense: false, activeDefenseType: 'Микроракеты' },
+            body: { os: 0, type: 'Лёгкая', activeDefense: false, activeDefenseType: 'Микроракеты' },
+            arms: { os: 0, type: 'Лёгкая', activeDefense: false, activeDefenseType: 'Микроракеты' },
+            legs: { os: 0, type: 'Лёгкая', activeDefense: false, activeDefenseType: 'Микроракеты' }
+        };
+        
+        // Титаническая броня
+        state.titanicArmorConnected = false;
+        
+        // Жилье с стартовой квартирой
+        state.property.housing = [
+            {
+                id: 'default-apartment',
+                name: '11-метров',
+                description: 'Эта квартира есть у всех По-умолчанию. Обычный человек имеет палку в углу над сортиром, называемую "душевая точка", кровать, встроенную в стену, в виде полки, кухню с 1 коморкой и микроволновкой и огромную телепанель на половину стены, по которой весь световой день крутится реклама, если житель дома. Корпорации сами решают, когда световой день кончился и пора спать…и это может быть время, никак не связанное с солнцем. Вот главная причина, почему люди так любят наушники или импланты с шумоподавлением. Ходит теория, что корпорации специально крутят эту рекламу, чтобы люди покупали больше шумодавов, ведь раз в год выходит новая модель, а старая начинает тупить пропускать излишний звук! Тем не менее, эти 11 квадратов — твоя заслуженная квартира!',
+                area: '11 м²',
+                rentPrice: 0,
+                buyPrice: 0,
+                type: 'apartment',
+                isDefault: true,
+                isOwned: true,
+                purchasePrice: 0
+            }
+        ];
+        
+        // Коммерческая недвижимость
+        state.property.commercialProperty = [];
+        
+        // Графы предыстории
+        state.backstoryGraphs = {
+            born: { text: '', completed: false },
+            grewUp: { text: '', completed: false },
+            adolescence: { text: '', completed: false },
+            loveStory: { text: '', completed: false },
+            enmity: { text: '', completed: false },
+            enmityBlame: { text: '', completed: false },
+            revenge: { text: '', completed: false },
+            whyHere: { text: '', completed: false },
+            howMet: { text: '', completed: false },
+            moneyAttitude: { text: '', completed: false },
+            peopleAttitude: { text: '', completed: false },
+            lastWeekEvent: { text: '', completed: false }
+        };
+        
+        // Настройки интерфейса
+        state.uiSettings = {
+            compactSkills: false
+        };
+        
+        // Размеры и порядок секций
+        state.sectionSizes = {};
+        state.layoutOrder = [];
+        
+        // Обновляем отображение полей ввода
+        if (typeof updateUIFromState === 'function') updateUIFromState();
+        
+        // Очищаем счетчики из localStorage
+        if (typeof saveCounters === 'function') {
+            state.counters = [];
+            saveCounters();
+        }
+        
+        // Обновляем все дисплеи
+        if (typeof updateAllDisplays === 'function') updateAllDisplays();
+        
+        // Принудительно обновляем все производные характеристики
+        if (typeof updateDerivedStats === 'function') updateDerivedStats();
+        if (typeof calculateAndUpdateHealth === 'function') calculateAndUpdateHealth();
+        if (typeof updateAwarenessMax === 'function') updateAwarenessMax();
+        
+        // Принудительно обновляем все отображения
+        if (typeof updateMoneyDisplay === 'function') updateMoneyDisplay();
+        if (typeof updateLoadDisplay === 'function') updateLoadDisplay();
         
         // Сохраняем
-        scheduleSave();
+        if (typeof scheduleSave === 'function') scheduleSave();
         
         showModal('Данные очищены', `
             <div style="text-align: center; padding: 1rem;">
                 <p style="color: var(--success); font-size: 1.1rem; margin-bottom: 0.5rem;">✓ Все данные очищены!</p>
-                <p style="color: var(--text); font-size: 0.9rem;">
+                <p style="color: ${getThemeColors().text}; font-size: 0.9rem;">
                     Персонаж сброшен к начальным значениям.
                 </p>
                 <p style="color: var(--muted); font-size: 0.8rem; margin-top: 0.5rem;">
                     Стартовые деньги: <strong>3500 уе</strong><br>
                     Дека: ОЗУ 3, Память 4, Сетка 4, версия ПО 10<br>
                     Характеристики равны <strong>5</strong><br>
-                    Транспорт: <strong>Компактный Микромобиль</strong>
+                    Транспорт: <strong>Компактный Микромобиль</strong><br>
+                    Жилье: <strong>11-метров</strong><br>
+                    Снаряжение: <strong>Хронотом (Дешёвый)</strong>
                 </p>
             </div>
         `);
@@ -13271,8 +5552,8 @@ function performClearAllData() {
         console.error('Ошибка при очистке данных:', error);
         showModal('Ошибка очистки', `
             <div style="text-align: center; padding: 1rem;">
-                <p style="color: var(--danger); font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при очистке!</p>
-                <p style="color: var(--text); font-size: 0.9rem;">
+                <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 0.5rem;">✗ Ошибка при очистке!</p>
+                <p style="color: ${getThemeColors().text}; font-size: 0.9rem;">
                     Не удалось очистить данные. Попробуйте ещё раз.
                 </p>
                 </div>
@@ -13287,18 +5568,24 @@ function updateAllDisplays() {
     calculateAndUpdateHealth();
     updateAwarenessMax();
     
-    // Обновляем снаряжение и оружие
-    renderGear();
-    renderWeapons();
-    renderAmmo();
-    renderDeckPrograms();
-    renderDeckChips();
-    updateDeckDisplay();
-    renderVehicles();
-    renderDrugs();
-    renderHousing();
-    renderImplants();
-    renderCriticalInjuries();
+    // Обновляем снаряжение и оружие (с проверкой существования функций)
+    if (typeof renderGear === 'function') renderGear();
+    if (typeof renderWeapons === 'function') renderWeapons();
+    if (typeof renderAmmo === 'function') renderAmmo();
+    if (typeof renderDeckPrograms === 'function') renderDeckPrograms();
+    if (typeof renderDeckChips === 'function') renderDeckChips();
+    if (typeof updateDeckDisplay === 'function') updateDeckDisplay();
+    // if (typeof renderVehicles === 'function') renderVehicles(); // Удалено - используется новая система transport.js
+    if (typeof renderTransport === 'function') renderTransport();
+    if (typeof renderVehicleModulesInventory === 'function') renderVehicleModulesInventory();
+    if (typeof renderDrugs === 'function') renderDrugs();
+    if (typeof renderHousing === 'function') renderHousing();
+    if (typeof renderCommercialProperty === 'function') renderCommercialProperty();
+    if (typeof renderImplants === 'function') renderImplants();
+    if (typeof renderCriticalInjuries === 'function') renderCriticalInjuries();
+    if (typeof renderArmorInventory === 'function') renderArmorInventory();
+    if (typeof updateArmorRemoveButtons === 'function') updateArmorRemoveButtons();
+    if (typeof renderDeckCollection === 'function') renderDeckCollection();
     
     // Обновляем навыки
     renderSkills();
@@ -13329,7 +5616,13 @@ function updateDeckOsVersion(deckId, osVersion) {
 // Функция броска инициативы
 function rollInitiative() {
     // Получаем значение характеристики РЕА
-    const reactionValue = parseInt(document.getElementById('statREA').value) || 0;
+    let reactionValue = parseInt(document.getElementById('statREA').value) || 0;
+    
+    // Применяем штрафы от брони к РЕА
+    const penalties = calculateArmorPenalties();
+    if (penalties.reaction !== 0) {
+        reactionValue = Math.max(1, reactionValue + penalties.reaction);
+    }
     
     // Получаем модификатор от пользователя
     const modifierValue = document.getElementById('initiativeModifier').value || '0';
@@ -13349,7 +5642,7 @@ function rollInitiative() {
                 Бросаем кубики...
         </div>
             <div style="font-size: 0.9rem; color: var(--muted);">
-                РЕА: ${reactionValue} + Модификатор: ${modifier}
+                РЕА: ${reactionValue}${penalties.reaction !== 0 ? ` (броня: ${penalties.reaction > 0 ? '+' : ''}${penalties.reaction})` : ''} + Модификатор: ${modifier}
             </div>
         </div>`,
         [
@@ -13397,7 +5690,7 @@ function rollInitiative() {
         }
         
         // Показываем анимацию кубиков
-        showInitiativeDiceAnimation(dice1, dice2, totalResult, reactionValue, modifier, d4Value, d4Type);
+        showInitiativeDiceAnimation(dice1, dice2, totalResult, reactionValue, modifier, d4Value, d4Type, penalties.reaction);
         
         // Обновляем отображение результата на кнопке
         const resultElement = document.getElementById('initiativeResult');
@@ -13425,7 +5718,7 @@ function rollInitiative() {
 }
 
 // Функция анимации броска кубиков для инициативы
-function showInitiativeDiceAnimation(dice1, dice2, totalResult, reactionValue, modifier, d4Value, d4Type) {
+function showInitiativeDiceAnimation(dice1, dice2, totalResult, reactionValue, modifier, d4Value, d4Type, armorPenalty = 0) {
     const diceAnimation = document.getElementById('initiativeDiceAnimation');
     const dice1Element = document.getElementById('initiativeDice1');
     const dice2Element = document.getElementById('initiativeDice2');
@@ -13509,7 +5802,7 @@ function showInitiativeDiceAnimation(dice1, dice2, totalResult, reactionValue, m
                     if (typeof totalResult === 'string') {
                         // Критический результат
                         resultElement.innerHTML = `
-                            <div style="font-size: 1.5rem; font-weight: bold; color: var(--danger); margin-bottom: 0.5rem;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: ${getThemeColors().danger}; margin-bottom: 0.5rem;">
                                 ${totalResult}
             </div>
                         `;
@@ -13522,7 +5815,7 @@ function showInitiativeDiceAnimation(dice1, dice2, totalResult, reactionValue, m
                             <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent); margin-bottom: 0.5rem;">
                                 Результат: ${totalResult}
                 </div>
-                            <div style="font-size: 0.9rem; color: var(--text);">
+                            <div style="font-size: 0.9rem; color: ${getThemeColors().text};">
                                 2d6: ${dice1} + ${dice2} = ${dice1 + dice2}<br>
                                 + РЕА (${reactionValue}) + Мод (${modifier})${d4Str} = <strong>${totalResult}</strong>
         </div>
@@ -13533,8 +5826,9 @@ function showInitiativeDiceAnimation(dice1, dice2, totalResult, reactionValue, m
                 // Показываем формулу
                 if (formulaElement) {
                     const modifierStr = modifier >= 0 ? `+${modifier}` : `${modifier}`;
+                    const armorPenaltyStr = armorPenalty !== 0 ? ` (броня: ${armorPenalty > 0 ? '+' : ''}${armorPenalty})` : '';
                     const d4Str = d4Value ? (d4Type === 'penalty' ? `-${d4Value}` : `+${d4Value}`) : '';
-                    const formula = `${reactionValue}${modifierStr}+${dice1}+${dice2}${d4Str} = ${totalResult}`;
+                    const formula = `${reactionValue}${armorPenaltyStr}${modifierStr}+${dice1}+${dice2}${d4Str} = ${totalResult}`;
                     formulaElement.textContent = formula;
                     formulaElement.style.display = 'block';
                 }
@@ -13560,7 +5854,7 @@ function removeProgramFromDeck(deckId, programIndex) {
     // Показываем подтверждение удаления
     showModal('Подтвердите удаление', 
         `Вы уверены, что хотите безвозвратно удалить программу "${programToRemove.name}"?<br><br>
-        <div style="color: var(--danger); font-size: 0.9rem; margin-top: 0.5rem;">
+        <div style="color: ${getThemeColors().danger}; font-size: 0.9rem; margin-top: 0.5rem;">
             ⚠️ Программа будет удалена навсегда и не может быть восстановлена!
         </div>`,
         [
@@ -13614,3 +5908,949 @@ function confirmRemoveProgramFromDeck(deckId, programIndex) {
         showModal('Ошибка', 'Не удалось найти программу для удаления!');
     }
 }
+
+// ==================== ФУНКЦИИ КАЛЬКУЛЯТОРА РАССТОЯНИЯ ====================
+
+// Показать модальное окно расчета расстояния
+function showDistanceModal() {
+    const modal = document.getElementById('distanceModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        // Сбрасываем поля при открытии
+        document.getElementById('shooterHeight').value = '';
+        document.getElementById('targetDistance').value = '';
+        document.getElementById('distanceResult').style.display = 'none';
+        document.getElementById('hitDifficultyInfo').style.display = 'none';
+        document.getElementById('distanceVisualization').innerHTML = `
+            <div style="text-align: center; color: var(--muted);">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎯</div>
+                <div>Введите данные для расчета</div>
+            </div>
+        `;
+    }
+}
+
+// Скрыть модальное окно расчета расстояния
+function hideDistanceModal() {
+    const modal = document.getElementById('distanceModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Расчет расстояния до цели
+function calculateDistance() {
+    const shooterHeight = parseFloat(document.getElementById('shooterHeight').value) || 0;
+    const targetDistance = parseFloat(document.getElementById('targetDistance').value) || 0;
+    
+    if (shooterHeight < 0 || targetDistance < 0) {
+        showModal('Ошибка', 'Значения не могут быть отрицательными!');
+        return;
+    }
+    
+    // Расчет по формуле 3D расстояния: d = √(x² + y² + z²)
+    // Где x = горизонтальное расстояние, y = 0 (цель на земле), z = высота стрелка
+    const horizontalDistance = targetDistance;
+    const verticalDistance = shooterHeight;
+    const totalDistance = Math.sqrt(horizontalDistance * horizontalDistance + verticalDistance * verticalDistance);
+    
+    // Округляем до 1 знака после запятой
+    const roundedTotal = Math.round(totalDistance * 10) / 10;
+    const roundedHorizontal = Math.round(horizontalDistance * 10) / 10;
+    const roundedVertical = Math.round(verticalDistance * 10) / 10;
+    
+    // Обновляем результаты
+    document.getElementById('totalDistance').textContent = roundedTotal;
+    document.getElementById('horizontalDistance').textContent = roundedHorizontal;
+    document.getElementById('verticalDistance').textContent = roundedVertical;
+    
+    // Показываем результат
+    document.getElementById('distanceResult').style.display = 'block';
+    
+    // Создаем визуализацию
+    createDistanceVisualization(roundedHorizontal, roundedVertical, roundedTotal);
+    
+    // Показываем и обновляем информацию о сложности попадания
+    document.getElementById('hitDifficultyInfo').style.display = 'block';
+    updateHitDifficultyInfo(roundedTotal);
+    
+    // Добавляем запись в лог
+    addToRollLog(`🎯 Расчет расстояния: Высота ${roundedVertical}п, Горизонтально ${roundedHorizontal}п = ${roundedTotal}п до цели`, {});
+}
+
+// Создание визуализации расчета расстояния
+function createDistanceVisualization(horizontal, vertical, total) {
+    const container = document.getElementById('distanceVisualization');
+    
+    // Создаем SVG для визуализации
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '160');
+    svg.setAttribute('viewBox', '0 0 400 160');
+    svg.style.background = 'rgba(0, 0, 0, 0.2)';
+    svg.style.borderRadius = '8px';
+    
+    // Определяем масштаб для визуализации
+    const maxDimension = Math.max(horizontal, vertical, 10); // минимум 10 для масштаба
+    const scale = 100 / maxDimension; // базовая длина 100px для максимального измерения
+    
+    // Центрируем график в области SVG
+    const svgWidth = 400;
+    const svgHeight = 160;
+    const margin = 30; // уменьшаем отступы от краев
+    
+    // Координаты точек (центрированные)
+    let shooterX = margin;
+    let shooterY = margin;
+    let targetX = shooterX + (horizontal * scale);
+    let targetY = shooterY + (vertical * scale);
+    
+    // Проверяем, не выходит ли график за границы, и корректируем масштаб если нужно
+    const maxX = Math.max(targetX, shooterX);
+    const maxY = Math.max(targetY, shooterY);
+    
+    if (maxX > svgWidth - margin || maxY > svgHeight - margin) {
+        const scaleX = (svgWidth - 2 * margin) / Math.max(horizontal, 10);
+        const scaleY = (svgHeight - 2 * margin) / Math.max(vertical, 10);
+        const newScale = Math.min(scaleX, scaleY);
+        
+        // Пересчитываем координаты с новым масштабом
+        const newTargetX = shooterX + (horizontal * newScale);
+        const newTargetY = shooterY + (vertical * newScale);
+        
+        // Центрируем график если он меньше области
+        const centerX = svgWidth / 2;
+        const centerY = svgHeight / 2;
+        const graphCenterX = (shooterX + newTargetX) / 2;
+        const graphCenterY = (shooterY + newTargetY) / 2;
+        
+        const offsetX = centerX - graphCenterX;
+        const offsetY = centerY - graphCenterY;
+        
+        // Применяем смещение для центрирования
+        shooterX = shooterX + offsetX;
+        shooterY = shooterY + offsetY;
+        targetX = newTargetX + offsetX;
+        targetY = newTargetY + offsetY;
+    } else {
+        // Если график помещается, центрируем его
+        const centerX = svgWidth / 2;
+        const centerY = svgHeight / 2;
+        const graphCenterX = (shooterX + targetX) / 2;
+        const graphCenterY = (shooterY + targetY) / 2;
+        
+        const offsetX = centerX - graphCenterX;
+        const offsetY = centerY - graphCenterY;
+        
+        shooterX += offsetX;
+        shooterY += offsetY;
+        targetX += offsetX;
+        targetY += offsetY;
+    }
+    
+    // Сетка (киберпанк стиль)
+    const gridSize = 20;
+    for (let x = 0; x < 400; x += gridSize) {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x);
+        line.setAttribute('y1', 0);
+        line.setAttribute('x2', x);
+        line.setAttribute('y2', 160);
+        line.setAttribute('stroke', 'rgba(182, 103, 255, 0.1)');
+        line.setAttribute('stroke-width', '1');
+        svg.appendChild(line);
+    }
+    
+    for (let y = 0; y < 160; y += gridSize) {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', 0);
+        line.setAttribute('y1', y);
+        line.setAttribute('x2', 400);
+        line.setAttribute('y2', y);
+        line.setAttribute('stroke', 'rgba(182, 103, 255, 0.1)');
+        line.setAttribute('stroke-width', '1');
+        svg.appendChild(line);
+    }
+    
+    // Земля (горизонтальная линия)
+    const groundLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    groundLine.setAttribute('x1', 0);
+    groundLine.setAttribute('y1', targetY);
+    groundLine.setAttribute('x2', 400);
+    groundLine.setAttribute('y2', targetY);
+    groundLine.setAttribute('stroke', 'rgba(125, 244, 198, 0.3)');
+    groundLine.setAttribute('stroke-width', '2');
+    groundLine.setAttribute('stroke-dasharray', '5,5');
+    svg.appendChild(groundLine);
+    
+    // Линия до цели (гипотенуза) с постоянной анимацией
+    const distanceLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    distanceLine.setAttribute('x1', shooterX);
+    distanceLine.setAttribute('y1', shooterY);
+    distanceLine.setAttribute('x2', targetX);
+    distanceLine.setAttribute('y2', targetY);
+    distanceLine.setAttribute('stroke', '#b667ff');
+    distanceLine.setAttribute('stroke-width', '3');
+    distanceLine.setAttribute('stroke-dasharray', '12,6');
+    distanceLine.setAttribute('stroke-dashoffset', '0');
+    
+    // Добавляем постоянную анимацию пунктира
+    const animateDash = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+    animateDash.setAttribute('attributeName', 'stroke-dashoffset');
+    animateDash.setAttribute('values', '0;-18');
+    animateDash.setAttribute('dur', '1s');
+    animateDash.setAttribute('repeatCount', 'indefinite');
+    animateDash.setAttribute('begin', '0.5s');
+    distanceLine.appendChild(animateDash);
+    
+    svg.appendChild(distanceLine);
+    
+    // Горизонтальная линия
+    const horizontalLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    horizontalLine.setAttribute('x1', shooterX);
+    horizontalLine.setAttribute('y1', shooterY);
+    horizontalLine.setAttribute('x2', targetX);
+    horizontalLine.setAttribute('y2', shooterY);
+    horizontalLine.setAttribute('stroke', '#7df4c6');
+    horizontalLine.setAttribute('stroke-width', '2');
+    svg.appendChild(horizontalLine);
+    
+    // Вертикальная линия
+    const verticalLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    verticalLine.setAttribute('x1', targetX);
+    verticalLine.setAttribute('y1', shooterY);
+    verticalLine.setAttribute('x2', targetX);
+    verticalLine.setAttribute('y2', targetY);
+    verticalLine.setAttribute('stroke', '#b667ff');
+    verticalLine.setAttribute('stroke-width', '2');
+    svg.appendChild(verticalLine);
+    
+    // Стрелок (точка)
+    const shooterCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    shooterCircle.setAttribute('cx', shooterX);
+    shooterCircle.setAttribute('cy', shooterY);
+    shooterCircle.setAttribute('r', '8');
+    shooterCircle.setAttribute('fill', '#b667ff');
+    shooterCircle.setAttribute('stroke', '#ffffff');
+    shooterCircle.setAttribute('stroke-width', '2');
+    svg.appendChild(shooterCircle);
+    
+    // Цель (точка на земле)
+    const targetCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    targetCircle.setAttribute('cx', targetX);
+    targetCircle.setAttribute('cy', targetY);
+    targetCircle.setAttribute('r', '8');
+    targetCircle.setAttribute('fill', '#ff5b87');
+    targetCircle.setAttribute('stroke', '#ffffff');
+    targetCircle.setAttribute('stroke-width', '2');
+    svg.appendChild(targetCircle);
+    
+    // Подписи
+    const shooterLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    shooterLabel.setAttribute('x', shooterX + 15);
+    shooterLabel.setAttribute('y', shooterY - 5);
+    shooterLabel.setAttribute('fill', '#b667ff');
+    shooterLabel.setAttribute('font-size', '12');
+    shooterLabel.setAttribute('font-weight', 'bold');
+    shooterLabel.textContent = 'СТРЕЛОК';
+    svg.appendChild(shooterLabel);
+    
+    const targetLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    targetLabel.setAttribute('x', targetX + 15);
+    targetLabel.setAttribute('y', targetY + 5);
+    targetLabel.setAttribute('fill', '#ff5b87');
+    targetLabel.setAttribute('font-size', '12');
+    targetLabel.setAttribute('font-weight', 'bold');
+    targetLabel.textContent = 'ЦЕЛЬ';
+    svg.appendChild(targetLabel);
+    
+    // Подписи расстояний (горизонтальное - под линией)
+    const horizontalLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    horizontalLabel.setAttribute('x', (shooterX + targetX) / 2);
+    horizontalLabel.setAttribute('y', shooterY + 20);
+    horizontalLabel.setAttribute('fill', '#7df4c6');
+    horizontalLabel.setAttribute('font-size', '11');
+    horizontalLabel.setAttribute('font-weight', '600');
+    horizontalLabel.setAttribute('text-anchor', 'middle');
+    horizontalLabel.textContent = `${horizontal}п`;
+    svg.appendChild(horizontalLabel);
+    
+    const verticalLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    verticalLabel.setAttribute('x', targetX + 15);
+    verticalLabel.setAttribute('y', (shooterY + targetY) / 2);
+    verticalLabel.setAttribute('fill', '#b667ff');
+    verticalLabel.setAttribute('font-size', '11');
+    verticalLabel.setAttribute('font-weight', '600');
+    verticalLabel.textContent = `${vertical}п`;
+    svg.appendChild(verticalLabel);
+    
+    // Общее расстояние
+    const totalLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    totalLabel.setAttribute('x', (shooterX + targetX) / 2);
+    totalLabel.setAttribute('y', (shooterY + targetY) / 2 - 15);
+    totalLabel.setAttribute('fill', '#ffffff');
+    totalLabel.setAttribute('font-size', '14');
+    totalLabel.setAttribute('font-weight', 'bold');
+    totalLabel.setAttribute('text-anchor', 'middle');
+    totalLabel.textContent = `${total}п`;
+    svg.appendChild(totalLabel);
+    
+    // Киберпанк эффекты
+    const glow1 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    glow1.setAttribute('cx', shooterX);
+    glow1.setAttribute('cy', shooterY);
+    glow1.setAttribute('r', '12');
+    glow1.setAttribute('fill', 'none');
+    glow1.setAttribute('stroke', '#b667ff');
+    glow1.setAttribute('stroke-width', '1');
+    glow1.setAttribute('opacity', '0.5');
+    svg.appendChild(glow1);
+    
+    const glow2 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    glow2.setAttribute('cx', targetX);
+    glow2.setAttribute('cy', targetY);
+    glow2.setAttribute('r', '12');
+    glow2.setAttribute('fill', 'none');
+    glow2.setAttribute('stroke', '#ff5b87');
+    glow2.setAttribute('stroke-width', '1');
+    glow2.setAttribute('opacity', '0.5');
+    svg.appendChild(glow2);
+    
+    // Заменяем содержимое контейнера
+    container.innerHTML = '';
+    container.appendChild(svg);
+}
+
+// Закрытие модального окна по клику вне его
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('distanceModal');
+    if (modal && modal.style.display === 'flex' && event.target === modal) {
+        hideDistanceModal();
+    }
+});
+
+// Закрытие модального окна по Escape
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const modal = document.getElementById('distanceModal');
+        if (modal && modal.style.display === 'flex') {
+            hideDistanceModal();
+        }
+    }
+});
+
+// Функция рендеринга программ деки (копия из deck.js для совместимости)
+function renderDeckPrograms() {
+    const container = document.getElementById('deckProgramsContainer');
+    if (!container) return;
+    
+    // Подсчитываем используемую память
+    const usedMemory = state.deckPrograms.reduce((total, program) => total + (program.memory || 1), 0);
+    const maxMemory = parseInt(state.deck.memory) + state.deckGear.filter(item => 
+        item.deckGearType === 'upgrade' && 
+        item.stat === 'memory' && 
+        item.installedDeckId === 'main'
+    ).length;
+    
+    if (state.deckPrograms.length === 0) {
+        container.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 1rem; font-size: 0.8rem;">Программы не установлены</p>';
+        updateDeckCounters();
+        return;
+    }
+    
+    container.innerHTML = state.deckPrograms.map((program, index) => `
+        <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem; position: relative;">
+            <button onclick="removeDeckProgramWithChoice(${index})" style="position: absolute; top: 0.5rem; right: 0.5rem; font-size: 1rem; background: transparent; border: none; color: ${getThemeColors().text}; cursor: pointer;">×</button>
+            <div style="padding-right: 1.5rem;">
+                <div style="color: var(--success); font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">${program.name}</div>
+                <div style="color: var(--muted); font-size: 0.75rem; margin-bottom: 0.25rem;">
+                    Цена: ${program.price} уе | ОЗУ: ${program.ram} | Память: ${program.memory || 1} | ${program.lethal ? 'Смертельная' : 'Несмертельная'}
+                </div>
+                <div style="color: var(--muted); font-size: 0.7rem; line-height: 1.3;">
+                    ${program.description}
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    // Добавляем информацию об использовании памяти
+    const memoryInfo = document.createElement('div');
+    memoryInfo.style.cssText = 'margin-top: 0.5rem; padding: 0.75rem; background: rgba(91, 155, 255, 0.1); border: 1px solid #5b9bff; border-radius: 6px; text-align: center;';
+    memoryInfo.innerHTML = `
+        <div style="color: var(--accent); font-size: 0.8rem;">
+            Использовано памяти: <strong>${usedMemory}/${maxMemory}</strong>
+            ${usedMemory > maxMemory ? '<span style="color: ${getThemeColors().danger};"> (ПРЕВЫШЕНО!)</span>' : ''}
+        </div>
+    `;
+    container.appendChild(memoryInfo);
+    
+    // Обновляем счетчик в заголовке
+    updateDeckCounters();
+}
+
+// Функция для переключения режима редактирования предыстории (теперь не используется)
+function toggleBackstoryEdit() {
+    // Эта функция больше не нужна, так как редактирование происходит через карточки
+    showToast('Используйте кнопки редактирования на карточках предыстории', 'info');
+}
+
+// Функция для сворачивания/разворачивания секции предыстории
+function toggleBackstorySection() {
+    const wrapper = document.getElementById('backstoryContentWrapper');
+    const icon = document.getElementById('backstoryToggleIcon');
+    
+    if (!wrapper || !icon) return;
+    
+    if (wrapper.style.display === 'none') {
+        wrapper.style.display = 'block';
+        icon.textContent = '▼';
+    } else {
+        wrapper.style.display = 'none';
+        icon.textContent = '▶';
+    }
+}
+
+// Функция для редактирования всех карточек предыстории
+function editAllBackstoryCards() {
+    const content = document.getElementById('backstoryContent');
+    if (!content) return;
+    
+    const cards = content.querySelectorAll('.backstory-card');
+    if (cards.length === 0) {
+        showToast('Нет элементов предыстории для редактирования', 'info');
+        return;
+    }
+    
+    // Собираем данные всех карточек
+    const backstoryElements = [];
+    cards.forEach((card, index) => {
+        const title = card.querySelector('.backstory-card-title')?.textContent?.trim();
+        const content = card.querySelector('.backstory-card-content')?.textContent?.replace(/<[^>]*>/g, '')?.trim();
+        
+        if (title && content) {
+            backstoryElements.push({
+                index: index,
+                title: title,
+                content: content
+            });
+        }
+    });
+    
+    if (backstoryElements.length === 0) {
+        showToast('Нет элементов предыстории для редактирования', 'info');
+        return;
+    }
+    
+    // Создаем модальное окно с формой для всех элементов
+    let modalContent = `
+        <div style="padding: 1rem; max-height: 70vh; overflow-y: auto;">
+            <div style="margin-bottom: 1rem; color: var(--muted); font-size: 0.8rem;">
+                Редактируйте элементы предыстории. Оставьте поле пустым, чтобы удалить элемент.
+            </div>
+    `;
+    
+    backstoryElements.forEach((element, index) => {
+        modalContent += `
+            <div style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 6px;">
+                <div style="color: var(--accent); font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Элемент ${index + 1}</div>
+                <div style="margin-bottom: 0.5rem;">
+                    <label style="display: block; color: ${getThemeColors().text}; font-weight: 500; margin-bottom: 0.3rem; font-size: 0.8rem;">Название:</label>
+                    <input type="text" id="editTitle${index}" value="${element.title}" style="width: 100%; padding: 0.4rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 4px; color: ${getThemeColors().text}; font-size: 0.8rem;">
+                </div>
+                <div>
+                    <label style="display: block; color: ${getThemeColors().text}; font-weight: 500; margin-bottom: 0.3rem; font-size: 0.8rem;">Содержание:</label>
+                    <textarea id="editContent${index}" style="width: 100%; height: 60px; padding: 0.4rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 4px; color: ${getThemeColors().text}; font-size: 0.8rem; resize: vertical;">${element.content}</textarea>
+                </div>
+            </div>
+        `;
+    });
+    
+    modalContent += `
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                <button class="pill-button" onclick="closeModal()" style="background: var(--danger);">Отмена</button>
+                <button class="pill-button success-button" onclick="saveAllBackstoryCards()">Сохранить все</button>
+            </div>
+        </div>
+    `;
+    
+    showModal('Редактировать предысторию', modalContent);
+}
+
+// Функция для сохранения всех изменений в карточках
+function saveAllBackstoryCards() {
+    const content = document.getElementById('backstoryContent');
+    if (!content) return;
+    
+    // Собираем новые данные из формы
+    const updatedElements = [];
+    let index = 0;
+    
+    // Ищем все поля ввода в модальном окне
+    while (true) {
+        const titleInput = document.getElementById(`editTitle${index}`);
+        const contentInput = document.getElementById(`editContent${index}`);
+        
+        if (!titleInput || !contentInput) break;
+        
+        const newTitle = titleInput.value.trim();
+        const newContent = contentInput.value.trim();
+        
+        // Добавляем только непустые элементы
+        if (newTitle && newContent) {
+            updatedElements.push({
+                title: newTitle,
+                content: newContent
+            });
+        }
+        
+        index++;
+    }
+    
+    // Обновляем отображение карточек
+    const cardsHTML = updatedElements.map(element => 
+        createBackstoryCard(element.title, element.content)
+    ).join('');
+    
+    content.innerHTML = cardsHTML;
+    
+    // Обновляем общий текст предыстории
+    updateBackstoryTextFromCards();
+    
+    closeModal();
+    showToast(`Сохранено ${updatedElements.length} элементов предыстории`, 'success');
+}
+
+// Функция для создания карточки элемента предыстории
+function createBackstoryCard(title, content, isEditable = true) {
+    const cardId = `backstory-card-${title.toLowerCase().replace(/[^a-zа-я0-9]/g, '-')}`;
+    const highlightedContent = highlightBonusesInText(content);
+    
+    return `
+        <div class="backstory-card" id="${cardId}" style="background: ${getThemeColors().accentLight}; border: 1px solid ${getThemeColors().accent}; border-radius: 6px; padding: 0.6rem; position: relative;">
+            <div class="backstory-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.2rem;">
+                <div class="backstory-card-title" style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 0.8rem; line-height: 1.1;">${title}</div>
+            </div>
+            <div class="backstory-card-content" style="color: ${getThemeColors().text}; line-height: 1.3; font-size: 0.75rem;">
+                ${highlightedContent}
+            </div>
+        </div>
+    `;
+}
+
+// Функция для обновления отображения предыстории в виде карточек
+function updateBackstoryDisplay() {
+    const content = document.getElementById('backstoryContent');
+    const textarea = document.getElementById('backstoryText');
+    
+    if (!content || !textarea) return;
+    
+    const backstoryText = textarea.value.trim();
+    
+    if (!backstoryText) {
+        content.innerHTML = `
+            <div id="emptyBackstory" style="color: ${getThemeColors().muted}; text-align: center; padding: 1.5rem; font-style: italic; grid-column: 1 / -1; font-size: 0.8rem;">
+                Ну и как ты сюда попал?<br>
+                <span style="font-size: 0.7rem; margin-top: 0.3rem; display: block;">Выберите предысторию или напишите свою</span>
+            </div>
+        `;
+        return;
+    }
+    
+    // Парсим текст предыстории на элементы
+    const backstoryElements = parseBackstoryText(backstoryText);
+    
+    if (backstoryElements.length === 0) {
+        content.innerHTML = `
+            <div id="emptyBackstory" style="color: var(--muted); text-align: center; padding: 1.5rem; font-style: italic; grid-column: 1 / -1; font-size: 0.8rem;">
+                Ну и как ты сюда попал?<br>
+                <span style="font-size: 0.7rem; margin-top: 0.3rem; display: block;">Выберите предысторию или напишите свою</span>
+            </div>
+        `;
+        return;
+    }
+    
+    // Создаем карточки
+    const cardsHTML = backstoryElements.map(element => 
+        createBackstoryCard(element.title, element.content)
+    ).join('');
+    
+    content.innerHTML = cardsHTML;
+}
+
+// Функция для парсинга текста предыстории на элементы
+function parseBackstoryText(text) {
+    // Разделяем текст по точкам, но учитываем что точки могут быть в скобках
+    const elements = [];
+    
+    // Ищем паттерн "Название: содержание. "
+    const regex = /([^:]+):\s*([^.]*(?:\([^)]*\)[^.]*)*)\.\s*/g;
+    let match;
+    
+    while ((match = regex.exec(text)) !== null) {
+        const title = match[1].trim();
+        const content = match[2].trim();
+        
+        if (title && content) {
+            elements.push({
+                title: title,
+                content: content
+            });
+        }
+    }
+    
+    return elements;
+}
+
+// Функция для редактирования карточки предыстории
+function editBackstoryCard(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    
+    const titleElement = card.querySelector('.backstory-card-title');
+    const contentElement = card.querySelector('.backstory-card-content');
+    
+    if (!titleElement || !contentElement) return;
+    
+    const currentTitle = titleElement.textContent;
+    const currentContent = contentElement.textContent.replace(/<[^>]*>/g, ''); // Убираем HTML теги
+    
+    // Создаем модальное окно для редактирования
+    const modalContent = `
+        <div style="padding: 1rem;">
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; color: var(--accent); font-weight: 600; margin-bottom: 0.5rem;">Название:</label>
+                <input type="text" id="editTitle" value="${currentTitle}" style="width: 100%; padding: 0.5rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 4px; color: ${getThemeColors().text};">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; color: var(--accent); font-weight: 600; margin-bottom: 0.5rem;">Содержание:</label>
+                <textarea id="editContent" style="width: 100%; height: 100px; padding: 0.5rem; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 4px; color: ${getThemeColors().text}; resize: vertical;">${currentContent}</textarea>
+            </div>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <button class="pill-button" onclick="closeModal()" style="background: var(--danger);">Отмена</button>
+                <button class="pill-button success-button" onclick="saveBackstoryCard('${cardId}')">Сохранить</button>
+            </div>
+        </div>
+    `;
+    
+    showModal('Редактировать элемент предыстории', modalContent);
+}
+
+// Функция для сохранения изменений в карточке
+function saveBackstoryCard(cardId) {
+    const titleInput = document.getElementById('editTitle');
+    const contentInput = document.getElementById('editContent');
+    
+    if (!titleInput || !contentInput) return;
+    
+    const newTitle = titleInput.value.trim();
+    const newContent = contentInput.value.trim();
+    
+    if (!newTitle || !newContent) {
+        showToast('Название и содержание не могут быть пустыми', 'error');
+        return;
+    }
+    
+    // Обновляем карточку
+    const card = document.getElementById(cardId);
+    if (card) {
+        const titleElement = card.querySelector('.backstory-card-title');
+        const contentElement = card.querySelector('.backstory-card-content');
+        
+        if (titleElement && contentElement) {
+            titleElement.textContent = newTitle;
+            contentElement.innerHTML = highlightBonusesInText(newContent);
+        }
+    }
+    
+    // Обновляем общий текст предыстории
+    updateBackstoryTextFromCards();
+    
+    closeModal();
+    showToast('Изменения сохранены', 'success');
+}
+
+// Функция для обновления общего текста предыстории из карточек
+function updateBackstoryTextFromCards() {
+    const content = document.getElementById('backstoryContent');
+    const textarea = document.getElementById('backstoryText');
+    
+    if (!content || !textarea) return;
+    
+    const cards = content.querySelectorAll('.backstory-card');
+    const backstoryElements = [];
+    
+    cards.forEach(card => {
+        const title = card.querySelector('.backstory-card-title')?.textContent?.trim();
+        const content = card.querySelector('.backstory-card-content')?.textContent?.replace(/<[^>]*>/g, '')?.trim();
+        
+        if (title && content) {
+            backstoryElements.push(`${title}: ${content}.`);
+        }
+    });
+    
+    const newText = backstoryElements.join(' ');
+    textarea.value = newText;
+    
+    // Сохраняем в state
+    if (typeof state !== 'undefined') {
+        state.backstory = newText;
+        if (typeof scheduleSave === 'function') {
+            scheduleSave();
+        }
+    }
+}
+
+// Функция для выделения бонусов в тексте предыстории (отдельная от той, что в ручном выборе)
+function highlightBonusesInText(text) {
+    // Регулярное выражение для поиска бонусов в скобках
+    return text.replace(/\(([^)]+)\)/g, (match, bonus) => {
+        // Определяем цвет в зависимости от типа бонуса
+        let color = 'var(--accent)'; // По умолчанию фиолетовый
+        
+        if (bonus.includes('+') && !bonus.includes('-')) {
+            // Положительные бонусы - зеленый
+            color = 'var(--success)';
+        } else if (bonus.includes('-')) {
+            // Отрицательные бонусы - красный
+            color = 'var(--danger)';
+        } else if (bonus.toLowerCase().includes('уе') || bonus.toLowerCase().includes('долг')) {
+            // Деньги/долги - желтый
+            color = 'var(--warning)';
+        } else if (bonus.toLowerCase().includes('предмет') || bonus.toLowerCase().includes('вещь') || bonus.toLowerCase().includes('чип') || bonus.toLowerCase().includes('пистолет') || bonus.toLowerCase().includes('кейс')) {
+            // Предметы - синий
+            color = '#3b82f6';
+        } else if (bonus.toLowerCase().includes('зависимость')) {
+            // Зависимости - оранжевый
+            color = '#f97316';
+        }
+        
+        return `<span style="color: ${color}; font-weight: 600; background: rgba(0,0,0,0.2); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.9em; display: inline-block; margin: 0 0.1rem;">(${bonus})</span>`;
+    });
+}
+
+// Функция обновления информации о сложности попадания
+function updateHitDifficultyInfo(distance) {
+    const container = document.getElementById('hitDifficultyInfo');
+    if (!container) return;
+    
+    // Определяем категорию расстояния
+    let distanceCategory;
+    if (distance === 0) {
+        distanceCategory = 'point_blank';
+    } else if (distance <= 6) {
+        distanceCategory = 'close';
+    } else if (distance <= 25) {
+        distanceCategory = 'medium';
+    } else if (distance <= 50) {
+        distanceCategory = 'far';
+    } else if (distance <= 250) {
+        distanceCategory = 'very_far';
+    } else {
+        distanceCategory = 'extreme';
+    }
+    
+    // Таблица сложности для одиночного выстрела
+    const singleShotDifficulty = {
+        'Пистолеты': { point_blank: 10, close: 13, medium: 17, far: 20, very_far: 30, extreme: null },
+        'ПП': { point_blank: 10, close: 13, medium: 15, far: 17, very_far: 30, extreme: null },
+        'Штурмовые винтовки и Пулемёты': { point_blank: 15, close: 20, medium: 17, far: 15, very_far: 20, extreme: 30 },
+        'Снайперские винтовки': { point_blank: 15, close: 30, medium: 20, far: 17, very_far: 15, extreme: 17 },
+        'Дробовики (жакан)': { point_blank: 10, close: 15, medium: 17, far: 20, very_far: 25, extreme: 30 },
+        'Гранатомёты': { point_blank: 10, close: 15, medium: 17, far: 20, very_far: 25, extreme: null },
+        'Ракетометы': { point_blank: 1, close: 20, medium: 15, far: 17, very_far: 20, extreme: 30 },
+        'Архаичное ОДБ': { point_blank: 10, close: 13, medium: 15, far: 17, very_far: 30, extreme: null }
+    };
+    
+    // Таблица сложности для автоматического огня
+    const autoFireDifficulty = {
+        'ПП': { point_blank: 15, close: 17, medium: 20, far: 25, very_far: 30, extreme: 'Только при Экстремальном Успехе. Множитель урона равен 3' },
+        'Штурмовая Винтовка': { point_blank: 15, close: 20, medium: 17, far: 20, very_far: 25, extreme: 30 },
+        'Пулемёт': { point_blank: 25, close: 20, medium: 17, far: 17, very_far: 20, extreme: 30 }
+    };
+    
+    // Создаем HTML для отображения
+    let html = `
+        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin-top: 0.75rem;">
+            <div style="color: var(--accent); font-size: 0.8rem; font-weight: 600; margin-bottom: 0.5rem; text-align: center;">
+                СЛОЖНОСТЬ ПОПАДАНИЯ
+            </div>
+            <div style="font-size: 0.7rem; color: var(--muted); margin-bottom: 0.5rem; text-align: center;">
+                Расстояние: ${distance}п (${getDistanceCategoryName(distanceCategory)})
+            </div>
+            
+            <div style="margin-bottom: 0.75rem;">
+                <div style="color: var(--success); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.35rem; text-align: center;">
+                    ОДИНОЧНЫЙ ВЫСТРЕЛ
+                </div>
+    `;
+    
+    // Добавляем информацию для одиночного выстрела
+    Object.entries(singleShotDifficulty).forEach(([weaponType, difficulties]) => {
+        const difficulty = difficulties[distanceCategory];
+        if (difficulty !== null && difficulty !== undefined) {
+            html += `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.15rem 0; font-size: 0.65rem;">
+                    <span style="color: ${getThemeColors().text};">${weaponType}</span>
+                    <span style="color: var(--accent); font-weight: 600;">${difficulty}</span>
+                </div>
+            `;
+        }
+    });
+    
+    html += `
+            </div>
+            
+            <div>
+                <div style="color: var(--warning); font-size: 0.75rem; font-weight: 600; margin-bottom: 0.35rem; text-align: center;">
+                    АВТОМАТИЧЕСКИЙ ОГОНЬ
+                </div>
+    `;
+    
+    // Добавляем информацию для автоматического огня
+    Object.entries(autoFireDifficulty).forEach(([weaponType, difficulties]) => {
+        const difficulty = difficulties[distanceCategory];
+        if (difficulty !== null && difficulty !== undefined) {
+            if (typeof difficulty === 'string') {
+                html += `
+                    <div style="padding: 0.15rem 0; font-size: 0.65rem;">
+                        <div style="color: ${getThemeColors().text}; font-weight: 600; margin-bottom: 0.05rem;">${weaponType}</div>
+                        <div style="color: var(--warning); font-size: 0.6rem; line-height: 1.1;">${difficulty}</div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.15rem 0; font-size: 0.65rem;">
+                        <span style="color: ${getThemeColors().text};">${weaponType}</span>
+                        <span style="color: var(--warning); font-weight: 600;">${difficulty}</span>
+                    </div>
+                `;
+            }
+        }
+    });
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+// Функция получения названия категории расстояния
+function getDistanceCategoryName(category) {
+    const names = {
+        'point_blank': 'Вплотную',
+        'close': 'Близкая',
+        'medium': 'Средняя',
+        'far': 'Дальняя',
+        'very_far': 'Очень дальняя',
+        'extreme': 'Сверх далёкая'
+    };
+    return names[category] || 'Неизвестно';
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ПЕРЕКЛЮЧЕНИЕ ТЕМЫ
+// ═══════════════════════════════════════════════════════════════════════
+
+// Функция переключения темы
+function toggleTheme() {
+    const body = document.body;
+    const button = document.getElementById('themeToggle');
+    
+    // Переключаем класс
+    body.classList.toggle('light-theme');
+    
+    // Определяем текущую тему
+    const isLight = body.classList.contains('light-theme');
+    
+    // Обновляем текст и иконку кнопки
+    if (isLight) {
+        button.innerHTML = '☀️ Вернуться в ночь';
+    } else {
+        button.innerHTML = '🌙 СВЕТОВАЯ ПОШЛА';
+    }
+    
+    // Сохраняем выбор в localStorage
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    
+    // Обновляем все динамически создаваемые элементы
+    if (typeof renderGear === 'function') renderGear();
+    if (typeof renderWeapons === 'function') renderWeapons();
+    if (typeof renderAmmo === 'function') renderAmmo();
+    if (typeof renderDeckPrograms === 'function') renderDeckPrograms();
+    if (typeof renderDeckChips === 'function') renderDeckChips();
+    if (typeof updateDeckDisplay === 'function') updateDeckDisplay();
+    if (typeof renderTransport === 'function') renderTransport();
+    if (typeof renderProfessionalSkills === 'function') renderProfessionalSkills();
+    if (typeof updateBackstoryDisplay === 'function') updateBackstoryDisplay();
+    
+    // Показываем уведомление
+    showNotification(isLight ? '☀️ Светлая тема активирована' : '🌙 Тёмная тема активирована', 'success');
+}
+
+// Загрузка сохраненной темы при запуске
+function loadTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    const body = document.body;
+    const button = document.getElementById('themeToggle');
+    
+    if (savedTheme === 'light') {
+        body.classList.add('light-theme');
+        if (button) {
+            button.innerHTML = '☀️ Вернуться в ночь';
+        }
+    } else {
+        body.classList.remove('light-theme');
+        if (button) {
+            button.innerHTML = '🌙 СВЕТОВАЯ ПОШЛА';
+        }
+    }
+}
+
+// Загружаем тему при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    loadTheme();
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// ПАРАЛЛАКС ЭФФЕКТ ДЛЯ ФОНА С ПАТТЕРНОМ
+// ═══════════════════════════════════════════════════════════════════════
+
+function initCircuitParallax() {
+    const bodyBg = document.querySelector('body::before');
+    let ticking = false;
+    
+    function updateParallax() {
+        const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+        const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+        
+        // Медленное движение по диагонали
+        const bgX = scrollX * 0.015; // % от горизонтальной прокрутки
+        const bgY = scrollY * 0.015; // % от вертикальной прокрутки
+        
+        // Применяем к body через CSS переменные
+        document.documentElement.style.setProperty('--circuit-bg-x', `${bgX}px`);
+        document.documentElement.style.setProperty('--circuit-bg-y', `${bgY}px`);
+        
+        ticking = false;
+    }
+    
+    function requestTick() {
+        if (!ticking) {
+            window.requestAnimationFrame(updateParallax);
+            ticking = true;
+        }
+    }
+    
+    // Обработчик прокрутки с throttling через requestAnimationFrame
+    window.addEventListener('scroll', requestTick, { passive: true });
+    
+    // Инициализируем сразу
+    updateParallax();
+}
+
+// Запускаем параллакс после загрузки страницы
+document.addEventListener('DOMContentLoaded', function() {
+    initCircuitParallax();
+});

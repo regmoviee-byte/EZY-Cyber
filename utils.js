@@ -1,6 +1,62 @@
 // EZY: Cyber Character Sheet - Utility Functions
 // Вспомогательные функции общего назначения
 
+// ═══════════════════════════════════════════════════════════════════════
+// УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ ЦВЕТОВ ТЕМЫ
+// ═══════════════════════════════════════════════════════════════════════
+
+function getThemeColors() {
+    const isLightTheme = document.body.classList.contains('light-theme');
+    
+    if (isLightTheme) {
+        return {
+            bg: '#d2d2d2',
+            panel: '#e8e8e8',
+            panelAlt: '#e0e0e0',
+            accent: '#4a4a4a',
+            accent2: '#666666',
+            text: '#2d2d2d',
+            muted: '#6e6e73',
+            danger: '#8b0000',
+            success: '#006400',
+            warning: '#8b5a00',
+            border: 'rgba(74, 74, 74, 0.4)',
+            shadow: '0 0 22px rgba(74, 74, 74, 0.2)',
+            // Дополнительные цвета для инлайн-стилей
+            bgLight: 'rgba(74, 74, 74, 0.1)',
+            bgMedium: 'rgba(74, 74, 74, 0.2)',
+            bgDark: 'rgba(74, 74, 74, 0.3)',
+            successLight: 'rgba(0, 100, 0, 0.1)',
+            dangerLight: 'rgba(139, 0, 0, 0.1)',
+            warningLight: 'rgba(139, 90, 0, 0.1)',
+            accentLight: 'rgba(74, 74, 74, 0.1)'
+        };
+    } else {
+        return {
+            bg: '#0a0712',
+            panel: '#171125',
+            panelAlt: '#211630',
+            accent: '#b667ff',
+            accent2: '#ff6acb',
+            text: '#f3e8ff',
+            muted: '#a394c4',
+            danger: '#ff5b87',
+            success: '#7df4c6',
+            warning: '#ffa500',
+            border: 'rgba(182, 103, 255, 0.38)',
+            shadow: '0 0 22px rgba(182, 103, 255, 0.28)',
+            // Дополнительные цвета для инлайн-стилей
+            bgLight: document.body.classList.contains('light-theme') ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.2)',
+            bgMedium: document.body.classList.contains('light-theme') ? 'rgba(0, 0, 0, 0.08)' : 'rgba(0, 0, 0, 0.3)',
+            bgDark: document.body.classList.contains('light-theme') ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.5)',
+            successLight: 'rgba(125, 244, 198, 0.1)',
+            dangerLight: 'rgba(255, 91, 135, 0.1)',
+            warningLight: 'rgba(255, 165, 0, 0.1)',
+            accentLight: 'rgba(182, 103, 255, 0.1)'
+        };
+    }
+}
+
 // Функции сохранения и загрузки
 function saveState() {
     try {
@@ -29,14 +85,84 @@ function loadState() {
             }
         }
         
+        // Инициализируем armorInventory, если его нет
+        if (!state.armorInventory) {
+            state.armorInventory = [];
+            console.log('Инициализирован armorInventory');
+        }
+        
+        // Инициализируем implants правильной структурой, если это массив или undefined
+        if (!state.implants || Array.isArray(state.implants)) {
+            state.implants = {
+                head: { installed: false, parts: { main: null } },
+                arms: {
+                    installed: false,
+                    parts: {
+                        wristLeft: null, wristRight: null,
+                        forearmLeft: null, forearmRight: null,
+                        shoulderLeft: null, shoulderRight: null
+                    }
+                },
+                legs: {
+                    installed: false,
+                    parts: {
+                        footLeft: null, footRight: null,
+                        shinLeft: null, shinRight: null,
+                        thighLeft: null, thighRight: null
+                    }
+                },
+                spine: {
+                    installed: false,
+                    parts: {
+                        cervical: null, thoracicLeft: null,
+                        thoracicRight: null, lumbar: null, sacral: null
+                    }
+                },
+                organs: { installed: false, parts: { main: null } },
+                neuromodule: { installed: false, parts: { main: null } }
+            };
+            console.log('Инициализирован implants с правильной структурой');
+        }
+        
+        // Инициализируем property, если его нет
+        if (!state.property) {
+            state.property = { 
+                housing: [], 
+                commercialProperty: [], 
+                vehicles: [] 
+            };
+        }
+        
+        // Инициализируем массивы, если их нет
+        if (!state.property.housing) {
+            state.property.housing = [];
+        }
+        if (!state.property.commercialProperty) {
+            state.property.commercialProperty = [];
+        }
+        if (!state.property.vehicles) {
+            state.property.vehicles = [];
+        }
+        
+        // Добавляем стартовое жилье, если его нет
+        if (state.property.housing.length === 0) {
+            state.property.housing.push({
+                id: 'default-apartment',
+                name: '11-метров',
+                description: 'Эта квартира есть у всех По-умолчанию. Обычный человек имеет палку в углу над сортиром, называемую "душевая точка", кровать, встроенную в стену, в виде полки, кухню с 1 коморкой и микроволновкой и огромную телепанель на половину стены, по которой весь световой день крутится реклама, если житель дома. Корпорации сами решают, когда световой день кончился и пора спать…и это может быть время, никак не связанное с солнцем. Вот главная причина, почему люди так любят наушники или импланты с шумоподавлением. Ходит теория, что корпорации специально крутят эту рекламу, чтобы люди покупали больше шумодавов, ведь раз в год выходит новая модель, а старая начинает тупить пропускать излишний звук! Тем не менее, эти 11 квадратов — твоя заслуженная квартира!',
+                area: '11 м²',
+                rentPrice: 0,
+                buyPrice: 0,
+                type: 'apartment',
+                isDefault: true,
+                isOwned: true,
+                purchasePrice: 0
+            });
+            console.log('Добавлено стартовое жилье: 11-метров');
+        }
+        
         // Добавляем стартовый транспорт, если его нет
-        if (!state.property || !state.property.vehicles || state.property.vehicles.length === 0) {
-            if (!state.property) {
-                state.property = { vehicles: [], realEstate: [] };
-            }
-            if (!state.property.vehicles) {
-                state.property.vehicles = [];
-            }
+        if (state.property.vehicles.length === 0) {
             
             // Добавляем стартовый транспорт - Компактный Микромобиль
             state.property.vehicles.push({
@@ -53,18 +179,27 @@ function loadState() {
                 purchasePrice: 0, // Бесплатно для пользователя
                 category: "ground",
                 modules: [],
+                trunk: [], // Багажник транспорта
                 isDefault: true,
                 itemType: 'free_default'
             });
             
             console.log('Добавлен стартовый транспорт: Компактный Микромобиль');
+        } else {
+            // Добавляем trunk к существующим транспортам, если его нет
+            state.property.vehicles.forEach(vehicle => {
+                if (!vehicle.trunk) {
+                    vehicle.trunk = [];
+                }
+            });
         }
         
         updateUIFromState();
         
-        // Загружаем профессиональные навыки и заметки
+        // Загружаем профессиональные навыки, заметки и счетчики
         loadProfessionalSkills();
         loadNotes();
+        loadCounters();
     } catch (error) {
         console.error('Ошибка загрузки:', error);
     }
@@ -72,13 +207,13 @@ function loadState() {
 
 // Автосохранение с debounce
 let saveTimeout;
-function scheduleSave() {
+window.scheduleSave = function() {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(saveState, 300);
 }
 
 // Генерация уникальных ID
-function generateId() {
+window.generateId = function() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
@@ -302,6 +437,14 @@ function updateUIFromState() {
     // Обновляем вычисляемые характеристики
     updateDerivedStats();
     
+    // Принудительно обновляем все производные характеристики
+    calculateAndUpdateHealth();
+    updateAwarenessMax();
+    
+    // Принудительно обновляем все отображения
+    updateMoneyDisplay();
+    updateLoadDisplay();
+    
     // Обновляем удачу
     const luckCurrent = document.getElementById('luckCurrent');
     const luckMax = document.getElementById('luckMax');
@@ -329,7 +472,13 @@ function updateUIFromState() {
     
     // Обновляем предысторию
     const backstoryText = document.getElementById('backstoryText');
-    if (backstoryText) backstoryText.value = state.backstory || '';
+    if (backstoryText) {
+        backstoryText.value = state.backstory || '';
+        // Обновляем красивое отображение предыстории
+        if (typeof updateBackstoryDisplay === 'function') {
+            updateBackstoryDisplay();
+        }
+    }
     
     // Обновляем броню
     const armorHeadOS = document.getElementById('armorHeadOS');
@@ -342,13 +491,13 @@ function updateUIFromState() {
     const armorLegsType = document.getElementById('armorLegsType');
     
     if (armorHeadOS) armorHeadOS.value = state.armor.head.os || 0;
-    if (armorHeadType) armorHeadType.value = state.armor.head.type || 'Лёгкая';
+    if (armorHeadType) armorHeadType.textContent = state.armor.head.os > 0 ? state.armor.head.type || 'Лёгкая' : '';
     if (armorBodyOS) armorBodyOS.value = state.armor.body.os || 0;
-    if (armorBodyType) armorBodyType.value = state.armor.body.type || 'Лёгкая';
+    if (armorBodyType) armorBodyType.textContent = state.armor.body.os > 0 ? state.armor.body.type || 'Лёгкая' : '';
     if (armorArmsOS) armorArmsOS.value = state.armor.arms.os || 0;
-    if (armorArmsType) armorArmsType.value = state.armor.arms.type || 'Лёгкая';
+    if (armorArmsType) armorArmsType.textContent = state.armor.arms.os > 0 ? state.armor.arms.type || 'Лёгкая' : '';
     if (armorLegsOS) armorLegsOS.value = state.armor.legs.os || 0;
-    if (armorLegsType) armorLegsType.value = state.armor.legs.type || 'Лёгкая';
+    if (armorLegsType) armorLegsType.textContent = state.armor.legs.os > 0 ? state.armor.legs.type || 'Лёгкая' : '';
     
     // Обновляем описание брони
     const armorDescription = document.getElementById('armorDescription');
@@ -357,8 +506,44 @@ function updateUIFromState() {
     // Обновляем штраф от брони
     if (typeof updateArmorPenalty === 'function') updateArmorPenalty();
     
+    // Обновляем инвентарь брони
+    if (typeof renderArmorInventory === 'function') renderArmorInventory();
+    
+    // Обновляем кнопки снятия брони
+    if (typeof updateArmorRemoveButtons === 'function') updateArmorRemoveButtons();
+    
     // Обновляем критические травмы
     if (typeof renderInjuries === 'function') renderInjuries();
+    
+    // Обновляем жилье
+    if (typeof renderHousing === 'function') renderHousing();
+    
+    // Обновляем коммерческую недвижимость
+    if (typeof renderCommercialProperty === 'function') renderCommercialProperty();
+    
+    // Обновляем транспорт
+    if (typeof renderTransport === 'function') renderTransport();
+    
+    // Обновляем снаряжение
+    if (typeof renderGear === 'function') renderGear();
+    
+    // Обновляем оружие
+    if (typeof renderWeapons === 'function') renderWeapons();
+    
+    // Обновляем боеприпасы
+    if (typeof renderAmmo === 'function') renderAmmo();
+    
+    // Обновляем программы деки
+    if (typeof renderDeckPrograms === 'function') renderDeckPrograms();
+    
+    // Обновляем щепки деки
+    if (typeof renderDeckChips === 'function') renderDeckChips();
+    
+    // Обновляем снаряжение для деки
+    if (typeof renderDeckGear === 'function') renderDeckGear();
+    
+    // Обновляем коллекцию дек
+    if (typeof renderDecksCollection === 'function') renderDecksCollection();
 }
 
 // Экспорт и импорт данных
@@ -397,12 +582,7 @@ function importData() {
     input.click();
 }
 
-function clearAllData() {
-    showConfirmModal('Подтверждение', 'Вы уверены, что хотите очистить все данные?', () => {
-        localStorage.removeItem('ezyCyberCharacter');
-        location.reload();
-    });
-}
+// Функция clearAllData перенесена в scripts.js для более полной очистки
 
 // Универсальные функции для модальных окон (замена alert/confirm/prompt)
 
@@ -420,7 +600,7 @@ function showConfirmModal(title, message, onConfirm, onCancel = null) {
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1.5rem;">${message}</p>
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1.5rem;">${message}</p>
                 <div style="display: flex; gap: 1rem; justify-content: flex-end;">
                     <button class="pill-button secondary-button" onclick="closeConfirmModal(false, this.closest('.modal-overlay'))">Отмена</button>
                     <button class="pill-button danger-button" onclick="closeConfirmModal(true, this.closest('.modal-overlay'))">Да</button>
@@ -485,8 +665,8 @@ function showPromptModal(title, message, defaultValue = '', onConfirm, onCancel 
                 <button class="icon-button" onclick="closePromptModal(null)">×</button>
             </div>
             <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1rem;">${message}</p>
-                <input type="text" id="promptInput" value="${defaultValue}" style="width: 100%; padding: 0.5rem; margin-bottom: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">${message}</p>
+                <input type="text" id="promptInput" value="${defaultValue}" style="width: 100%; padding: 0.5rem; margin-bottom: 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; color: ${getThemeColors().text};">
                 <div style="display: flex; gap: 1rem; justify-content: flex-end;">
                     <button class="pill-button secondary-button" onclick="closePromptModal(null)">Отмена</button>
                     <button class="pill-button primary-button" onclick="closePromptModal(document.getElementById('promptInput').value)">ОК</button>
@@ -551,7 +731,7 @@ function showAlertModal(title, message) {
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1.5rem;">${message}</p>
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1.5rem;">${message}</p>
                 <div style="display: flex; justify-content: flex-end;">
                     <button class="pill-button primary-button" onclick="closeModal(this.parentElement.parentElement.parentElement)">ОК</button>
                 </div>
@@ -601,4 +781,109 @@ function canBargain() {
     return result;
 }
 
+// ============================================================================
+// СИСТЕМА СОСТОЯНИЯ СВОРАЧИВАНИЯ ЭЛЕМЕНТОВ
+// ============================================================================
+
+// Инициализация состояния сворачивания
+function initializeCollapsedItemsState() {
+    if (!state.collapsedItems) {
+        state.collapsedItems = {
+            commercialProperty: [],
+            vehicles: [],
+            housing: [],
+            gear: [],
+            armor: [],
+            weapons: [],
+            drugs: [],
+            implants: [],
+            deckPrograms: [],
+            deckChips: []
+        };
+    }
+}
+
+// Добавить элемент в список свернутых
+function addCollapsedItem(category, index) {
+    initializeCollapsedItemsState();
+    if (!state.collapsedItems[category].includes(index)) {
+        state.collapsedItems[category].push(index);
+        scheduleSave();
+    }
+}
+
+// Удалить элемент из списка свернутых
+function removeCollapsedItem(category, index) {
+    initializeCollapsedItemsState();
+    const itemIndex = state.collapsedItems[category].indexOf(index);
+    if (itemIndex > -1) {
+        state.collapsedItems[category].splice(itemIndex, 1);
+        scheduleSave();
+    }
+}
+
+// Проверить, свернут ли элемент
+function isItemCollapsed(category, index) {
+    initializeCollapsedItemsState();
+    return state.collapsedItems[category].includes(index);
+}
+
+// Переключить состояние сворачивания элемента
+function toggleCollapsedItem(category, index) {
+    if (isItemCollapsed(category, index)) {
+        removeCollapsedItem(category, index);
+        return false; // Элемент развернут
+    } else {
+        addCollapsedItem(category, index);
+        return true; // Элемент свернут
+    }
+}
+
+// Получить стиль отображения для элемента
+function getCollapsedDisplayStyle(category, index) {
+    return isItemCollapsed(category, index) ? 'none' : 'block';
+}
+
+// Обновить состояние сворачивания для массива элементов (при удалении элементов)
+function updateCollapsedItemsAfterRemoval(category, removedIndex) {
+    initializeCollapsedItemsState();
+    state.collapsedItems[category] = state.collapsedItems[category]
+        .map(index => index > removedIndex ? index - 1 : index)
+        .filter(index => index >= 0);
+    scheduleSave();
+}
+
 console.log('Utils.js loaded - вспомогательные функции загружены');
+
+// Функция обновления отображения нагрузки (копия из deck.js для совместимости)
+function updateLoadDisplay() {
+    // Пересчитываем нагрузку из инвентаря
+    if (typeof recalculateLoadFromInventory === 'function') {
+        recalculateLoadFromInventory();
+    }
+    
+    // Обновляем отображение нагрузки
+    const currentLoadEl = document.getElementById('currentLoad');
+    const maxLoadEl = document.getElementById('maxLoad');
+    
+    if (currentLoadEl) currentLoadEl.textContent = state.load.current.toFixed(1);
+    if (maxLoadEl) maxLoadEl.textContent = state.load.max.toFixed(1);
+    
+    // Показываем штраф под "Скорость перемещения" только если нагрузка меньше 0
+    const speedWarningEl = document.getElementById('speedWarning');
+    
+    if (state.load.current < 0) {
+        const penalty = Math.ceil(Math.abs(state.load.current) / 5);
+        
+        if (speedWarningEl) {
+            speedWarningEl.textContent = `Штраф ${penalty} от перегрузки!`;
+            speedWarningEl.style.display = 'block';
+            speedWarningEl.style.color = 'var(--danger)';
+            speedWarningEl.style.fontSize = '0.8rem';
+            speedWarningEl.style.fontWeight = '600';
+            speedWarningEl.style.marginTop = '0.25rem';
+        }
+    } else if (speedWarningEl) {
+        speedWarningEl.style.display = 'none';
+    }
+}

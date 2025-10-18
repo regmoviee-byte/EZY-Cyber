@@ -40,32 +40,41 @@ function showFenceShop() {
         getFencePrice(item);
     });
     
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     
     const itemsHTML = sellableItems.map(item => {
         const fencePrice = getFencePrice(item);
         const catalogPrice = item.price || 0;
         
         return `
-            <div class="item-card" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 8px; align-items: center;">
+            <div class="item-card" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem; padding: 1rem; background: ${getThemeColors().bgLight}; border: 1px solid ${getThemeColors().border}; border-radius: 8px; align-items: center;">
                 <div>
-                    <div style="font-weight: 600; color: var(--text); margin-bottom: 0.25rem;">${item.name}</div>
-                    <div style="font-size: 0.8rem; color: var(--muted);">${item.category}</div>
+                    <div style="font-weight: 600; color: ${getThemeColors().text}; margin-bottom: 0.25rem;">${item.name}</div>
+                    <div style="font-size: 0.8rem; color: ${getThemeColors().muted};">${item.category}</div>
                 </div>
                 <div style="text-align: center;">
-                    <div style="font-size: 0.7rem; color: var(--muted); margin-bottom: 0.25rem;">По каталогу</div>
-                    <div style="font-weight: 600; color: var(--text);">${catalogPrice} уе</div>
+                    <div style="font-size: 0.7rem; color: ${getThemeColors().muted}; margin-bottom: 0.25rem;">По каталогу</div>
+                    <div style="font-weight: 600; color: ${getThemeColors().text};">${catalogPrice} уе</div>
                 </div>
                 <div style="text-align: center;">
-                    <div style="font-size: 0.7rem; color: var(--muted); margin-bottom: 0.25rem;">Предложение</div>
-                    <div style="font-weight: 600; color: var(--success);">${fencePrice} уе</div>
+                    <div style="font-size: 0.7rem; color: ${getThemeColors().muted}; margin-bottom: 0.25rem;">Предложение</div>
+                    <div style="font-weight: 600; color: ${getThemeColors().success};">${fencePrice} уе</div>
                 </div>
                 <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                     <button class="pill-button success-button" onclick="initiateSaleWithPrice('${item.id}', '${item.type}', ${fencePrice})" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">Продать</button>
-                    <button class="pill-button muted-button" onclick="enterManualPrice('${item.id}', '${item.type}')" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">Мастер назвал цену </button>
+                    ${canBargain() ? `<button class="pill-button muted-button" onclick="enterManualPrice('${item.id}', '${item.type}')" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">Мастер назвал цену</button>` : ''}
                 </div>
             </div>
         `;
@@ -78,9 +87,9 @@ function showFenceShop() {
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body" style="overflow-y: auto; max-height: calc(80vh - 150px);">
-                <div style="padding: 1rem; background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; margin-bottom: 1.5rem;">
-                    <p style="color: var(--text); font-size: 0.9rem; margin: 0; line-height: 1.5;">
-                        <strong style="color: var(--success);">Скупщик</strong> предлагает случайную цену от 20% до 70% от каталожной.<br>
+                <div style="padding: 1rem; background: ${getThemeColors().successLight}; border: 1px solid ${getThemeColors().success}; border-radius: 8px; margin-bottom: 1.5rem;">
+                    <p style="color: ${getThemeColors().text}; font-size: 0.9rem; margin: 0; line-height: 1.5;">
+                        <strong style="color: ${getThemeColors().success};">Скупщик</strong> предлагает случайную цену от 20% до 70% от каталожной.<br>
                         Если у вас есть навык <strong>Торг</strong>, вы можете попробовать договориться о лучшей цене.
                     </p>
                 </div>
@@ -143,7 +152,7 @@ function getSellableItems() {
     state.ammo.forEach(ammo => {
         items.push({
             id: ammo.id,
-            name: ammo.name + ' (' + ammo.quantity + ' шт.)',
+            name: `${ammo.type} (${ammo.weaponType}) (${ammo.quantity} шт.)`,
             price: (ammo.price || 0) * ammo.quantity,
             type: 'ammo',
             category: 'Боеприпасы'
@@ -208,6 +217,21 @@ function getSellableItems() {
         }
     });
     
+    // Модули транспорта из инвентаря (не установленные)
+    if (state.vehicleModules && state.vehicleModules.length > 0) {
+        state.vehicleModules.forEach(module => {
+            if (!module.isInstalled) {
+                items.push({
+                    id: module.id,
+                    name: module.name + ' (модуль транспорта)',
+                    price: module.price || 0,
+                    type: 'vehicle_module_inventory',
+                    category: 'Модуль транспорта'
+                });
+            }
+        });
+    }
+    
     // Модули транспорта (не установленные)
     state.property.vehicles.forEach(vehicle => {
         if (vehicle.modules && vehicle.modules.length > 0) {
@@ -223,6 +247,43 @@ function getSellableItems() {
                         moduleIndex: idx
                     });
                 }
+            });
+        }
+    });
+    
+    // Предметы из багажников транспорта
+    state.property.vehicles.forEach(vehicle => {
+        if (vehicle.trunk && vehicle.trunk.length > 0) {
+            vehicle.trunk.forEach((item, idx) => {
+                // Определяем тип предмета
+                let itemType, category;
+                if (item.moduleType === 'vehicle_module') {
+                    itemType = 'trunk_vehicle_module';
+                    category = 'Модуль транспорта (багажник)';
+                } else if (item.originalSource === 'gear') {
+                    itemType = 'trunk_gear';
+                    category = 'Снаряжение (багажник)';
+                } else if (item.originalSource === 'armor') {
+                    itemType = 'trunk_armor';
+                    category = 'Броня (багажник)';
+                } else if (item.originalSource === 'drugs') {
+                    itemType = 'trunk_drugs';
+                    category = 'Препараты (багажник)';
+                } else {
+                    itemType = 'trunk_item';
+                    category = 'Предмет (багажник)';
+                }
+                
+                items.push({
+                    id: vehicle.id + '_trunk_' + idx,
+                    name: item.name + ` (${vehicle.name})`,
+                    price: item.price || 0,
+                    type: itemType,
+                    category: category,
+                    vehicleId: vehicle.id,
+                    trunkIndex: idx,
+                    originalItem: item
+                });
             });
         }
     });
@@ -257,6 +318,12 @@ function getSellableItems() {
     
     // Транспорт
     state.property.vehicles.forEach(vehicle => {
+        // Проверяем, есть ли предметы в багажнике
+        if (vehicle.trunk && vehicle.trunk.length > 0) {
+            // Не добавляем транспорт с предметами в багажнике
+            return;
+        }
+        
         // Определяем цену продажи
         let sellPrice;
         if (vehicle.itemType === 'free_default') {
@@ -278,6 +345,25 @@ function getSellableItems() {
             itemType: vehicle.itemType
         });
     });
+    
+    // Жилье (только купленное, не стартовое)
+    state.property.housing.forEach(housing => {
+        // Проверяем: жилье должно быть куплено (isOwned), не стартовое, и иметь цену покупки больше 0
+        if (!housing.isDefault && housing.isOwned && housing.purchasePrice > 0) {
+            // Продаем за половину цены покупки
+            const sellPrice = Math.floor(housing.purchasePrice / 2);
+            items.push({
+                id: housing.id,
+                name: housing.name,
+                price: sellPrice,
+                type: 'housing',
+                category: 'Жилье',
+                purchasePrice: housing.purchasePrice
+            });
+        }
+    });
+    
+    // Коммерческая недвижимость НЕ продается скупщику - только прекращение аренды через интерфейс
     
     return items;
 }
@@ -327,7 +413,8 @@ function initiateSaleWithPrice(itemId, itemType, fencePrice) {
     }
     
     // Для предметов с ценой 0 (подобрано с пола) - запрашиваем цену
-    if (!item.price || item.price === 0) {
+    // Исключаем жилье из этой логики, так как оно может иметь цену 0, но не является "подобранным с пола"
+    if ((!item.price || item.price === 0) && itemType !== 'housing') {
         enterManualPrice(itemId, itemType);
         return;
     }
@@ -352,10 +439,19 @@ function showBargainChoiceWithPrice(item, itemId, itemType, baseFencePrice) {
         return;
     }
     
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     
     modal.innerHTML = `
         <div class="modal" style="max-width: 500px;">
@@ -364,17 +460,17 @@ function showBargainChoiceWithPrice(item, itemId, itemType, baseFencePrice) {
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1rem;">
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">
                     У вас есть навык <strong>Торг</strong>. Хотите попробовать договориться о лучшей цене?
                 </p>
-                <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
-                    <div style="color: var(--success); font-weight: 600; margin-bottom: 0.5rem;">Текущее предложение:</div>
-                    <div style="font-size: 1.2rem; font-weight: 700; color: var(--text);">${baseFencePrice} уе</div>
+                <div style="background: ${getThemeColors().successLight}; border: 1px solid ${getThemeColors().success}; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+                    <div style="color: ${getThemeColors().success}; font-weight: 600; margin-bottom: 0.5rem;">Текущее предложение:</div>
+                    <div style="font-size: 1.2rem; font-weight: 700; color: ${getThemeColors().text};">${baseFencePrice} уе</div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="pill-button" onclick="confirmSaleDirect('${itemId}', '${itemType}', ${baseFencePrice}); closeModal(this)">Продать за ${baseFencePrice} уе</button>
-                <button class="pill-button primary-button" onclick="startBargain('${itemId}', '${itemType}', ${baseFencePrice})">Поторговаться</button>
+                <button class="pill-button primary-button" onclick="startBargaining('${itemId}', '${itemType}', ${baseFencePrice})">Поторговаться</button>
             </div>
         </div>
     `;
@@ -395,10 +491,28 @@ function showBargainChoiceWithPrice(item, itemId, itemType, baseFencePrice) {
 
 // Начать торг
 function startBargaining(itemId, itemType) {
+    // Закрываем модальное окно "Хотите поторговаться?" (ищем по содержимому)
+    const allModals = document.querySelectorAll('.modal-overlay');
+    allModals.forEach(modal => {
+        const modalBody = modal.querySelector('.modal-body');
+        if (modalBody && modalBody.textContent.includes('У вас есть навык Торг')) {
+            modal.remove();
+        }
+    });
+    
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     
     modal.innerHTML = `
         <div class="modal" style="max-width: 600px;">
@@ -407,7 +521,7 @@ function startBargaining(itemId, itemType) {
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1rem;">
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">
                     Мастер должен бросить <strong>2d10</strong> для определения Сложности (СЛ) торга.
                 </p>
                 
@@ -507,14 +621,23 @@ function showBargainResult(itemId, itemType, checkData) {
     
     const { bargainLevel, dice, diceTotal, checkResult, difficulty, success } = checkData;
     
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
     
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
+    
     const resultText = success 
-        ? `<div style="color: var(--success); font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">✓ УСПЕХ!</div>`
-        : `<div style="color: var(--danger); font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">✗ ПРОВАЛ</div>`;
+        ? `<div style="color: ${getThemeColors().success}; font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">✓ УСПЕХ!</div>`
+        : `<div style="color: ${getThemeColors().danger}; font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem;">✗ ПРОВАЛ</div>`;
     
     modal.innerHTML = `
         <div class="modal" style="max-width: 600px;">
@@ -532,7 +655,7 @@ function showBargainResult(itemId, itemType, checkData) {
                     </div>
                 </div>
                 
-                <p style="color: var(--text); margin-bottom: 1rem;">
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">
                     Теперь укажите уровень вашего профессионального навыка <strong>Решала</strong>:
                 </p>
                 
@@ -541,7 +664,7 @@ function showBargainResult(itemId, itemType, checkData) {
                     <input type="number" class="input-field" id="fixerLevel" placeholder="Уровень" min="1" max="10" value="1">
                 </div>
                 
-                <div style="margin-bottom: 1rem; padding: 1rem; background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; font-size: 0.85rem;">
+                <div style="margin-bottom: 1rem; padding: 1rem; background: ${getThemeColors().successLight}; border: 1px solid ${getThemeColors().success}; border-radius: 8px; font-size: 0.85rem;">
                     <strong>Модификатор цены по уровню Решалы:</strong><br>
                     1-2: ±10% | 3-4: ±20% | 5-6: ±30% | 7: ±40% | 8-9: ±50% | 10: ±100% (или 1уе при провале)
                 </div>
@@ -630,10 +753,19 @@ function enterManualPrice(itemId, itemType) {
         return;
     }
     
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
     
     modal.innerHTML = `
         <div class="modal" style="max-width: 500px;">
@@ -642,7 +774,7 @@ function enterManualPrice(itemId, itemType) {
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body">
-                <p style="color: var(--text); margin-bottom: 1rem;">
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">
                     Мастер определил цену для <strong>${item.name}</strong>.
                 </p>
                 
@@ -700,15 +832,24 @@ function confirmManualSale(itemId, itemType) {
 
 // Подтвердить продажу
 function confirmSale(item, itemId, itemType, price, bargainDetails = null) {
+    // Используем новую систему с блокировкой скролла
+    document.body.style.overflow = 'hidden';
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     const existingModals = document.querySelectorAll('.modal-overlay');
     modal.style.zIndex = 1000 + (existingModals.length * 100);
     
+    // Добавляем автоматическую разблокировку скролла при удалении
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
+    
     let detailsHTML = '';
     if (bargainDetails) {
         detailsHTML = `
-            <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; font-size: 0.85rem;">
+            <div style="background: ${getThemeColors().successLight}; border: 1px solid ${getThemeColors().success}; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; font-size: 0.85rem;">
                 <strong>Детали торга:</strong><br>
                 Базовая цена скупщика: ${bargainDetails.baseFencePrice} уе<br>
                 Результат проверки: ${bargainDetails.success ? 'Успех ✓' : 'Провал ✗'}<br>
@@ -726,8 +867,8 @@ function confirmSale(item, itemId, itemType, price, bargainDetails = null) {
             </div>
             <div class="modal-body">
                 ${detailsHTML}
-                <p style="color: var(--text); margin-bottom: 1.5rem;">
-                    Продать <strong>${item.name}</strong> за <strong style="color: var(--success); font-size: 1.2rem;">${price} уе</strong>?
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1.5rem;">
+                    Продать <strong>${item.name}</strong> за <strong style="color: ${getThemeColors().success}; font-size: 1.2rem;">${price} уе</strong>?
                 </p>
                 
                 <div style="display: flex; gap: 1rem;">
@@ -782,11 +923,31 @@ function executeSale(itemId, itemType, price) {
     // Закрываем поп-ап "Подтвердите продажу"
     closeCurrentModal();
     
-    // Обновляем ассортимент скупщика
-    updateFenceShop();
+    // Закрываем исходное модальное окно "Хотите поторговаться?" (ищем по содержимому)
+    const allModals = document.querySelectorAll('.modal-overlay');
+    allModals.forEach(modal => {
+        const modalBody = modal.querySelector('.modal-body');
+        if (modalBody && modalBody.textContent.includes('У вас есть навык Торг')) {
+            modal.remove();
+        }
+    });
     
-    // Показываем уведомление
-    showAlertModal('Продано!', `Вы продали <strong>${item.name}</strong> за <strong>${price} уе</strong>.`);
+    // Обновляем ассортимент скупщика с небольшой задержкой для корректного обновления
+    setTimeout(() => {
+        console.log('🔄 Вызываем updateFenceShop()...');
+        updateFenceShop();
+        
+        // Если модальное окно не найдено, пробуем еще раз через небольшую задержку
+        setTimeout(() => {
+            console.log('🔄 Повторный вызов updateFenceShop()...');
+            updateFenceShop();
+        }, 100);
+        
+        // Показываем уведомление после обновления списка
+        setTimeout(() => {
+            showAlertModal('Продано!', `Вы продали <strong>${item.name}</strong> за <strong>${price} уе</strong>.`);
+        }, 200);
+    }, 200);
 }
 
 // Найти предмет по ID и типу
@@ -833,6 +994,9 @@ function findItemById(itemId, itemType) {
                 };
             }
             break;
+        case 'vehicle_module_inventory':
+            foundItem = state.vehicleModules.find(m => m.id === itemId);
+            break;
         case 'vehicle_module':
             const vParts = itemId.split('_module_');
             const vehicleId = vParts[0];
@@ -854,6 +1018,9 @@ function findItemById(itemId, itemType) {
             break;
         case 'vehicle':
             foundItem = state.property.vehicles.find(v => v.id === itemId);
+            break;
+        case 'housing':
+            foundItem = state.property.housing.find(h => h.id === itemId);
             break;
     }
     
@@ -900,6 +1067,10 @@ function removeItemFromInventory(itemId, itemType) {
                 implant.parts[partKey] = null;
             }
             break;
+        case 'vehicle_module_inventory':
+            state.vehicleModules = state.vehicleModules.filter(m => m.id !== itemId);
+            if (typeof renderVehicleModulesInventory === 'function') renderVehicleModulesInventory();
+            break;
         case 'vehicle_module':
             const vParts = itemId.split('_module_');
             const vehicleId = vParts[0];
@@ -907,7 +1078,21 @@ function removeItemFromInventory(itemId, itemType) {
             const vehicle = state.property.vehicles.find(v => v.id === vehicleId);
             if (vehicle && vehicle.modules) {
                 vehicle.modules.splice(vModuleIdx, 1);
-                renderVehicles();
+                renderTransport();
+            }
+            break;
+        case 'trunk_vehicle_module':
+        case 'trunk_gear':
+        case 'trunk_armor':
+        case 'trunk_drugs':
+        case 'trunk_item':
+            const tParts = itemId.split('_trunk_');
+            const tVehicleId = tParts[0];
+            const tTrunkIdx = parseInt(tParts[1]);
+            const tVehicle = state.property.vehicles.find(v => v.id === tVehicleId);
+            if (tVehicle && tVehicle.trunk) {
+                tVehicle.trunk.splice(tTrunkIdx, 1);
+                renderTransport();
             }
             break;
         case 'deck':
@@ -946,15 +1131,48 @@ function removeItemFromInventory(itemId, itemType) {
             }
             break;
         case 'vehicle':
+            // ВАЖНО: Возвращаем оружие из модулей в блок "Оружие" перед продажей
+            const vehicleToSell = state.property.vehicles.find(v => v.id === itemId);
+            if (vehicleToSell && vehicleToSell.modules && vehicleToSell.modules.length > 0) {
+                let totalWeaponsReturned = 0;
+                vehicleToSell.modules.forEach(module => {
+                    if (module.weapons && module.weapons.length > 0) {
+                        module.weapons.forEach(weapon => {
+                            state.weapons.push(weapon);
+                            totalWeaponsReturned++;
+                        });
+                    }
+                });
+                
+                if (totalWeaponsReturned > 0) {
+                    showToast(`Оружие из модулей транспорта (${totalWeaponsReturned} шт.) возвращено в блок "Оружие"`, 3000);
+                }
+            }
+            
             // Удаляем транспорт из списка
             state.property.vehicles = state.property.vehicles.filter(v => v.id !== itemId);
             
-            // Обновляем отображение транспорта
-            if (typeof renderVehicles === 'function') {
-                renderVehicles();
+            // Обновляем отображение транспорта и оружия
+            if (typeof renderTransportInventory === 'function') {
+                renderTransportInventory();
+            }
+            if (typeof renderWeapons === 'function') {
+                renderWeapons();
+            }
+            break;
+        case 'housing':
+            // Удаляем жилье из списка
+            state.property.housing = state.property.housing.filter(h => h.id !== itemId);
+            
+            // Обновляем отображение жилья
+            if (typeof renderHousing === 'function') {
+                renderHousing();
             }
             break;
     }
+    
+    // Сохраняем изменения
+    scheduleSave();
 }
 
 // Прямая продажа без подтверждения
@@ -984,8 +1202,19 @@ function confirmSaleDirect(itemId, itemType, price) {
     
     scheduleSave();
     
-    // Обновляем ассортимент скупщика
-    updateFenceShop();
+    // Обновляем ассортимент скупщика с небольшой задержкой для корректного обновления
+    setTimeout(() => {
+        updateFenceShop();
+    }, 200);
+    
+    // Закрываем модальное окно "Хотите поторговаться?" (ищем по содержимому)
+    const allModals = document.querySelectorAll('.modal-overlay');
+    allModals.forEach(modal => {
+        const modalBody = modal.querySelector('.modal-body');
+        if (modalBody && modalBody.textContent.includes('У вас есть навык Торг')) {
+            modal.remove();
+        }
+    });
     
     // Показываем уведомление
     showAlertModal('Продано!', `Вы продали <strong>${item.name}</strong> за <strong>${price} уе</strong>.`);
@@ -993,13 +1222,49 @@ function confirmSaleDirect(itemId, itemType, price) {
 
 // Функция обновления ассортимента скупщика
 function updateFenceShop() {
-    // Находим открытый поп-ап скупщика
-    const fenceModal = document.querySelector('.modal-overlay');
-    if (!fenceModal) return;
+    console.log('🔄 Обновление ассортимента скупщика...');
     
-    // Проверяем, что это именно поп-ап скупщика
-    const modalTitle = fenceModal.querySelector('h3');
-    if (!modalTitle || !modalTitle.textContent.includes('Скупщик')) return;
+    // Сначала пробуем найти по ID
+    let fenceModal = document.getElementById('fenceModal');
+    
+    if (!fenceModal) {
+        // Если не найдено по ID, ищем по заголовку
+        const modals = document.querySelectorAll('.modal-overlay');
+        console.log(`📋 Найдено модальных окон: ${modals.length}`);
+        
+        for (const modal of modals) {
+            const modalTitle = modal.querySelector('h3');
+            if (modalTitle && modalTitle.textContent.includes('Скупщик')) {
+                fenceModal = modal;
+                console.log('✅ Найдено модальное окно скупщика по заголовку');
+                break;
+            }
+        }
+    } else {
+        console.log('✅ Найдено модальное окно скупщика по ID');
+    }
+    
+    if (!fenceModal) {
+        console.log('❌ Модальное окно скупщика не найдено');
+        return;
+    }
+    
+    // Дополнительная проверка - убеждаемся, что модальное окно видимо
+    const computedStyle = window.getComputedStyle(fenceModal);
+    const isVisible = computedStyle.display !== 'none' && 
+                     computedStyle.visibility !== 'hidden' && 
+                     fenceModal.offsetParent !== null;
+    
+    if (!isVisible) {
+        console.log('❌ Модальное окно скупщика скрыто');
+        console.log(`Display: ${computedStyle.display}, Visibility: ${computedStyle.visibility}, OffsetParent: ${fenceModal.offsetParent}`);
+        
+        // Попробуем принудительно обновить, если модальное окно найдено
+        console.log('🔄 Попытка принудительного обновления...');
+        // Не возвращаемся, а продолжаем выполнение
+    } else {
+        console.log('✅ Модальное окно скупщика активно, обновляем список...');
+    }
     
     // Собираем новые предметы для продажи
     const sellableItems = getSellableItems();
@@ -1022,22 +1287,22 @@ function updateFenceShop() {
         const catalogPrice = item.price || 0;
         
         return `
-            <div class="item-card" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 8px; align-items: center;">
+            <div class="item-card" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 1rem; padding: 1rem; background: ${getThemeColors().bgLight}; border: 1px solid ${getThemeColors().border}; border-radius: 8px; align-items: center;">
                 <div>
-                    <div style="font-weight: 600; color: var(--text); margin-bottom: 0.25rem;">${item.name}</div>
-                    <div style="font-size: 0.8rem; color: var(--muted);">${item.category}</div>
+                    <div style="font-weight: 600; color: ${getThemeColors().text}; margin-bottom: 0.25rem;">${item.name}</div>
+                    <div style="font-size: 0.8rem; color: ${getThemeColors().muted};">${item.category}</div>
                 </div>
                 <div style="text-align: center;">
-                    <div style="font-size: 0.7rem; color: var(--muted); margin-bottom: 0.25rem;">По каталогу</div>
-                    <div style="font-weight: 600; color: var(--text);">${catalogPrice} уе</div>
+                    <div style="font-size: 0.7rem; color: ${getThemeColors().muted}; margin-bottom: 0.25rem;">По каталогу</div>
+                    <div style="font-weight: 600; color: ${getThemeColors().text};">${catalogPrice} уе</div>
                 </div>
                 <div style="text-align: center;">
-                    <div style="font-size: 0.7rem; color: var(--muted); margin-bottom: 0.25rem;">Предложение</div>
-                    <div style="font-weight: 600; color: var(--success);">${fencePrice} уе</div>
+                    <div style="font-size: 0.7rem; color: ${getThemeColors().muted}; margin-bottom: 0.25rem;">Предложение</div>
+                    <div style="font-weight: 600; color: ${getThemeColors().success};">${fencePrice} уе</div>
                 </div>
                 <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                     <button class="pill-button success-button" onclick="initiateSaleWithPrice('${item.id}', '${item.type}', ${fencePrice})" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">Продать</button>
-                    <button class="pill-button muted-button" onclick="enterManualPrice('${item.id}', '${item.type}')" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">Мастер назвал цену </button>
+                    ${canBargain() ? `<button class="pill-button muted-button" onclick="enterManualPrice('${item.id}', '${item.type}')" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">Мастер назвал цену</button>` : ''}
                 </div>
             </div>
         `;
@@ -1047,9 +1312,9 @@ function updateFenceShop() {
     const modalBody = fenceModal.querySelector('.modal-body');
     if (modalBody) {
         modalBody.innerHTML = `
-            <div style="padding: 1rem; background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; margin-bottom: 1.5rem;">
-                <p style="color: var(--text); font-size: 0.9rem; margin: 0; line-height: 1.5;">
-                    <strong style="color: var(--success);">Скупщик</strong> предлагает случайную цену от 20% до 70% от каталожной.<br>
+            <div style="padding: 1rem; background: ${getThemeColors().successLight}; border: 1px solid ${getThemeColors().success}; border-radius: 8px; margin-bottom: 1.5rem;">
+                <p style="color: ${getThemeColors().text}; font-size: 0.9rem; margin: 0; line-height: 1.5;">
+                    <strong style="color: ${getThemeColors().success};">Скупщик</strong> предлагает случайную цену от 20% до 70% от каталожной.<br>
                     Если у вас есть навык <strong>Торг</strong>, вы можете попробовать договориться о лучшей цене.
                 </p>
             </div>
@@ -1058,6 +1323,8 @@ function updateFenceShop() {
             </div>
         `;
     }
+    
+    console.log('✅ Ассортимент скупщика обновлен');
 }
 
 console.log('Fence.js loaded - Скупщик готов к работе');
