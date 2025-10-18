@@ -265,7 +265,8 @@ function addBicycleToTransport(bicycleId) {
     renderTransport();
     if (typeof renderGear === 'function') renderGear();
     
-    
+    // Сохраняем состояние
+    scheduleSave();
 }
 
 // Функция удаления велосипеда из транспорта (сложить обратно)
@@ -308,7 +309,8 @@ function removeBicycleFromTransport(vehicleId) {
     renderTransport();
     if (typeof renderGear === 'function') renderGear();
     
-    
+    // Сохраняем состояние
+    scheduleSave();
 }
 
 // Функция расчета скорости велосипеда
@@ -685,7 +687,14 @@ function renderTransportShopItems(category = 'ground') {
 // Функция рендеринга одного товара в магазине
 function renderTransportShopItem(vehicle) {
     const price = typeof vehicle.price === 'string' ? parseInt(vehicle.price.split('-')[0]) : vehicle.price;
-    const canAfford = state.money >= price;
+    
+    // Рассчитываем скидку от "Друга семьи"
+    const familyFriendLevel = getProfessionalSkillLevel('Друг семьи');
+    const familyFriendDiscount = familyFriendLevel * 10;
+    const totalDiscount = Math.min(familyFriendDiscount / 100, 1.0);
+    const finalPrice = Math.floor(price * (1 - totalDiscount));
+    
+    const canAfford = state.money >= finalPrice;
     const isOwned = state.property.vehicles?.some(v => v.name === vehicle.name);
     const isBicycle = vehicle.name === 'СКЛАДНОЙ ВЕЛОСИПЕД' || vehicle.linkedGearId;
     
@@ -707,7 +716,9 @@ function renderTransportShopItem(vehicle) {
             </div>
             
             <div class="shop-item-price">
-                ${price.toLocaleString()}
+                ${totalDiscount > 0 && finalPrice < price ? 
+                    `<span style="text-decoration: line-through; color: var(--muted);">${price.toLocaleString()}</span> <span style="color: var(--success); font-weight: 600;">${finalPrice.toLocaleString()}</span> <span style="color: var(--success); font-size: 0.8rem;">(-${Math.round(totalDiscount * 100)}%)</span> €` :
+                    `${price.toLocaleString()} €`}
             </div>
             
             ${isOwned ? `
@@ -717,7 +728,7 @@ function renderTransportShopItem(vehicle) {
             ` : `
                 <button 
                     class="shop-item-buy-btn"
-                    onclick="buyTransport('${vehicle.name}', ${price})"
+                    onclick="buyTransport('${vehicle.name}', ${finalPrice})"
                     ${!canAfford ? 'disabled' : ''}
                 >
                     Купить
@@ -795,6 +806,9 @@ function buyTransport(vehicleName, price) {
         mechanicalSpeed: vehicleData.mechanicalSpeed || vehicleData.speed || 0,
         narrativeSpeed: vehicleData.narrativeSpeed || '',
         price: price,
+        catalogPrice: vehicleData.price || price, // Цена по каталогу
+        purchasePrice: price, // Цена покупки (с учетом скидок)
+        itemType: 'purchased', // Тип предмета
         modules: [],
         trunk: {
             capacity: 100,
@@ -824,6 +838,13 @@ function buyTransport(vehicleName, price) {
     // Показываем уведомление
     showToast(`Куплен ${vehicleName} за ${price.toLocaleString()} уе`, 3000);
     
+    // Добавляем в лог
+    addToRollLog('purchase', {
+        item: vehicleName,
+        price: price,
+        category: 'Транспорт'
+    });
+    
     // Обновляем интерфейс
     updateMoneyDisplay();
     renderTransport();
@@ -834,7 +855,8 @@ function buyTransport(vehicleName, price) {
         shopList.innerHTML = renderTransportShopItems();
     }
     
-    
+    // Сохраняем состояние
+    scheduleSave();
 }
 
 // Функция генерации уникального ID для транспорта
@@ -1394,9 +1416,106 @@ function installVehicleModuleFromInventory(vehicleId, moduleId) {
     
     const module = state.vehicleModules[moduleInventoryIndex];
     
+    // Проверяем навыки для установки
+    const transportSkillLevel = state.skills.find(s => s.name === 'Транспорт')?.level || 0;
+    const familyFriendLevel = getProfessionalSkillLevel('Друг семьи');
+    
+    // Если есть навык Транспорт 4+ или Друг семьи - бесплатная установка
+    if (transportSkillLevel >= 4 || familyFriendLevel > 0) {
+        installVehicleModuleDirectly(vehicleId, moduleId, 0);
+        return;
+    }
+    
+    // Иначе показываем диалог с выбором способа установки
+    showVehicleModuleInstallDialog(vehicleId, moduleId, module);
+}
+
+// Функция показа диалога установки модуля транспорта
+function showVehicleModuleInstallDialog(vehicleId, moduleId, module) {
+    document.body.style.overflow = 'hidden';
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>🔧 Установка модуля</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 1rem;">
+                    <h4 style="color: ${getThemeColors().text}; margin-bottom: 0.5rem;">${module.name}</h4>
+                    <p style="color: ${getThemeColors().muted}; font-size: 0.9rem; margin-bottom: 1rem;">${module.description}</p>
+                </div>
+                
+                <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid #ffc107; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                    <h5 style="color: #ffc107; margin-bottom: 0.5rem;">⚠️ Требования для установки:</h5>
+                    <ul style="color: ${getThemeColors().text}; font-size: 0.9rem; margin: 0; padding-left: 1rem;">
+                        <li>Навык <strong>Транспорт</strong> 4 уровня или выше</li>
+                        <li>Профессиональный навык <strong>Друг семьи</strong></li>
+                        <li>Или оплата <strong>500 уе</strong> за установку</li>
+                    </ul>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; justify-content: center;">
+                    <button class="pill-button primary-button" onclick="installVehicleModuleDirectly('${vehicleId}', '${moduleId}', 500)" style="font-size: 0.9rem; padding: 0.5rem 1rem;">
+                        Установить за 500 уе
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
+}
+
+// Функция прямой установки модуля транспорта
+function installVehicleModuleDirectly(vehicleId, moduleId, installCost) {
+    // Находим транспорт
+    const vehicle = state.property.vehicles?.find(v => v.id === vehicleId);
+    if (!vehicle) {
+        showToast('Транспорт не найден!', 2000);
+        return;
+    }
+    
+    // Находим модуль в инвентаре
+    const moduleInventoryIndex = state.vehicleModules.findIndex(m => m.id === moduleId);
+    if (moduleInventoryIndex === -1) {
+        showToast('Модуль не найден в инвентаре!', 2000);
+        return;
+    }
+    
+    const module = state.vehicleModules[moduleInventoryIndex];
+    
     // Проверяем требования модуля
     if (module.requirements && module.requirements.length > 0) {
         // TODO: Добавить проверку требований если нужно
+    }
+    
+    // Проверяем деньги для установки
+    if (installCost > 0 && state.money < installCost) {
+        showModal('Недостаточно средств', `У вас ${state.money.toLocaleString()} уе, а нужно ${installCost.toLocaleString()} уе за установку.`);
+        return;
+    }
+    
+    // Списываем деньги если нужно
+    if (installCost > 0) {
+        state.money -= installCost;
+        updateMoneyDisplay();
     }
     
     // Создаем копию модуля для установки на транспорт
@@ -1429,20 +1548,32 @@ function installVehicleModuleFromInventory(vehicleId, moduleId) {
     }
     
     // Устанавливаем модуль на транспорт
-    if (!vehicle.modules) vehicle.modules = [];
+    if (!vehicle.modules) {
+        vehicle.modules = [];
+    }
     vehicle.modules.push(installedModule);
     
-    // Отмечаем модуль как установленный и меняем его вес на 0
-    state.vehicleModules[moduleInventoryIndex].isInstalled = true;
-    state.vehicleModules[moduleInventoryIndex].weight = 0;
-    state.vehicleModules[moduleInventoryIndex].installedOnVehicle = vehicleId;
-    
-    // Показываем уведомление
-    showToast(`Модуль "${module.name}" установлен на ${vehicle.name}`, 2000);
+    // Помечаем модуль как установленный в инвентаре
+    module.isInstalled = true;
+    module.installedOnVehicle = vehicleId;
+    module.weight = 0; // Установленные модули не занимают места в инвентаре
     
     // Обновляем интерфейс
     renderTransport();
-    renderVehicleModulesInventory();
+    scheduleSave();
+    
+    // Закрываем диалог установки
+    const installModal = document.querySelector('.modal-overlay:last-child');
+    if (installModal) {
+        installModal.remove();
+    }
+    
+    // Показываем уведомление
+    if (installCost > 0) {
+        showToast(`Модуль "${module.name}" установлен! Списано ${installCost} уе за установку`, 3000);
+    } else {
+        showToast(`Модуль "${module.name}" установлен бесплатно!`, 3000);
+    }
     
     // Перезагружаем модал
     const modal = document.getElementById('vehicleModulesModal');
@@ -2930,6 +3061,9 @@ function addTestVehicle() {
         mechanicalSpeed: 15,
         narrativeSpeed: '120 км/ч',
         price: 50000,
+        catalogPrice: 50000, // Цена по каталогу
+        purchasePrice: 50000, // Цена покупки
+        itemType: 'test', // Тип предмета
         modules: [],
         trunk: {
             capacity: 200,
@@ -2951,7 +3085,8 @@ function addTestVehicle() {
     
     renderTransport();
     
-    
+    // Сохраняем состояние
+    scheduleSave();
 }
 
 // Функция открытия модала рюкзака велосипеда

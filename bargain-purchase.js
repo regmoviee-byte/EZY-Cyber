@@ -225,7 +225,7 @@ function showPurchaseBargainResult(itemName, originalPrice, checkData, onSuccess
                     
                     <div style="margin-bottom: 1.5rem;">
                         <label class="input-label">Уровень Решалы (1-10):</label>
-                        <input type="number" class="input-field" id="purchaseFixerLevel" placeholder="Уровень" min="1" max="10" value="1">
+                        <input type="number" class="input-field" id="purchaseFixerLevel" placeholder="Уровень" min="1" max="10" value="${getProfessionalSkillLevel('Решала') || 1}">
                     </div>
                     
                     <div style="margin-bottom: 1rem; padding: 1rem; background: ${getThemeColors().successLight}; border: 1px solid ${getThemeColors().success}; border-radius: 8px; font-size: 0.85rem;">

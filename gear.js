@@ -921,7 +921,10 @@ function addBikeToVehicles(bikeItem) {
         seats: 1,
         mechanicalSpeed: speed,
         narrativeSpeed: `${speed} км/ч`,
-        category: 'ground'
+        category: 'ground',
+        catalogPrice: bikeItem.catalogPrice || 0, // Цена по каталогу
+        purchasePrice: bikeItem.purchasePrice || 0, // Цена покупки
+        itemType: bikeItem.itemType || 'free_default' // Тип предмета
     };
     
     state.property.vehicles.push(bikeVehicle);

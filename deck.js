@@ -297,6 +297,17 @@ function calculateProgramDiscount(program) {
     return Math.min(discount, 100); // Максимум 100% скидка
 }
 
+// Функция расчёта скидки на снаряжение для Деки
+function calculateDeckGearDiscount() {
+    let discount = 0;
+    
+    // Чёрный хакер: 5% скидка на всё снаряжение для Деки за уровень
+    const blackHackerLevel = getProfessionalSkillLevel('Чёрный хакер');
+    discount += blackHackerLevel * 5;
+    
+    return Math.min(discount, 100); // Максимум 100% скидка
+}
+
 // Функция расчёта финальной цены с учётом скидки
 function calculateFinalPrice(originalPrice, discount) {
     const price = parseInt(originalPrice) || 0;
@@ -4609,7 +4620,16 @@ function showDeckGearShop() {
                             
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
                                 <span style="color: ${getThemeColors().muted}; font-size: 0.9rem; font-weight: 600;">
-                                    ${item.price} уе
+                                    ${(() => {
+                                        const discount = calculateDeckGearDiscount();
+                                        if (discount > 0) {
+                                            const originalPrice = typeof item.price === 'string' ? parseInt(item.price.replace(/\s/g, '')) : parseInt(item.price);
+                                            const discountedPrice = Math.floor(originalPrice * (1 - discount / 100));
+                                            return `<span style="text-decoration: line-through; color: var(--muted);">${originalPrice}</span> <span style="color: var(--success); font-weight: 600;">${discountedPrice}</span> уе <span style="color: var(--success); font-size: 0.8rem;">(-${discount}%)</span>`;
+                                        } else {
+                                            return `${item.price} уе`;
+                                        }
+                                    })()}
                                 </span>
                                 <button class="pill-button primary-button" onclick="buyDeckGear('${item.name}', '${item.price}', '${item.type}', '${item.stat || ''}', ${item.maxValue || 0}, ${item.unique || false}, ${item.maxQuantity || 0})" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
                                     Купить
@@ -4647,8 +4667,13 @@ function buyDeckGear(name, priceStr, type, stat, maxValue, unique, maxQuantity, 
         price = parseInt(priceStr.replace(/\s/g, ''));
     }
     
-    if (state.money < price) {
-        showModal('Недостаточно средств', `У вас ${state.money.toLocaleString()} уе, а нужно ${price.toLocaleString()} уе.`);
+    // Рассчитываем скидку от "Чёрного хакера"
+    const discount = calculateDeckGearDiscount();
+    const discountedPrice = Math.floor(price * (1 - discount / 100));
+    const finalPrice = discount > 0 ? discountedPrice : price;
+    
+    if (state.money < finalPrice) {
+        showModal('Недостаточно средств', `У вас ${state.money.toLocaleString()} уе, а нужно ${finalPrice.toLocaleString()} уе.`);
         return;
     }
     
@@ -4681,7 +4706,7 @@ function buyDeckGear(name, priceStr, type, stat, maxValue, unique, maxQuantity, 
         maxQuantity: maxQuantity,
         installedDeckId: null,
         catalogPrice: catalogPrice || price,
-        purchasePrice: price,
+        purchasePrice: finalPrice,
         itemType: catalogPrice ? 'free_catalog' : 'purchased'
     };
     

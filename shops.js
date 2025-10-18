@@ -554,7 +554,6 @@ function showVehicleShop() {
     // Добавляем обработчики клавиатуры для правильной работы Enter
     addModalKeyboardHandlers(modal);
 }
-*/
 
 // Функция показа модального окна для выбора количества кают/секций
 function showVehicleQuantityModal(name, description, hp, seats, mechanicalSpeed, narrativeSpeed, priceString, category) {
