@@ -3420,11 +3420,6 @@ function takeWeaponFromGear(gearIndex) {
 }
 
 function updateLoadDisplay() {
-    // Пересчитываем нагрузку из инвентаря
-    if (typeof recalculateLoadFromInventory === 'function') {
-        recalculateLoadFromInventory();
-    }
-    
     // Обновляем отображение нагрузки
     const currentLoadEl = document.getElementById('currentLoad');
     const maxLoadEl = document.getElementById('maxLoad');
@@ -3449,6 +3444,17 @@ function updateLoadDisplay() {
     } else if (speedWarningEl) {
         speedWarningEl.style.display = 'none';
     }
+}
+
+// Функция для автоматического пересчета нагрузки из инвентаря
+function recalculateAndUpdateLoad() {
+    // Пересчитываем нагрузку из инвентаря
+    if (typeof recalculateLoadFromInventory === 'function') {
+        recalculateLoadFromInventory();
+    }
+    
+    // Обновляем отображение
+    updateLoadDisplay();
 }
 
 function resetLoad() {
@@ -3799,7 +3805,7 @@ window.buyGear = function(name, price, load, description, catalogPrice = null) {
     const itemData = { description, price, load };
     if (typeof handleSpecialGearPurchase === 'function' && handleSpecialGearPurchase(name, itemData)) {
         // Специальная обработка выполнена, не добавляем предмет обычным способом
-        updateLoadDisplay();
+        recalculateAndUpdateLoad();
         scheduleSave();
         
         // Добавляем в лог
@@ -3826,7 +3832,7 @@ window.buyGear = function(name, price, load, description, catalogPrice = null) {
     
     state.gear.push(newGear);
     renderGear();
-    updateLoadDisplay();
+    recalculateAndUpdateLoad();
     scheduleSave();
     
     // Добавляем в лог
@@ -3865,7 +3871,7 @@ function forceBuyGear(name, price, load, description) {
     
     state.gear.push(newGear);
     renderGear();
-    updateLoadDisplay();
+    recalculateAndUpdateLoad();
     scheduleSave();
 }
 
@@ -4015,7 +4021,7 @@ function savePickedGear() {
     
     state.gear.push(newGear);
     renderGear();
-    updateLoadDisplay();
+    recalculateAndUpdateLoad();
     scheduleSave();
     
     closeModal(document.querySelector('.modal-overlay .icon-button'));
@@ -4032,7 +4038,7 @@ function removeGear(index) {
             
             // Обновляем отображение
             renderGear();
-            updateLoadDisplay();
+            recalculateAndUpdateLoad();
             scheduleSave();
         }
 }

@@ -268,7 +268,12 @@ function updateDerivedStats() {
     if (maxLoadEl) maxLoadEl.textContent = derived.maxLoad;
     
     state.load.max = derived.maxLoad;
-    updateLoadDisplay();
+    
+    // Обновляем только отображение максимальной нагрузки, не пересчитывая текущую
+    const currentLoadEl = document.getElementById('currentLoad');
+    
+    if (currentLoadEl) currentLoadEl.textContent = state.load.current;
+    if (maxLoadEl) maxLoadEl.textContent = state.load.max;
 }
 
 // Функция пересчета нагрузки из инвентаря (исправление бага после перезагрузки)
@@ -282,6 +287,24 @@ function recalculateLoadFromInventory() {
             
             // Проверяем особые состояния предмета
             const isEquipped = item.equipped || item.worn || item.activated || item.installed;
+            
+            // Специальная логика для велосипеда
+            if (item.name === 'СКЛАДНОЙ ВЕЛОСИПЕД') {
+                if (item.bikeMode === 'ride') {
+                    // Велосипед в режиме "катить" - нагрузка 0
+                    return; // Пропускаем этот предмет
+                } else {
+                    // Велосипед в режиме "нести" - нагрузка 36
+                    totalLoad += 36;
+                    return;
+                }
+            }
+            
+            // Специальная логика для рюкзака, прикрепленного к велосипеду
+            if (item.attachedToBike && item.attachedToBikeId) {
+                // Рюкзак прикреплен к велосипеду - нагрузка 0
+                return; // Пропускаем этот предмет
+            }
             
             // Если предмет надето/активировано и имеет флаг zeroLoadWhenEquipped, нагрузка = 0
             if (isEquipped && item.zeroLoadWhenEquipped) {

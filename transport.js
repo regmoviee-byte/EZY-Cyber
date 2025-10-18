@@ -1920,9 +1920,6 @@ function manageVehicleTrunk(vehicleId) {
         };
     }
     
-    // Рассчитываем текущую загрузку
-    const currentLoad = (vehicle.trunk.items || []).reduce((sum, item) => sum + (item.load || 0), 0);
-    
     // Создаем модал
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -1930,27 +1927,11 @@ function manageVehicleTrunk(vehicleId) {
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 90vw; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header">
-                <h3 style="color: ${getThemeColors().accent}; margin: 0;">🎒 Багажник: ${vehicle.name}</h3>
+                <h3 style="color: ${getThemeColors().accent}; margin: 0;"><img src="https://static.tildacdn.com/tild6236-6432-4830-a337-666531333863/trunk.png" alt="🎒" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 0.5rem;"> Багажник: ${vehicle.name}</h3>
                 <button onclick="closeVehicleTrunkModal()" style="background: none; border: none; color: ${getThemeColors().muted}; font-size: 1.5rem; cursor: pointer;">&times;</button>
             </div>
             
             <div class="modal-body" style="padding: 1rem;">
-                <!-- Информация о загрузке -->
-                <div style="background: ${getThemeColors().accentLight}; border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <span style="color: ${getThemeColors().muted}; font-size: 0.9rem;">Загрузка:</span>
-                            <span style="color: ${getThemeColors().accent}; font-size: 1.2rem; font-weight: bold; margin-left: 0.5rem;">${currentLoad} / ${vehicle.trunk.capacity}</span>
-                        </div>
-                        <div style="background: ${getThemeColors().accentLight}; padding: 0.5rem 1rem; border-radius: 6px;">
-                            <span style="color: ${getThemeColors().accent}; font-weight: bold;">${Math.floor((currentLoad / vehicle.trunk.capacity) * 100)}%</span>
-                        </div>
-                    </div>
-                    <div style="background: ${getThemeColors().bgLight}; height: 8px; border-radius: 4px; margin-top: 0.5rem; overflow: hidden;">
-                        <div style="background: var(--accent); height: 100%; width: ${Math.min((currentLoad / vehicle.trunk.capacity) * 100, 100)}%; transition: width 0.3s ease;"></div>
-                    </div>
-                </div>
-                
                 <!-- Предметы в багажнике -->
                 <div style="margin-bottom: 2rem;">
                     <h4 style="color: ${getThemeColors().accent}; margin: 0 0 1rem 0;">Предметы в багажнике</h4>
@@ -2025,36 +2006,32 @@ function renderAvailableGearForTrunk(vehicle) {
         return '<p style="color: ${getThemeColors().muted}; text-align: center; padding: 2rem;">Нет доступных предметов в снаряжении</p>';
     }
     
-    const currentLoad = (vehicle.trunk.items || []).reduce((sum, item) => sum + (item.load || 0), 0);
-    
     return availableGear.map((item, index) => {
-        const canFit = currentLoad + (item.load || 0) <= vehicle.trunk.capacity;
+        const canFit = true; // Убрали ограничения по вместимости
         
         return `
             <div style="
                 background: linear-gradient(135deg, rgba(182, 103, 255, 0.1) 0%, rgba(182, 103, 255, 0.05) 100%);
-                border: 2px solid ${canFit ? 'var(--accent)' : '#dc3545'};
+                border: 2px solid var(--accent);
                 border-radius: 8px;
                 padding: 1rem;
                 margin-bottom: 1rem;
-                opacity: ${canFit ? '1' : '0.6'};
+                opacity: 1;
             ">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="flex: 1;">
-                        <h5 style="color: ${canFit ? 'var(--accent)' : '#dc3545'}; margin: 0 0 0.5rem 0;">📦 ${item.name}</h5>
+                        <h5 style="color: var(--accent); margin: 0 0 0.5rem 0;">📦 ${item.name}</h5>
                         <p style="color: ${getThemeColors().text}; font-size: 0.9rem; margin: 0 0 0.5rem 0;">${item.description || ''}</p>
                         <div style="font-size: 0.8rem; color: ${getThemeColors().muted};">
                             ⚖️ Нагрузка: ${item.load || 0}
                         </div>
-                        ${!canFit ? '<div style="font-size: 0.75rem; color: #dc3545; margin-top: 0.3rem;">⚠️ Не помещается в багажник</div>' : ''}
                     </div>
                     <button 
                         onclick="addItemToTrunk('${vehicle.id}', ${index})"
-                        class="pill-button ${canFit ? 'success-button' : 'danger-button'}"
+                        class="pill-button success-button"
                         style="font-size: 0.8rem; padding: 0.4rem 0.8rem;"
-                        ${!canFit ? 'disabled' : ''}
                     >
-                        ${canFit ? '➕ Положить' : '❌ Не помещается'}
+                        ➕ Положить
                     </button>
                 </div>
             </div>
@@ -2087,13 +2064,6 @@ function addItemToTrunk(vehicleId, itemIndex) {
         return;
     }
     
-    // Проверяем, поместится ли предмет
-    const currentLoad = (vehicle.trunk.items || []).reduce((sum, item) => sum + (item.load || 0), 0);
-    if (currentLoad + (item.load || 0) > vehicle.trunk.capacity) {
-        showToast('Недостаточно места в багажнике!', 2000);
-        return;
-    }
-    
     // Удаляем предмет из снаряжения
     const gearIndex = state.gear.findIndex(g => g === item);
     if (gearIndex !== -1) {
@@ -2101,7 +2071,24 @@ function addItemToTrunk(vehicleId, itemIndex) {
     }
     
     // Добавляем предмет в багажник
+    if (!vehicle.trunk) {
+        vehicle.trunk = {
+            capacity: 100,
+            items: []
+        };
+    }
+    if (!vehicle.trunk.items) {
+        vehicle.trunk.items = [];
+    }
     vehicle.trunk.items.push(item);
+    
+    // Пересчитываем нагрузку и обновляем отображение
+    if (typeof recalculateLoadFromInventory === 'function') {
+        recalculateLoadFromInventory();
+    }
+    if (typeof updateLoadDisplay === 'function') {
+        updateLoadDisplay();
+    }
     
     // Показываем уведомление
     showToast(`"${item.name}" добавлен в багажник`, 2000);
@@ -2111,6 +2098,9 @@ function addItemToTrunk(vehicleId, itemIndex) {
     
     // Обновляем модал
     updateVehicleTrunkModal(vehicleId);
+    
+    // Сохраняем состояние
+    if (typeof scheduleSave === 'function') scheduleSave();
     
     
 }
@@ -2126,8 +2116,19 @@ function removeItemFromTrunk(vehicleId, itemIndex) {
         return;
     }
     
+    // Инициализируем багажник, если его нет
+    if (!vehicle.trunk) {
+        vehicle.trunk = {
+            capacity: 100,
+            items: []
+        };
+    }
+    if (!vehicle.trunk.items) {
+        vehicle.trunk.items = [];
+    }
+    
     // Проверяем, есть ли предмет
-    if (!vehicle.trunk.items || !vehicle.trunk.items[itemIndex]) {
+    if (!vehicle.trunk.items[itemIndex]) {
         showToast('Предмет не найден!', 2000);
         return;
     }
@@ -2141,6 +2142,14 @@ function removeItemFromTrunk(vehicleId, itemIndex) {
     if (!state.gear) state.gear = [];
     state.gear.push(item);
     
+    // Пересчитываем нагрузку и обновляем отображение
+    if (typeof recalculateLoadFromInventory === 'function') {
+        recalculateLoadFromInventory();
+    }
+    if (typeof updateLoadDisplay === 'function') {
+        updateLoadDisplay();
+    }
+    
     // Показываем уведомление
     showToast(`"${item.name}" убран из багажника`, 2000);
     
@@ -2150,7 +2159,8 @@ function removeItemFromTrunk(vehicleId, itemIndex) {
     // Обновляем модал
     updateVehicleTrunkModal(vehicleId);
     
-    
+    // Сохраняем состояние
+    if (typeof scheduleSave === 'function') scheduleSave();
 }
 
 // Функция обновления модала багажника
@@ -2167,29 +2177,6 @@ function updateVehicleTrunkModal(vehicleId) {
     
     if (gearList) {
         gearList.innerHTML = renderAvailableGearForTrunk(vehicle);
-    }
-    
-    // Обновляем информацию о загрузке
-    const currentLoad = (vehicle.trunk.items || []).reduce((sum, item) => sum + (item.load || 0), 0);
-    const modalBody = document.querySelector('#vehicleTrunkModal .modal-body');
-    if (modalBody) {
-        const loadInfo = modalBody.querySelector('div[style*="background: rgba(182, 103, 255, 0.1)"]');
-        if (loadInfo) {
-            loadInfo.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <span style="color: ${getThemeColors().muted}; font-size: 0.9rem;">Загрузка:</span>
-                        <span style="color: ${getThemeColors().accent}; font-size: 1.2rem; font-weight: bold; margin-left: 0.5rem;">${currentLoad} / ${vehicle.trunk.capacity}</span>
-                    </div>
-                    <div style="background: ${getThemeColors().accentLight}; padding: 0.5rem 1rem; border-radius: 6px;">
-                        <span style="color: ${getThemeColors().accent}; font-weight: bold;">${Math.floor((currentLoad / vehicle.trunk.capacity) * 100)}%</span>
-                    </div>
-                </div>
-                <div style="background: ${getThemeColors().bgLight}; height: 8px; border-radius: 4px; margin-top: 0.5rem; overflow: hidden;">
-                    <div style="background: var(--accent); height: 100%; width: ${Math.min((currentLoad / vehicle.trunk.capacity) * 100, 100)}%; transition: width 0.3s ease;"></div>
-                </div>
-            `;
-        }
     }
 }
 
@@ -2341,36 +2328,32 @@ function renderAvailableGearForSmuggler(vehicle) {
         return '<p style="color: ${getThemeColors().muted}; text-align: center; padding: 2rem;">Нет доступных предметов в снаряжении</p>';
     }
     
-    const currentLoad = (vehicle.smugglerCompartment.items || []).reduce((sum, item) => sum + (item.load || 0), 0);
-    
     return availableGear.map((item, index) => {
-        const canFit = currentLoad + (item.load || 0) <= vehicle.smugglerCompartment.capacity;
+        const canFit = true; // Убрали ограничения по вместимости
         
         return `
             <div style="
                 background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 193, 7, 0.05) 100%);
-                border: 2px solid ${canFit ? '#ffc107' : '#dc3545'};
+                border: 2px solid #ffc107;
                 border-radius: 8px;
                 padding: 1rem;
                 margin-bottom: 1rem;
-                opacity: ${canFit ? '1' : '0.6'};
+                opacity: 1;
             ">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="flex: 1;">
-                        <h5 style="color: ${canFit ? '#ffc107' : '#dc3545'}; margin: 0 0 0.5rem 0;">🕳️ ${item.name}</h5>
+                        <h5 style="color: #ffc107; margin: 0 0 0.5rem 0;">🕳️ ${item.name}</h5>
                         <p style="color: ${getThemeColors().text}; font-size: 0.9rem; margin: 0 0 0.5rem 0;">${item.description || ''}</p>
                         <div style="font-size: 0.8rem; color: ${getThemeColors().muted};">
                             ⚖️ Нагрузка: ${item.load || 0}
                         </div>
-                        ${!canFit ? '<div style="font-size: 0.75rem; color: #dc3545; margin-top: 0.3rem;">⚠️ Не помещается</div>' : ''}
                     </div>
                     <button 
                         onclick="addItemToSmuggler('${vehicle.id}', ${index})"
-                        class="pill-button ${canFit ? 'warning-button' : 'danger-button'}"
+                        class="pill-button warning-button"
                         style="font-size: 0.8rem; padding: 0.4rem 0.8rem;"
-                        ${!canFit ? 'disabled' : ''}
                     >
-                        ${canFit ? '➕ Спрятать' : '❌ Не помещается'}
+                        ➕ Спрятать
                     </button>
                 </div>
             </div>
@@ -2398,12 +2381,6 @@ function addItemToSmuggler(vehicleId, itemIndex) {
     const item = availableGear[itemIndex];
     if (!item) {
         showToast('Предмет не найден!', 2000);
-        return;
-    }
-    
-    const currentLoad = (vehicle.smugglerCompartment.items || []).reduce((sum, item) => sum + (item.load || 0), 0);
-    if (currentLoad + (item.load || 0) > vehicle.smugglerCompartment.capacity) {
-        showToast('Недостаточно места!', 2000);
         return;
     }
     

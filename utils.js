@@ -443,7 +443,13 @@ function updateUIFromState() {
     
     // Принудительно обновляем все отображения
     updateMoneyDisplay();
-    updateLoadDisplay();
+    
+    // Пересчитываем нагрузку из инвентаря при загрузке
+    if (typeof recalculateAndUpdateLoad === 'function') {
+        recalculateAndUpdateLoad();
+    } else {
+        updateLoadDisplay();
+    }
     
     // Обновляем удачу
     const luckCurrent = document.getElementById('luckCurrent');
@@ -857,17 +863,14 @@ console.log('Utils.js loaded - вспомогательные функции з�
 
 // Функция обновления отображения нагрузки (копия из deck.js для совместимости)
 function updateLoadDisplay() {
-    // Пересчитываем нагрузку из инвентаря
-    if (typeof recalculateLoadFromInventory === 'function') {
-        recalculateLoadFromInventory();
-    }
+    // Не пересчитываем нагрузку автоматически - только обновляем отображение
     
     // Обновляем отображение нагрузки
     const currentLoadEl = document.getElementById('currentLoad');
     const maxLoadEl = document.getElementById('maxLoad');
     
-    if (currentLoadEl) currentLoadEl.textContent = state.load.current.toFixed(1);
-    if (maxLoadEl) maxLoadEl.textContent = state.load.max.toFixed(1);
+    if (currentLoadEl) currentLoadEl.textContent = state.load.current;
+    if (maxLoadEl) maxLoadEl.textContent = state.load.max;
     
     // Показываем штраф под "Скорость перемещения" только если нагрузка меньше 0
     const speedWarningEl = document.getElementById('speedWarning');

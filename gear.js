@@ -79,6 +79,9 @@ window.renderGear = function() {
             } else {
                 currentLoad = 36; // При ношении нагрузка 36
             }
+        } else if (item.attachedToBike && item.attachedToBikeId) {
+            // Рюкзак прикреплен к велосипеду - нагрузка 0
+            currentLoad = 0;
         } else if (item.equipped || item.worn || item.activated || item.installed) {
             if (item.zeroLoadWhenEquipped) {
                 currentLoad = 0;
@@ -572,6 +575,8 @@ function toggleMultitoolActivated(index, isActivated) {
     if (!item) return;
     
     item.activated = isActivated;
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
     scheduleSave();
     renderGear();
     
@@ -799,6 +804,7 @@ function toggleBackpackWorn(index, isWorn) {
     }
     
     recalculateLoadFromInventory();
+    updateLoadDisplay();
     renderGear();
     scheduleSave();
     
@@ -811,6 +817,8 @@ function setBackpackPosition(index, position) {
     if (!item) return;
     
     item.backpackPosition = position;
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
     scheduleSave();
     renderGear();
     
@@ -880,6 +888,8 @@ function setBikeMode(index, mode) {
         removeBikeFromVehicles(item.id);
     }
     
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
     scheduleSave();
     renderGear();
     renderTransport();
@@ -984,6 +994,8 @@ function attachBackpackToBike(bikeIndex) {
     }
     
     // Обновляем отображение
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
     renderGear();
     renderTransport();
     scheduleSave();
@@ -1012,6 +1024,8 @@ function detachBackpackFromBike(backpackIndex) {
     }
     
     // Обновляем отображение
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
     renderGear();
     renderTransport();
     scheduleSave();
@@ -1274,6 +1288,11 @@ function confirmInstallWeaponOnDrone(gearIndex, weaponIndex) {
     state.weapons.splice(weaponIndex, 1);
     
     closeModal(document.querySelector('.modal-overlay .icon-button'));
+    
+    // Пересчитываем нагрузку и обновляем отображение
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
+    
     renderGear();
     renderWeapons();
     scheduleSave();
@@ -1292,6 +1311,10 @@ function removeDroneWeapon(gearIndex) {
     
     // Убираем оружие с дрона
     drone.weaponSlot = null;
+    
+    // Пересчитываем нагрузку и обновляем отображение
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
     
     renderGear();
     renderWeapons();
@@ -1715,6 +1738,7 @@ function addItemToBackpack(backpackIndex, itemIndex) {
     
     // Пересчитываем нагрузку
     recalculateLoadFromInventory();
+    updateLoadDisplay();
     
     renderGear();
     scheduleSave();
@@ -1750,6 +1774,7 @@ function removeItemFromBackpack(backpackIndex, storageIndex) {
     
     // Пересчитываем нагрузку
     recalculateLoadFromInventory();
+    updateLoadDisplay();
     
     renderGear();
     scheduleSave();
@@ -2470,10 +2495,14 @@ function removeGear(index) {
         // Обновляем состояние сворачивания
         updateCollapsedItemsAfterRemoval('gear', index);
         
+        // Пересчитываем нагрузку и обновляем отображение
+        recalculateLoadFromInventory();
+        updateLoadDisplay();
+        
         // Обновляем UI и сохраняем
         renderGear();
         renderTransport();
-        updateLoadDisplay();
+        renderGear();
         scheduleSave();
     }
 }
