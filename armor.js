@@ -575,6 +575,183 @@ function showArmorShop() {
     addModalKeyboardHandlers(modal);
 }
 
+// Функция для обновления отображения брони с учетом укреплений
+function updateArmorDisplay() {
+    console.log('🛡️ updateArmorDisplay вызвана');
+    console.log('state.armor.reinforcement:', state.armor.reinforcement);
+    
+    // Убеждаемся, что укрепления инициализированы
+    if (!state.armor.reinforcement) {
+        state.armor.reinforcement = {
+            head: null,
+            body: null,
+            arms: null,
+            legs: null
+        };
+        console.log('⚠️ Инициализированы укрепления в updateArmorDisplay');
+    }
+    
+    // Обновляем ОС для каждой зоны с учетом укреплений
+    const zones = ['head', 'body', 'arms', 'legs'];
+    
+    zones.forEach(zone => {
+        const armorOS = parseInt(state.armor[zone].os) || 0;
+        const reinforcement = state.armor.reinforcement && state.armor.reinforcement[zone];
+        const reinforcementOS = reinforcement ? parseInt(reinforcement.os) || 0 : 0;
+        
+        console.log(`🔍 Зона ${zone}:`, {
+            armorOS,
+            reinforcement,
+            reinforcementOS,
+            armorData: state.armor[zone]
+        });
+        
+        // Показываем максимальное ОС (броня или укрепление)
+        const displayOS = Math.max(armorOS, reinforcementOS);
+        
+        // Обновляем поле ОС
+        const osInput = document.getElementById(`armor${zone.charAt(0).toUpperCase() + zone.slice(1)}OS`);
+        if (osInput) {
+            osInput.value = displayOS;
+            // НЕ обновляем state.armor[zone].os для укреплений - это может привести к потере данных
+            // Обновляем только если это обычная броня (не укрепление)
+            if (!reinforcement || armorOS > reinforcementOS) {
+                state.armor[zone].os = displayOS;
+            }
+        }
+        
+        // Обновляем тип брони с правильной логикой приоритета
+        const typeSpan = document.getElementById(`armor${zone.charAt(0).toUpperCase() + zone.slice(1)}Type`);
+        if (typeSpan) {
+            if (armorOS > 0 && reinforcement && reinforcementOS > 0) {
+                // Если есть и броня, и укрепление
+                if (armorOS > reinforcementOS) {
+                    // Броня сильнее укрепления - показываем только название брони
+                    typeSpan.textContent = state.armor[zone].type || '';
+                    console.log(`✅ Показана броня для ${zone}: ${state.armor[zone].type} (ОС ${armorOS} > ${reinforcementOS})`);
+                } else {
+                    // Укрепление сильнее или равно броне - показываем через слеш
+                    const reinforcementName = reinforcement.type === 'polymer' ? 'Полимер' : 'Полиметалл';
+                    typeSpan.textContent = `${reinforcementName} / ${state.armor[zone].type || ''}`;
+                    console.log(`✅ Показана комбинация для ${zone}: ${reinforcementName} / ${state.armor[zone].type}`);
+                }
+            } else if (reinforcement && reinforcementOS > 0) {
+                // Если есть только укрепление
+                const typeName = reinforcement.type === 'polymer' ? 'Полимер' : 'Полиметалл';
+                typeSpan.textContent = typeName;
+                console.log(`✅ Показано укрепление для ${zone}: ${typeName}`);
+            } else if (armorOS > 0) {
+                // Если есть только обычная броня
+                typeSpan.textContent = state.armor[zone].type || '';
+                console.log(`✅ Показана броня для ${zone}: ${state.armor[zone].type}`);
+            } else {
+                // Если нет ни брони, ни укрепления
+                typeSpan.textContent = '';
+                console.log(`❌ Нет брони и укрепления для ${zone}`);
+            }
+        }
+        
+        // Обновляем кнопку снятия брони - показываем только если есть обычная броня поверх укрепления
+        const removeButton = document.getElementById(`removeArmor${zone.charAt(0).toUpperCase() + zone.slice(1)}`);
+        if (removeButton) {
+            // Показываем кнопку снятия только если есть обычная броня (не укрепление)
+            const hasRegularArmor = armorOS > 0 && (!reinforcement || armorOS > reinforcementOS);
+            removeButton.style.display = hasRegularArmor ? 'block' : 'none';
+        }
+    });
+    
+    // Обновляем сообщение об укреплениях
+    updateReinforcementMessage();
+}
+
+// Функция для обновления сообщения об укреплениях
+function updateReinforcementMessage() {
+    const reinforcementContainer = document.getElementById('reinforcementMessage');
+    if (!reinforcementContainer) return;
+    
+    const reinforcements = state.armor.reinforcement;
+    if (!reinforcements) return;
+    
+    // Собираем уникальные типы укреплений
+    const uniqueReinforcements = new Map();
+    
+    ['head', 'body', 'arms', 'legs'].forEach(zone => {
+        if (reinforcements[zone]) {
+            const reinforcement = reinforcements[zone];
+            const typeName = reinforcement.type === 'polymer' ? 'полимером' : 'полиметаллом';
+            const zoneName = {
+                'head': 'голове',
+                'body': 'теле',
+                'arms': 'руках',
+                'legs': 'ногах'
+            }[zone];
+            
+            // Если такого типа еще нет, добавляем
+            if (!uniqueReinforcements.has(reinforcement.type)) {
+                uniqueReinforcements.set(reinforcement.type, {
+                    type: typeName,
+                    os: reinforcement.os,
+                    description: reinforcement.description,
+                    zones: []
+                });
+            }
+            
+            // Добавляем зону к существующему типу
+            uniqueReinforcements.get(reinforcement.type).zones.push(zoneName);
+        }
+    });
+    
+    if (uniqueReinforcements.size > 0) {
+        let messageHTML = `
+            <div style="background: ${getThemeColors().infoLight}; border-radius: 8px; padding: 1rem; margin-top: 1rem; border: 1px solid ${getThemeColors().info};">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <h6 style="color: ${getThemeColors().info}; margin: 0; font-size: 1rem; font-weight: 600;">Имплантированная броня</h6>
+                    <button onclick="toggleReinforcementDetails()" style="background: transparent; border: none; color: ${getThemeColors().info}; cursor: pointer; font-size: 1.2rem; padding: 0;" title="Свернуть/развернуть">▼</button>
+                </div>
+                <div id="reinforcementDetails" style="display: block;">
+        `;
+        
+        uniqueReinforcements.forEach((reinforcement, type) => {
+            const zonesText = reinforcement.zones.join(', ');
+            messageHTML += `
+                <div style="background: ${getThemeColors().bgMedium}; border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem;">
+                    <div style="color: ${getThemeColors().text}; font-weight: 600; margin-bottom: 0.25rem;">
+                        Укрепление ${reinforcement.type} (${reinforcement.os} ОС)
+                    </div>
+                    <div style="color: ${getThemeColors().muted}; font-size: 0.85rem; line-height: 1.4;">
+                        ${reinforcement.description}
+                    </div>
+                </div>
+            `;
+        });
+        
+        messageHTML += `
+                </div>
+            </div>
+        `;
+        
+        reinforcementContainer.innerHTML = messageHTML;
+    } else {
+        reinforcementContainer.innerHTML = '';
+    }
+}
+
+// Функция для сворачивания/разворачивания деталей укреплений
+function toggleReinforcementDetails() {
+    const details = document.getElementById('reinforcementDetails');
+    const button = document.querySelector('button[onclick="toggleReinforcementDetails()"]');
+    
+    if (details && button) {
+        if (details.style.display === 'none') {
+            details.style.display = 'block';
+            button.innerHTML = '▼';
+        } else {
+            details.style.display = 'none';
+            button.innerHTML = '▶';
+        }
+    }
+}
+
 // Функции для магазина брони
 function toggleArmorShopFreeMode() {
     window.armorShopFreeMode = !window.armorShopFreeMode;
@@ -978,11 +1155,19 @@ function confirmEquipArmor(armorId, bodyPart) {
         state.armorInventory.push(returnedArmor);
     }
     
+    // Определяем ОС укрепления для этой зоны, чтобы не понижать текущее отображаемое ОС
+    const reinforcement = state.armor.reinforcement && state.armor.reinforcement[bodyPart];
+    const reinforcementOS = reinforcement ? parseInt(reinforcement.os) || 0 : 0;
+    const effectiveOS = Math.max(armorPiece.os, reinforcementOS);
+
     // Надеваем новую броню с сохранением всей информации
     state.armor[bodyPart] = {
-        os: armorPiece.os,
+        // В state храним эффективную ОС, чтобы не понижать текущее значение при более слабой броне
+        os: effectiveOS,
         type: armorPiece.type,
         armorName: armorPiece.name, // Сохраняем оригинальное название
+        // Сохраняем исходную ОС надетой брони отдельно, чтобы корректно возвращать её в инвентарь
+        equippedArmorOS: armorPiece.os,
         price: armorPiece.price,
         catalogPrice: armorPiece.catalogPrice,
         purchasePrice: armorPiece.purchasePrice,
@@ -996,7 +1181,7 @@ function confirmEquipArmor(armorId, bodyPart) {
     const osField = document.getElementById(`armor${bodyPartCapitalized}OS`);
     const typeField = document.getElementById(`armor${bodyPartCapitalized}Type`);
     
-    if (osField) osField.value = armorPiece.os;
+    if (osField) osField.value = effectiveOS;
     if (typeField) {
         if (armorPiece.name.includes('Простые шмотки')) {
             typeField.textContent = 'Простые шмотки';
@@ -1098,6 +1283,23 @@ function removeEquippedArmor(bodyPart) {
     const currentArmor = state.armor[bodyPart];
     if (!currentArmor || currentArmor.os <= 0) return;
     
+    // Проверяем, есть ли укрепление в этой зоне
+    const reinforcement = state.armor.reinforcement && state.armor.reinforcement[bodyPart];
+    if (reinforcement) {
+        // Если есть укрепление, проверяем, есть ли обычная броня поверх него
+        const reinforcementOS = parseInt(reinforcement.os) || 0;
+        const armorOS = parseInt(currentArmor.os) || 0;
+        
+        // Если у брони нет armorName, значит это только укрепление, а не настоящая броня
+        if (!currentArmor.armorName && armorOS <= reinforcementOS) {
+            showNotification('Нельзя снять имплантированную броню!', 'error');
+            return;
+        }
+        
+        // Если есть armorName, значит это настоящая броня из инвентаря - можно снимать
+        console.log(`✅ Снимаем броню "${currentArmor.armorName}" с ОС ${armorOS} поверх укрепления с ОС ${reinforcementOS}`);
+    }
+    
     // Возвращаем броню в инвентарь с оригинальным названием
     // Удаляем часть тела из названия если она уже есть, чтобы добавить правильную
     let armorBaseName = currentArmor.armorName || `${currentArmor.type} броня`;
@@ -1122,22 +1324,30 @@ function removeEquippedArmor(bodyPart) {
     };
     state.armorInventory.push(returnedArmor);
     
-    // Обнуляем броню на части тела
+    // Обнуляем броню на части тела, но сохраняем укрепление если есть
+    const reinforcementOS = reinforcement ? parseInt(reinforcement.os) || 0 : 0;
+    
     state.armor[bodyPart] = {
-        os: 0,
+        os: 0, // ОС обычной брони обнуляем
         type: 'Лёгкая',
         activeDefense: false,
         activeDefenseType: 'Микроракеты'
     };
     
-    // Обновляем UI
+    // Обновляем UI - показываем ОС укрепления если есть
     const bodyPartCapitalized = bodyPart.charAt(0).toUpperCase() + bodyPart.slice(1);
     const osField = document.getElementById(`armor${bodyPartCapitalized}OS`);
     const typeField = document.getElementById(`armor${bodyPartCapitalized}Type`);
-    if (osField) osField.value = 0;
-    if (typeField) typeField.textContent = '';
+    
+    if (osField) {
+        // Показываем ОС укрепления если есть, иначе 0
+        osField.value = reinforcementOS;
+    }
+    
+    // Название типа будет обновлено в updateArmorDisplay
     
     renderArmorInventory();
+    updateArmorDisplay(); // Обновляем отображение с учетом укреплений
     updateArmorRemoveButtons();
     updateArmorPenalty();
     scheduleSave();
@@ -1163,10 +1373,32 @@ function updateArmorRemoveButtons() {
         }
         
         if (typeField) {
+            // Проверяем, есть ли укрепление в этой зоне
+            const reinforcement = state.armor.reinforcement && state.armor.reinforcement[part];
+            const reinforcementOS = reinforcement ? parseInt(reinforcement.os) || 0 : 0;
+            const armorOS = parseInt(armor.os) || 0;
+            
             if (armor && armor.armorName && armor.armorName.includes('Простые шмотки')) {
                 typeField.textContent = 'Простые шмотки';
                 console.log(`Type field for ${part}: Простые шмотки`);
-            } else if (armor && armor.os > 0) {
+            } else if (armorOS > 0 && reinforcement && reinforcementOS > 0) {
+                // Если есть и броня, и укрепление
+                if (armorOS > reinforcementOS) {
+                    // Броня сильнее укрепления - показываем только название брони
+                    typeField.textContent = armor.type;
+                    console.log(`Type field for ${part}: ${armor.type} (броня сильнее)`);
+                } else {
+                    // Укрепление сильнее или равно броне - показываем через слеш
+                    const reinforcementName = reinforcement.type === 'polymer' ? 'Полимер' : 'Полиметалл';
+                    typeField.textContent = `${reinforcementName} / ${armor.type}`;
+                    console.log(`Type field for ${part}: ${reinforcementName} / ${armor.type}`);
+                }
+            } else if (reinforcement && reinforcementOS > 0) {
+                // Если есть только укрепление, показываем его название
+                const typeName = reinforcement.type === 'polymer' ? 'Полимер' : 'Полиметалл';
+                typeField.textContent = typeName;
+                console.log(`Type field for ${part}: ${typeName} (укрепление)`);
+            } else if (armorOS > 0) {
                 typeField.textContent = armor.type;
                 console.log(`Type field for ${part}:`, armor.type);
             } else {
@@ -1355,5 +1587,22 @@ function buyBallisticShield(catalogPrice = null) {
 }
 
 console.log('✅ armor.js загружен - система брони готова');
+
+// Функция для тестирования состояния укреплений (временно для отладки)
+window.testReinforcements = function() {
+    console.log('🧪 Тестирование состояния укреплений:');
+    console.log('state.armor:', state.armor);
+    console.log('state.armor.reinforcement:', state.armor.reinforcement);
+    
+    if (state.armor.reinforcement) {
+        ['head', 'body', 'arms', 'legs'].forEach(zone => {
+            const reinforcement = state.armor.reinforcement[zone];
+            console.log(`${zone}:`, reinforcement);
+        });
+    }
+    
+    // Принудительно вызываем updateArmorDisplay
+    updateArmorDisplay();
+};
 
 

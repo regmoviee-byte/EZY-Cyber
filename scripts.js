@@ -619,6 +619,13 @@ function renderRollLog() {
                 text = `<img src="https://static.tildacdn.com/tild3765-3433-4435-b435-636665663530/target_1.png" alt="🎯" style="width: 16px; height: 16px; vertical-align: middle;"> Бросок инициативы: <strong style="color: var(--accent);">${entry.total}</strong> (2d6: ${entry.dice1}+${entry.dice2} + РЕА: ${entry.reaction} + Мод: ${entry.modifier}${d4Str})`;
                 break;
             
+            case 'implant_install':
+                const awarenessText = entry.awarenessLoss > 0 ? 
+                    `<span style="color: ${colors.danger};">-${entry.awarenessLoss}</span> осознанности` : 
+                    'без потери осознанности';
+                text = `<img src="https://static.tildacdn.com/tild6166-3331-4338-b038-623539346365/x-button.png" alt="🦾" style="width: 16px; height: 16px; vertical-align: middle;"> Установлен модуль: <strong>${entry.moduleName}</strong> (${entry.location}) - ${awarenessText} <span style="color: var(--muted); font-size: 0.8rem;">[${entry.slotsUsed} слотов]</span>`;
+                break;
+            
             default:
                 // Если тип содержит "🎯 Расчет расстояния", отображаем его как обычный текст
                 if (entry.type && entry.type.includes('🎯 Расчет расстояния')) {
@@ -874,10 +881,24 @@ function showSkillCheckModal(skillIndex) {
 }
 
 function closeModal(button) {
-    // Находим ближайший modal-overlay к кнопке
-    const modal = button ? button.closest('.modal-overlay') : null;
+    // Если передан button - находим ближайший modal-overlay к кнопке
+    // Если нет - находим любой открытый modal-overlay
+    let modal;
+    if (button) {
+        modal = button.closest('.modal-overlay');
+    } else {
+        // Находим последний открытый modal (с наибольшим z-index)
+        const modals = document.querySelectorAll('.modal-overlay');
+        if (modals.length > 0) {
+            modal = modals[modals.length - 1];
+        }
+    }
     if (modal) {
         modal.remove();
+        // Восстанавливаем скролл если это был последний модал
+        if (document.querySelectorAll('.modal-overlay').length === 0) {
+            document.body.style.overflow = '';
+        }
     }
 }
 
@@ -1049,7 +1070,7 @@ function formatMoney(value) {
 }
 
 // Функции для генерации ID
-function generateId(prefix) {
+window.generateId = function(prefix) {
     return prefix + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
@@ -2842,7 +2863,7 @@ function showManualBackstorySelection() {
             <div class="modal" style="max-width: 600px; width: 90%;">
                 <div class="modal-header">
                     <h3>Выбор предыстории (${currentStep + 1}/${steps.length})</h3>
-                    <button class="icon-button" onclick="closeModal(this)">×</button>
+                    <button class="icon-button" onclick="cancelBackstorySelection()">×</button>
                 </div>
                 <div class="modal-body">
                     <div style="background: ${getThemeColors().accentLight}; border: 1px solid ${getThemeColors().accent}; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
@@ -2859,7 +2880,7 @@ function showManualBackstorySelection() {
                     </div>
                     
                     <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
-                        <button class="pill-button muted-button" onclick="closeModal(this)" style="font-size: 0.9rem;">Отмена</button>
+                        <button class="pill-button muted-button" onclick="cancelBackstorySelection()" style="font-size: 0.9rem;">Отмена</button>
                         <div style="display: flex; gap: 0.5rem;">
                             ${currentStep > 0 ? `<button class="pill-button primary-button" onclick="previousBackstoryStep()" style="font-size: 0.9rem;">Назад</button>` : ''}
                             ${currentStep < steps.length - 1 ? `<button class="pill-button success-button" onclick="nextBackstoryStep()" style="font-size: 0.9rem;" ${!selectedOptions[stepKey] ? 'disabled' : ''}>Далее</button>` : ''}
@@ -2920,6 +2941,12 @@ function showManualBackstorySelection() {
             currentStep--;
             renderStep();
         }
+    };
+    
+    window.cancelBackstorySelection = function() {
+        // Закрываем модал и восстанавливаем скролл
+        modal.remove();
+        document.body.style.overflow = '';
     };
     
     window.finishBackstorySelection = function() {
@@ -3219,6 +3246,13 @@ document.addEventListener('DOMContentLoaded', () => {
         initNumericInputs();
         renderWeapons();
         initFloatingLogDrag();
+        
+        // Обновляем отображение брони после загрузки DOM
+        setTimeout(() => {
+            if (typeof updateArmorDisplay === 'function') {
+                updateArmorDisplay();
+            }
+        }, 100);
     }
     
     // Отслеживаем изменения размера окна
@@ -3292,6 +3326,54 @@ function checkAndAddAutoSkills() {
         if (typeof autoRemoveMedicineSkill === 'function') autoRemoveMedicineSkill();
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// БУРГЕР-МЕНЮ СИСТЕМА
+// ═══════════════════════════════════════════════════════════════════════
+
+let burgerMenuOpen = false;
+
+function toggleBurgerMenu() {
+    const menuItems = document.getElementById('burgerMenuItems');
+    const menuItemsArray = menuItems.querySelectorAll('.burger-menu-item');
+    
+    if (!burgerMenuOpen) {
+        // Открываем меню
+        menuItems.classList.add('open');
+        
+        // Анимируем появление каждой кнопки с задержкой
+        menuItemsArray.forEach((item, index) => {
+            setTimeout(() => {
+                item.classList.remove('animate-out');
+                item.classList.add('animate-in');
+            }, index * 100); // Задержка 100мс между каждой кнопкой
+        });
+        
+        burgerMenuOpen = true;
+    } else {
+        // Закрываем меню
+        // Анимируем исчезновение каждой кнопки с задержкой
+        menuItemsArray.forEach((item, index) => {
+            setTimeout(() => {
+                item.classList.remove('animate-in');
+                item.classList.add('animate-out');
+            }, index * 50); // Задержка 50мс между каждой кнопкой
+        });
+        
+        // Скрываем контейнер после завершения анимации
+        setTimeout(() => {
+            menuItems.classList.remove('open');
+            menuItemsArray.forEach(item => {
+                item.classList.remove('animate-out');
+            });
+        }, menuItemsArray.length * 50 + 300); // Ждем завершения всех анимаций
+        
+        burgerMenuOpen = false;
+    }
+}
+
+// Убеждаемся, что функция доступна глобально
+window.toggleBurgerMenu = toggleBurgerMenu;
 
 // Система заметок
 let notes = [];
@@ -5467,8 +5549,16 @@ function performClearAllData() {
                 parts: { main: null }
             },
             neuromodule: {
-                installed: false,
-                parts: { main: null }
+                installed: true,
+                parts: { 
+                    main: {
+                        slots: 3,
+                        modules: [null, null, null],
+                        catalogPrice: null,
+                        purchasePrice: 0,
+                        itemType: 'free_default'
+                    }
+                }
             }
         };
         
@@ -5480,7 +5570,13 @@ function performClearAllData() {
             head: { os: 0, type: 'Лёгкая', activeDefense: false, activeDefenseType: 'Микроракеты' },
             body: { os: 0, type: 'Лёгкая', activeDefense: false, activeDefenseType: 'Микроракеты' },
             arms: { os: 0, type: 'Лёгкая', activeDefense: false, activeDefenseType: 'Микроракеты' },
-            legs: { os: 0, type: 'Лёгкая', activeDefense: false, activeDefenseType: 'Микроракеты' }
+            legs: { os: 0, type: 'Лёгкая', activeDefense: false, activeDefenseType: 'Микроракеты' },
+            reinforcement: {
+                head: null,
+                body: null,
+                arms: null,
+                legs: null
+            }
         };
         
         // Титаническая броня

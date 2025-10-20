@@ -838,6 +838,9 @@ function rollWeaponDamage(damageFormula, weaponName, weaponType, weaponId, damag
     showAmmoSelectionModal(damageFormula, weaponName, weaponId, damageType);
 }
 
+// Экспортируем функцию в глобальную область видимости
+window.rollWeaponDamage = rollWeaponDamage;
+
 function showStandardDamageRoll(damageFormula, weaponName, weaponId) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -913,11 +916,46 @@ function executeMeleeDamageRoll(damageFormula, weaponName, weaponId) {
 }
 
 function showAmmoSelectionModal(damageFormula, weaponName, weaponId, damageType) {
-    // Получаем информацию об оружии
-    const weapon = state.weapons.find(w => w.id === weaponId);
-    if (!weapon) {
-        showModal('Ошибка', 'Оружие не найдено!');
-        return;
+    // Проверяем, это встроенное оружие, оружие на мини-станине или обычное
+    let weapon = null;
+    let isEmbeddedWeapon = false;
+    let isMiniStandWeapon = false;
+    let parts = null; // Объявляем parts в более широкой области видимости
+    
+    if (weaponId.startsWith('embedded_')) {
+        // Это встроенное оружие
+        isEmbeddedWeapon = true;
+        parts = weaponId.replace('embedded_', '').split('_');
+        const implantType = parts[0];
+        const partName = parts[1];
+        const slotIndex = parseInt(parts[2]);
+        
+        weapon = getImplantModule(implantType, partName, slotIndex);
+        if (!weapon) {
+            showModal('Ошибка', 'Модуль встроенного оружия не найден!');
+            return;
+        }
+    } else if (weaponId.startsWith('mini_stand_')) {
+        // Это оружие на мини-станине
+        isMiniStandWeapon = true;
+        parts = weaponId.replace('mini_stand_', '').split('_');
+        const implantType = parts[0];
+        const partName = parts[1];
+        const slotIndex = parseInt(parts[2]);
+        
+        const module = getImplantModule(implantType, partName, slotIndex);
+        if (!module || !module.weaponSlot) {
+            showModal('Ошибка', 'Оружие на мини-станине не найдено!');
+            return;
+        }
+        weapon = module.weaponSlot;
+    } else {
+        // Обычное оружие
+        weapon = state.weapons.find(w => w.id === weaponId);
+        if (!weapon) {
+            showModal('Ошибка', 'Оружие не найдено!');
+            return;
+        }
     }
     
     // Особая обработка для дробовиков
@@ -928,11 +966,20 @@ function showAmmoSelectionModal(damageFormula, weaponName, weaponId, damageType)
     
     // Проверяем, есть ли патроны в магазине
     if (!weapon.currentAmmo || weapon.currentAmmo <= 0 || !weapon.loadedAmmoType) {
+        let reloadFunction;
+        if (isEmbeddedWeapon) {
+            reloadFunction = `reloadEmbeddedWeapon('${parts[0]}', '${parts[1]}', ${parts[2]})`;
+        } else if (isMiniStandWeapon) {
+            reloadFunction = `reloadMiniStandWeapon('${parts[0]}', '${parts[1]}', ${parts[2]})`;
+        } else {
+            reloadFunction = `reloadWeapon('${weaponId}')`;
+        }
+            
         showModal('Магазин пуст', `
             <div style="text-align: center; padding: 1rem;">
                 <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 1rem;">Магазин пуст!</p>
                 <p style="color: ${getThemeColors().muted}; margin-bottom: 1rem;">Сначала перезарядите оружие</p>
-                <button class="pill-button primary-button" onclick="closeModal(this); setTimeout(() => reloadWeapon('${weaponId}'), 100)">Перезарядить</button>
+                <button class="pill-button primary-button" onclick="closeModal(this); setTimeout(() => ${reloadFunction}, 100)">Перезарядить</button>
             </div>
         `);
         return;
@@ -1013,7 +1060,7 @@ function showAmmoSelectionModal(damageFormula, weaponName, weaponId, damageType)
                 </div>
             </div>
             <div class="modal-footer" id="weaponDamageFooter">
-                <button class="pill-button primary-button" id="weaponShootButton" onclick="executeRangedWeaponDamageRoll('${damageFormula}', '${weaponName}', '${weaponId}', '${weaponTypeForAmmo}')">
+                <button class="pill-button primary-button" id="weaponShootButton" onclick="${isEmbeddedWeapon ? `executeEmbeddedWeaponDamageRoll('${damageFormula}', '${weaponName}', '${weaponId}', '${weaponTypeForAmmo}')` : isMiniStandWeapon ? `executeMiniStandWeaponDamageRoll('${damageFormula}', '${weaponName}', '${weaponId}', '${weaponTypeForAmmo}')` : `executeRangedWeaponDamageRoll('${damageFormula}', '${weaponName}', '${weaponId}', '${weaponTypeForAmmo}')`}">
                     &#x1F52B; Стрелять!
                 </button>
             </div>
@@ -1059,6 +1106,7 @@ function getWeaponTypeForAmmo(weaponName) {
         'Оружие с самонаведением': 'Оружие с самонаведением',
         'Гранатомёт': 'Гранаты',
         'Ракетомёт': 'Ракеты',
+        'Микроракеты': 'Микроракета',
         
         // Активная броня
         'Активная броня (Микроракета)': 'Микроракета',
@@ -1095,6 +1143,74 @@ function isAutomaticWeapon(weaponType) {
 
 function getMinAmmoForAuto(weaponType) {
     return weaponType === 'Пулемёт' ? 50 : 10;
+}
+
+// Функция для выполнения стрельбы из встроенного оружия
+window.executeEmbeddedWeaponDamageRoll = function(damageFormula, weaponName, weaponId, weaponType) {
+    // Парсим ID встроенного оружия
+    const parts = weaponId.replace('embedded_', '').split('_');
+    const implantType = parts[0];
+    const partName = parts[1];
+    const slotIndex = parseInt(parts[2]);
+    
+    const module = getImplantModule(implantType, partName, slotIndex);
+    if (!module) return;
+    
+    const modifier = parseInt(document.getElementById('damageModifier').value) || 0;
+    
+    // Определяем режим огня
+    const fireModeRadios = document.querySelectorAll('input[name="fireMode"]');
+    let fireMode = 'single';
+    for (const radio of fireModeRadios) {
+        if (radio.checked) {
+            fireMode = radio.value;
+            break;
+        }
+    }
+    
+    // Определяем количество патронов для списания
+    let ammoToConsume = 1;
+    let fireModeText = 'Одиночный выстрел';
+    
+    if (fireMode === 'auto') {
+        ammoToConsume = weaponType === 'Пулемёт' ? 50 : 10;
+        fireModeText = 'Автоматический огонь';
+    } else if (fireMode === 'suppression') {
+        ammoToConsume = weaponType === 'Пулемёт' ? 50 : 10;
+        fireModeText = 'Огонь на подавление';
+    }
+    
+    // Проверяем достаточность патронов в магазине оружия
+    if (module.currentAmmo < ammoToConsume) {
+        showModal('Недостаточно патронов', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 1rem;">Недостаточно патронов!</p>
+                <p style="color: ${getThemeColors().muted}; margin-bottom: 1rem;">Требуется: ${ammoToConsume}, доступно: ${module.currentAmmo}</p>
+            </div>
+        `);
+        return;
+    }
+    
+    // Скрываем секцию настройки и показываем анимацию
+    document.getElementById('weaponSetupSection').style.display = 'none';
+    document.getElementById('weaponDamageAnimation').style.display = 'block';
+    document.getElementById('weaponShootButton').style.display = 'none';
+    
+    // Выполняем бросок урона с анимацией
+    performWeaponDamageRoll(damageFormula, weaponName, modifier, null, null, null, weaponId, null, false, fireMode);
+    
+    // Списываем патроны
+    module.currentAmmo -= ammoToConsume;
+    
+    // Обновляем отображение имплантов
+    if (typeof renderImplants === 'function') renderImplants();
+    
+    // Сохраняем состояние
+    scheduleSave();
+    
+    // Логируем выстрел
+    const logMessage = `🔫 ${weaponName} (${fireModeText}): ${damageFormula}${modifier > 0 ? `+${modifier}` : modifier < 0 ? modifier : ''} | Патронов: ${module.currentAmmo}/${module.magazine}`;
+    addToRollLog(logMessage);
 }
 
 function executeRangedWeaponDamageRoll(damageFormula, weaponName, weaponId, weaponType) {
@@ -1155,6 +1271,92 @@ function executeRangedWeaponDamageRoll(damageFormula, weaponName, weaponId, weap
     
     // Выполняем бросок урона с анимацией
     performWeaponDamageRoll(actualDamageFormula, weaponName, modifier, weapon.loadedAmmoType, fireModeText, ammoToConsume, weaponId, weaponType, true, fireMode);
+}
+
+// Функция для выполнения броска урона оружия на мини-станине
+function executeMiniStandWeaponDamageRoll(damageFormula, weaponName, weaponId, weaponType) {
+    // Парсим ID мини-станины
+    const parts = weaponId.replace('mini_stand_', '').split('_');
+    const implantType = parts[0];
+    const partName = parts[1];
+    const slotIndex = parseInt(parts[2]);
+    
+    const module = getImplantModule(implantType, partName, slotIndex);
+    if (!module || !module.weaponSlot) return;
+    
+    const weapon = module.weaponSlot;
+    const modifier = parseInt(document.getElementById('damageModifier').value) || 0;
+    
+    // Определяем режим огня
+    const fireModeRadios = document.querySelectorAll('input[name="fireMode"]');
+    let fireMode = 'single';
+    for (const radio of fireModeRadios) {
+        if (radio.checked) {
+            fireMode = radio.value;
+            break;
+        }
+    }
+    
+    // Определяем количество патронов для списания
+    let ammoToConsume = 1;
+    let fireModeText = 'Одиночный выстрел';
+    
+    switch (fireMode) {
+        case 'single':
+            ammoToConsume = 1;
+            fireModeText = 'Одиночный выстрел';
+            break;
+        case 'burst':
+            ammoToConsume = 3;
+            fireModeText = 'Очередь';
+            break;
+        case 'auto':
+            ammoToConsume = 10;
+            fireModeText = 'Автоматический огонь';
+            break;
+        case 'suppression':
+            ammoToConsume = 20;
+            fireModeText = 'Огонь на подавление';
+            break;
+    }
+    
+    // Проверяем, достаточно ли патронов
+    if (weapon.currentAmmo < ammoToConsume) {
+        showModal('Недостаточно патронов', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 1rem;">Недостаточно патронов!</p>
+                <p style="color: ${getThemeColors().muted}; margin-bottom: 1rem;">Нужно: ${ammoToConsume}, доступно: ${weapon.currentAmmo}</p>
+            </div>
+        `);
+        return;
+    }
+    
+    // Списываем патроны
+    weapon.currentAmmo -= ammoToConsume;
+    
+    // Обновляем отображение имплантов
+    if (typeof renderImplants === 'function') renderImplants();
+    
+    // Сохраняем состояние
+    scheduleSave();
+    
+    // Скрываем секцию настройки и показываем анимацию
+    document.getElementById('weaponSetupSection').style.display = 'none';
+    document.getElementById('weaponDamageAnimation').style.display = 'block';
+    document.getElementById('weaponShootButton').style.display = 'none';
+    
+    // Определяем формулу урона в зависимости от режима огня
+    let actualDamageFormula = damageFormula;
+    if (fireMode === 'auto' || fireMode === 'suppression') {
+        actualDamageFormula = '2d6'; // Для автоматического огня и огня на подавление всегда 2d6
+    }
+    
+    // Выполняем бросок урона с анимацией
+    performWeaponDamageRoll(actualDamageFormula, weaponName, modifier, weapon.loadedAmmoType, fireModeText, ammoToConsume, weaponId, weaponType, true, fireMode);
+    
+    // Логируем выстрел
+    const logMessage = `🔫 ${weaponName} (${fireModeText}): ${damageFormula}${modifier > 0 ? `+${modifier}` : modifier < 0 ? modifier : ''} | Патронов: ${weapon.currentAmmo}/${weapon.maxAmmo || weapon.magazine}`;
+    addToRollLog(logMessage);
 }
 
 // Универсальная функция для броска урона с анимацией
@@ -1639,7 +1841,17 @@ function installWeaponModule(weaponId, slotIndex, gearIndex) {
     renderGear();
     renderWeapons();
     scheduleSave();
-    showModal('Модуль установлен', `&#x2705; ${module.name} установлен в оружие!`);
+    showModal('Модуль установлен', `
+        <div style="text-align: center; padding: 1.5rem;">
+            <div style="background: ${getThemeColors().bgLight}; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().border};">
+                <div style="font-size: 2rem; margin-bottom: 0.75rem; color: ${getThemeColors().accent};">✓</div>
+                <h4 style="color: ${getThemeColors().text}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 500;">${module.name} установлен в оружие</h4>
+            </div>
+            <button class="pill-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem; background: ${getThemeColors().accent}; color: ${getThemeColors().bg}; border: none;">
+                Отлично
+            </button>
+        </div>
+    `);
 }
 
 function removeWeaponModule(weaponId, slotIndex) {
@@ -2622,21 +2834,59 @@ function removeAmmo(index) {
 
 // Функция перезарядки оружия
 function reloadWeapon(weaponId) {
+    console.log('🔫 reloadWeapon вызвана с weaponId:', weaponId);
+    
     const weapon = state.weapons.find(w => w.id === weaponId);
+    console.log('🔍 Найденное оружие:', weapon);
+    
     if (!weapon || weapon.type !== 'ranged') {
+        console.error('❌ Оружие не найдено или не является дальним!');
         showModal('Ошибка', 'Оружие не найдено или не является дальним!');
         return;
     }
     
+    console.log('✅ Оружие найдено, тип:', weapon.type);
+    
     // Определяем тип оружия для поиска подходящих боеприпасов
-    const weaponTypeForAmmo = getWeaponTypeForAmmo(weapon.name);
+    let weaponTypeForAmmo;
+    
+    // Проверяем, является ли это встроенным оружием (по ID или флагу)
+    const isEmbeddedWeapon = weapon.isEmbedded || weapon.id.startsWith('embedded_');
+    
+    if (isEmbeddedWeapon) {
+        // Для встроенного оружия используем название оружия напрямую
+        // Но проверяем специальные случаи для совместимости с названиями боеприпасов
+        console.log('🔧 Встроенное оружие, weapon.name:', weapon.name);
+        console.log('🔧 Встроенное оружие, weapon.id:', weapon.id);
+        
+        // Дополнительная проверка по ID для микроракет
+        if (weapon.id.includes('embedded_') && weapon.id.includes('Микроракеты')) {
+            weaponTypeForAmmo = 'Микроракета';
+            console.log('🔧 Обнаружены микроракеты по ID, weaponTypeForAmmo:', weaponTypeForAmmo);
+        } else if (weapon.name === 'Гранатомёт') {
+            weaponTypeForAmmo = 'Гранаты'; // Боеприпасы имеют weaponType: "Гранаты"
+        } else if (weapon.name === 'Микроракеты') {
+            weaponTypeForAmmo = 'Микроракета'; // Для микроракет
+        } else {
+            weaponTypeForAmmo = weapon.name;
+        }
+        console.log('🔧 Встроенное оружие, weaponTypeForAmmo:', weaponTypeForAmmo);
+    } else {
+        weaponTypeForAmmo = getWeaponTypeForAmmo(weapon.name);
+        console.log('🔧 Обычное оружие, weaponTypeForAmmo:', weaponTypeForAmmo);
+    }
     
     // Находим подходящие боеприпасы
     const compatibleAmmo = state.ammo.filter(ammo => 
         ammo.weaponType === weaponTypeForAmmo && ammo.quantity > 0
     );
     
+    console.log('📦 Все боеприпасы в state.ammo:', state.ammo);
+    console.log('📦 Ищем боеприпасы с weaponType:', weaponTypeForAmmo);
+    console.log('📦 Совместимые боеприпасы:', compatibleAmmo);
+    
     if (compatibleAmmo.length === 0) {
+        console.warn('⚠️ Нет подходящих боеприпасов!');
         showModal('Нет боеприпасов', `
             <div style="text-align: center; padding: 1rem;">
                 <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 1rem;">У вас нет подходящих боеприпасов!</p>
@@ -2645,6 +2895,8 @@ function reloadWeapon(weaponId) {
         `);
         return;
     }
+    
+    console.log('✅ Найдены подходящие боеприпасы, создаем модальное окно');
     
     // Используем новую систему с блокировкой скролла
     document.body.style.overflow = 'hidden';
@@ -2724,6 +2976,14 @@ function reloadWeapon(weaponId) {
     
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
+            // Если это временное встроенное оружие, удаляем его при закрытии модального окна
+            if (weapon.isEmbedded && weapon.id.startsWith('embedded_')) {
+                const index = state.weapons.findIndex(w => w.id === weapon.id);
+                if (index !== -1) {
+                    state.weapons.splice(index, 1);
+                    console.log('➖ Временное встроенное оружие удалено при закрытии модального окна');
+                }
+            }
             closeModal(modal.querySelector('.icon-button'));
         }
     });
@@ -2732,12 +2992,37 @@ function reloadWeapon(weaponId) {
     addModalKeyboardHandlers(modal);
 }
 
-function executeReload(weaponId) {
+// Функция для выполнения перезарядки
+window.executeReload = function(weaponId) {
+    console.log('⚡ executeReload вызвана с weaponId:', weaponId);
+    
     const weapon = state.weapons.find(w => w.id === weaponId);
-    if (!weapon) return;
+    console.log('🔍 Найденное оружие в executeReload:', weapon);
+    
+    if (!weapon) {
+        console.error('❌ Оружие не найдено в executeReload!');
+        return;
+    }
     
     const selectedAmmoIndex = parseInt(document.getElementById('reloadAmmoType').value);
-    const weaponTypeForAmmo = getWeaponTypeForAmmo(weapon.name);
+    console.log('📋 Выбранный индекс боеприпасов:', selectedAmmoIndex);
+    
+    // Определяем тип оружия для поиска боеприпасов
+    let weaponTypeForAmmo;
+    if (weapon.isEmbedded) {
+        // Для встроенного оружия используем название оружия напрямую
+        // Но проверяем специальные случаи для совместимости с названиями боеприпасов
+        if (weapon.name === 'Гранатомёт') {
+            weaponTypeForAmmo = 'Гранаты'; // Боеприпасы имеют weaponType: "Гранаты"
+        } else if (weapon.name === 'Микроракеты') {
+            weaponTypeForAmmo = 'Микроракета'; // Для микроракет
+        } else {
+            weaponTypeForAmmo = weapon.name;
+        }
+    } else {
+        weaponTypeForAmmo = getWeaponTypeForAmmo(weapon.name);
+    }
+    
     const compatibleAmmo = state.ammo.filter(ammo => 
         ammo.weaponType === weaponTypeForAmmo && ammo.quantity > 0
     );
@@ -2785,7 +3070,24 @@ function executeReload(weaponId) {
         weapon.loadedAmmoType = selectedAmmo.type;
         
         renderAmmo();
-        renderWeapons();
+        if (weapon.isEmbedded) {
+            // Для встроенного оружия обновляем данные модуля и отображение имплантов
+            const parts = weapon.id.replace('embedded_', '').split('_');
+            const implantType = parts[0];
+            const partName = parts[1];
+            const slotIndex = parseInt(parts[2]);
+            
+            const module = getImplantModule(implantType, partName, slotIndex);
+            if (module) {
+                module.currentAmmo = weapon.currentAmmo;
+                module.loadedAmmoType = weapon.loadedAmmoType;
+            }
+            
+            if (typeof renderImplants === 'function') renderImplants();
+        } else {
+            // Для обычного оружия обновляем отображение оружия
+            renderWeapons();
+        }
         scheduleSave();
         
         closeModal(document.querySelector('.modal-overlay .icon-button'));
@@ -2801,6 +3103,15 @@ function executeReload(weaponId) {
                 <p style="color: ${getThemeColors().muted}; font-size: 0.9rem;">Тип: ${selectedAmmo.type} | Патронов: ${weapon.currentAmmo}/${weapon.maxAmmo}</p>
             </div>
         `);
+        
+        // Если это временное встроенное оружие, удаляем его из массива
+        if (weapon.isEmbedded && weapon.id.startsWith('embedded_')) {
+            const index = state.weapons.findIndex(w => w.id === weapon.id);
+            if (index !== -1) {
+                state.weapons.splice(index, 1);
+                console.log('➖ Временное встроенное оружие удалено из state.weapons');
+            }
+        }
     }
 }
 
@@ -3092,3 +3403,12 @@ showWeaponModulesShop = function() {
 };
 
 console.log('weapons.js loaded - weapon system ready');
+
+// Убеждаемся, что функция rollWeaponDamage доступна в глобальной области видимости
+if (typeof window.rollWeaponDamage !== 'function') {
+    window.rollWeaponDamage = rollWeaponDamage;
+    console.log('rollWeaponDamage экспортирована в глобальную область видимости');
+}
+
+// Экспортируем функцию для мини-станины
+window.executeMiniStandWeaponDamageRoll = executeMiniStandWeaponDamageRoll;

@@ -140,8 +140,9 @@ function renderGearSpecialFeatures(item, index, specialType) {
             <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
                 <span style="color: ${getThemeColors().accent}; font-size: 0.75rem;">ПЗ:</span>
                 <button onclick="decreaseGearHP(${index})" style="background: transparent; border: 1px solid var(--accent); color: ${getThemeColors().accent}; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem;">−</button>
-                <input type="number" value="${currentHp}" min="0" max="${maxHp}" 
+                <input type="text" value="${currentHp}" 
                     onchange="setGearHP(${index}, this.value)" 
+                    onkeypress="return event.charCode >= 48 && event.charCode <= 57"
                     style="width: 50px; background: ${getThemeColors().bgMedium}; border: 1px solid var(--accent); color: ${getThemeColors().text}; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.75rem; text-align: center;" />
                 <span style="color: ${getThemeColors().muted}; font-size: 0.7rem;">/${maxHp}</span>
                 <button onclick="increaseGearHP(${index})" style="background: transparent; border: 1px solid var(--accent); color: ${getThemeColors().accent}; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem;">+</button>
@@ -212,13 +213,14 @@ function renderGearSpecialFeatures(item, index, specialType) {
             break;
     }
     
-    // Кнопка установки импланта
-    if (item.type === 'implant') {
-        html += `
-            <div style="margin-top: 0.5rem;">
-                <button class="pill-button success-button" onclick="installImplantFromGear(${index})" style="font-size: 0.7rem; padding: 0.3rem 0.6rem;">Установить</button>
-            </div>
-        `;
+    // Щепка навыка - специальная обработка
+    if (item.isSkillChip) {
+        html += renderSkillChipFeatures(item, index);
+    }
+    
+    // Модули имплантов - добавляем кнопку установки для укреплений
+    if (item.type === 'implant' && item.implantData) {
+        html += renderImplantFeatures(item, index);
     }
     
     return html;
@@ -271,6 +273,64 @@ function set3DPrinterLocation(index, location) {
     if (!item) return;
     
     item.installedLocation = location;
+    scheduleSave();
+}
+
+// ============================================================================
+// ФУНКЦИИ ДЛЯ ЩЕПКИ НАВЫКА
+// ============================================================================
+
+function renderSkillChipFeatures(item, index) {
+    const isInserted = item.inserted || false;
+    
+    return `
+        <div style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(182, 103, 255, 0.1); border: 1px solid #b667ff; border-radius: 6px;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" ${isInserted ? 'checked' : ''} 
+                    onchange="toggleSkillChipInserted(${index}, this.checked)" 
+                    style="width: 16px; height: 16px; accent-color: #b667ff; cursor: pointer;">
+                <span style="color: #b667ff; font-weight: 600; font-size: 0.85rem;">Вставлена${item.awarenessLoss ? ` (теряет ${item.awarenessLoss} ПО при каждой активации)` : ''}</span>
+            </label>
+            ${isInserted ? `
+                <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(255, 91, 135, 0.1); border: 1px solid #ff5b87; border-radius: 4px;">
+                    <p style="color: #ff5b87; font-size: 0.75rem; margin: 0; line-height: 1.3;">
+                        ⚠️ При каждой активации щепки вы теряете ${item.awarenessLoss} Осознанности!
+                    </p>
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+function toggleSkillChipInserted(index, isInserted) {
+    const item = state.gear[index];
+    if (!item) return;
+    
+    const wasInserted = item.inserted || false;
+    
+    // Если вставляем щепку (переход с false на true), теряем осознанность
+    if (!wasInserted && isInserted && item.awarenessLoss) {
+        const lossRoll = rollDiceForAwarenessLoss(item.awarenessLoss);
+        const currentAwareness = parseInt(state.awareness.current) || 50;
+        state.awareness.current = Math.max(0, currentAwareness - lossRoll);
+        const awarenessEl = document.getElementById('awarenessCurrent');
+        if (awarenessEl) awarenessEl.value = state.awareness.current;
+        
+        // Показываем уведомление о потере осознанности
+        showModal('Щепка вставлена', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: ${getThemeColors().success}; font-size: 1.1rem; margin-bottom: 1rem;">✅ Щепка вставлена!</p>
+                <p style="color: ${getThemeColors().danger}; margin-bottom: 1rem;">Потеря осознанности: -${lossRoll}</p>
+                <p style="color: ${getThemeColors().muted}; font-size: 0.85rem;">Помните: при каждой активации щепки вы будете терять ${item.awarenessLoss} Осознанности!</p>
+                <button class="pill-button" onclick="closeModal(this)" style="margin-top: 1rem;">
+                    Закрыть
+                </button>
+            </div>
+        `);
+    }
+    
+    item.inserted = isInserted;
+    renderGear();
     scheduleSave();
 }
 
@@ -498,8 +558,9 @@ function renderArmoredDroneFeatures(item, index) {
             <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
                 <span style="color: ${getThemeColors().accent}; font-size: 0.75rem;">ПЗ:</span>
                 <button onclick="decreaseGearHP(${index})" style="background: transparent; border: 1px solid var(--accent); color: ${getThemeColors().accent}; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem;">−</button>
-                <input type="number" value="${item.currentHp}" min="0" max="${item.maxHp}" 
+                <input type="text" value="${item.currentHp}" 
                     onchange="setGearHP(${index}, this.value)" 
+                    onkeypress="return event.charCode >= 48 && event.charCode <= 57"
                     style="width: 50px; background: ${getThemeColors().bgMedium}; border: 1px solid var(--accent); color: ${getThemeColors().text}; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.75rem; text-align: center;" />
                 <span style="color: ${getThemeColors().muted}; font-size: 0.7rem;">/${item.maxHp}</span>
                 <button onclick="increaseGearHP(${index})" style="background: transparent; border: 1px solid var(--accent); color: ${getThemeColors().accent}; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem;">+</button>
@@ -2400,7 +2461,17 @@ function confirmInstallOpticalModule(glassesIndex, moduleIndex) {
     renderGear();
     scheduleSave();
     
-    showModal('Модуль установлен', `✅ ${module.name} установлен в очки!`);
+    showModal('Модуль установлен', `
+        <div style="text-align: center; padding: 1.5rem;">
+            <div style="background: ${getThemeColors().bgLight}; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().border};">
+                <div style="font-size: 2rem; margin-bottom: 0.75rem; color: ${getThemeColors().accent};">✓</div>
+                <h4 style="color: ${getThemeColors().text}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 500;">${module.name} установлен в очки</h4>
+            </div>
+            <button class="pill-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem; background: ${getThemeColors().accent}; color: ${getThemeColors().bg}; border: none;">
+                Отлично
+            </button>
+        </div>
+    `);
 }
 
 function removeOpticalModule(glassesIndex) {
@@ -2575,6 +2646,368 @@ function updateDEXDisplay() {
 }
 
 // ============================================================================
+// МАГАЗИН СНАРЯЖЕНИЯ
+// ============================================================================
+
+function showGearShop() {
+    document.body.style.overflow = 'hidden';
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    const originalRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+        document.body.style.overflow = '';
+        originalRemove();
+    };
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 90vw !important; max-height: 90vh !important; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3><img src="https://static.tildacdn.com/tild3363-6531-4132-a138-663132646531/remote-control.png" alt="🎒" style="width: 24px; height: 24px; margin-right: 0.5rem; vertical-align: middle;"> Магазин снаряжения</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            
+            <!-- Фильтры -->
+            <div style="padding: 1rem; border-bottom: 1px solid var(--border); display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button class="pill-button gear-category-filter active" onclick="filterGear('all')" data-category="all" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                    Все предметы
+                </button>
+                <button class="pill-button gear-category-filter" onclick="filterGear('tools')" data-category="tools" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                    Инструменты
+                </button>
+                <button class="pill-button gear-category-filter" onclick="filterGear('protection')" data-category="protection" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                    Защита
+                </button>
+                <button class="pill-button gear-category-filter" onclick="filterGear('tech')" data-category="tech" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                    Техника
+                </button>
+                <button class="pill-button gear-category-filter" onclick="filterGear('storage')" data-category="storage" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                    Хранилища
+                </button>
+                <button class="pill-button gear-category-filter" onclick="filterGear('chips')" data-category="chips" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+                    Щепки навыков
+                </button>
+            </div>
+            
+            <div class="modal-body" style="overflow-y: auto; flex: 1;" id="gearShopContainer">
+                <!-- Контент будет загружен через filterGear -->
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
+    
+    // Добавляем стили для фильтров
+    const style = document.createElement('style');
+    style.textContent = `
+        .gear-category-filter.active {
+            background: var(--accent) !important;
+            color: white !important;
+        }
+    `;
+    if (!document.getElementById('gear-filter-styles')) {
+        style.id = 'gear-filter-styles';
+        document.head.appendChild(style);
+    }
+    
+    // Загружаем все предметы по умолчанию
+    filterGear('all');
+    
+    addModalKeyboardHandlers(modal);
+}
+
+// Функция фильтрации снаряжения
+function filterGear(category) {
+    const container = document.getElementById('gearShopContainer');
+    if (!container) return;
+    
+    // Обновляем активный фильтр
+    document.querySelectorAll('.gear-category-filter').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-category') === category) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Проверяем, есть ли у игрока профессиональный навык "Глас народа"
+    const hasJournalistSkill = state.professionalSkills && state.professionalSkills.some(skill => 
+        skill && skill.name === 'Глас народа'
+    );
+    
+    // Фильтруем снаряжение по профессиональным навыкам
+    let filteredGear = GEAR_LIBRARY.filter(item => {
+        if (item.requiresProfSkill === 'Глас народа') {
+            return hasJournalistSkill;
+        }
+        return true;
+    });
+    
+    // Фильтруем по категориям
+    if (category !== 'all') {
+        filteredGear = filteredGear.filter(gear => {
+            const name = gear.name.toUpperCase();
+            const description = gear.description.toUpperCase();
+            
+            switch(category) {
+                case 'tools':
+                    return name.includes('ПРИНТЕР') || name.includes('АНАЛИЗАТОР') || 
+                           name.includes('ТЕПЛОВИЗОР') || name.includes('ЭНДОСКОП') ||
+                           name.includes('ДРОН') || name.includes('КАМЕРА') ||
+                           name.includes('СКАНЕР') || name.includes('ДЕТЕКТОР') ||
+                           name.includes('ИНСТРУМЕНТ') || name.includes('ОТВЕРТКА') ||
+                           name.includes('КЛЮЧ') || name.includes('ПИЛА') ||
+                           name.includes('ДРЕЛЬ') || name.includes('ПАЯЛЬНИК');
+                           
+                case 'protection':
+                    return name.includes('КОСТЮМ') || name.includes('ЗАЩИТА') ||
+                           name.includes('БРОНЯ') || name.includes('ЩИТ') ||
+                           name.includes('КАСКА') || name.includes('ПЕРЧАТКИ') ||
+                           name.includes('МАСКА') || name.includes('РЕСПИРАТОР') ||
+                           name.includes('АНТИРАДИАЦИОННЫЙ') || name.includes('ПРОТИВОГАЗ');
+                           
+                case 'tech':
+                    return name.includes('КОМПЬЮТЕР') || name.includes('ПЛАНШЕТ') ||
+                           name.includes('ТЕРМИНАЛ') || name.includes('ЧИП') ||
+                           name.includes('КАРТА') || name.includes('ДИСК') ||
+                           name.includes('ФЛЕШКА') || name.includes('ПАМЯТЬ') ||
+                           name.includes('ПРОЦЕССОР') || name.includes('МОДЕМ') ||
+                           name.includes('РАДИО') || name.includes('ПЕРЕДАТЧИК');
+                           
+                case 'storage':
+                    return name.includes('РЮКЗАК') || name.includes('СУМКА') ||
+                           name.includes('КЕЙС') || name.includes('КОНТЕЙНЕР') ||
+                           name.includes('ЯЩИК') || name.includes('КОРОБКА') ||
+                           name.includes('МЕШОК') || name.includes('КОШЕЛЕК');
+                           
+                case 'chips':
+                    return name.includes('ЩЕПКА НАВЫКА');
+                           
+                default:
+                    return true;
+            }
+        });
+    }
+    
+    // Рендерим отфильтрованные предметы
+    container.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1rem; padding: 1rem;">
+            ${filteredGear.map((gear, index) => {
+                const originalIndex = GEAR_LIBRARY.findIndex(g => g === gear);
+                const isSkillChip = gear.name.includes('ЩЕПКА НАВЫКА');
+                
+                return `
+                    <div class="shop-item" ${isSkillChip ? 'style="border: 2px solid #b667ff;"' : ''}>
+                        <div class="shop-item-header">
+                            <h4 class="shop-item-title">${gear.name}</h4>
+                        </div>
+                        
+                        <p class="shop-item-description">
+                            ${gear.description}
+                        </p>
+                        
+                        <div class="shop-item-stats">
+                            ${gear.awarenessLoss ? `<div class="shop-stat">Потеря осознанности: ${gear.awarenessLoss}</div>` : ''}
+                            <div class="shop-stat">Нагрузка: ${gear.load}</div>
+                        </div>
+                        
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                            <span style="color: ${getThemeColors().muted}; font-size: 0.9rem; font-weight: 600;">
+                                ${gear.price} уе
+                            </span>
+                            <button class="pill-button primary-button" onclick="buyGearItem(${originalIndex})" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
+                                Купить
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+function buyGearItem(index) {
+    const gear = GEAR_LIBRARY[index];
+    const currentMoney = parseInt(state.money) || 0;
+    
+    if (currentMoney < gear.price) {
+        showModal('Недостаточно денег', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 1rem;">Ха-ха, не так быстро, нищюк!</p>
+                <button class="pill-button" onclick="closeModal(this)">
+                    Закрыть
+                </button>
+            </div>
+        `);
+        return;
+    }
+    
+    // Проверяем, является ли это щепкой навыка
+    const isSkillChip = gear.name.includes('ЩЕПКА НАВЫКА');
+    
+    // Списываем деньги
+    state.money = currentMoney - gear.price;
+    updateMoneyDisplay();
+    
+    // Показываем сообщение о покупке только для обычных предметов
+    if (!isSkillChip) {
+        showModal('Предмет куплен', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: ${getThemeColors().success}; font-size: 1.1rem; margin-bottom: 1rem;">✅ Предмет куплен!</p>
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">
+                    <strong>${gear.name}</strong> добавлен в ваш инвентарь.
+                </p>
+                <button class="pill-button" onclick="closeModal(this)">
+                    Отлично
+                </button>
+            </div>
+        `);
+    }
+    
+    if (isSkillChip) {
+        // Показываем модал для ввода навыка
+        showModal('Выбор навыка для щепки', `
+            <div style="padding: 1rem;">
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">
+                    Введите название навыка, который содержится на этой щепке:
+                </p>
+                <input type="text" id="skillChipNameInput" 
+                    placeholder="Например: Взлом, Стрельба, Медицина..." 
+                    onkeypress="if(event.key==='Enter') confirmSkillChipPurchase(${index})"
+                    style="width: 100%; padding: 0.75rem; background: ${getThemeColors().bgMedium}; border: 1px solid ${getThemeColors().accent}; color: ${getThemeColors().text}; border-radius: 6px; font-size: 1rem; margin-bottom: 1rem;">
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                    <button class="pill-button" onclick="closeModal(this)" style="background: ${getThemeColors().bgMedium}; color: ${getThemeColors().text};">
+                        Отмена
+                    </button>
+                    <button class="pill-button primary-button" onclick="confirmSkillChipPurchase(${index})" style="background: ${getThemeColors().accent}; color: white;">
+                        Подтвердить
+                    </button>
+                </div>
+            </div>
+        `);
+        
+        // Фокусируемся на поле ввода
+        setTimeout(() => {
+            const input = document.getElementById('skillChipNameInput');
+            if (input) input.focus();
+        }, 100);
+    } else {
+        // Обычная покупка для не-щепок
+        addGearToInventory(gear, index);
+    }
+}
+
+// Функция для добавления обычного снаряжения в инвентарь
+function addGearToInventory(gear, index) {
+    // Добавляем снаряжение
+    const newGear = {
+        id: generateId('gear'),
+        name: gear.name,
+        description: gear.description,
+        price: gear.price,
+        load: gear.load,
+        type: gear.type || 'gear'
+    };
+    
+    state.gear.push(newGear);
+    renderGear();
+    scheduleSave();
+    
+    // Логируем покупку
+    addToRollLog('purchase', {
+        item: gear.name,
+        price: gear.price,
+        category: 'Снаряжение'
+    });
+}
+
+// Функция для подтверждения покупки щепки навыка
+window.confirmSkillChipPurchase = function(index) {
+    const skillName = document.getElementById('skillChipNameInput').value.trim();
+    
+    if (!skillName) {
+        showToast('Введите название навыка!', 3000);
+        return;
+    }
+    
+    if (skillName.length < 2) {
+        showToast('Название навыка должно содержать минимум 2 символа!', 3000);
+        return;
+    }
+    
+    // Закрываем модал выбора навыка сразу при нажатии "Подтвердить"
+    // Ищем модал с заголовком "Выбор навыка для щепки"
+    const modals = document.querySelectorAll('.modal-overlay');
+    modals.forEach(modal => {
+        const title = modal.querySelector('h3');
+        if (title && title.textContent.includes('Выбор навыка для щепки')) {
+            modal.remove();
+        }
+    });
+    
+    const gear = GEAR_LIBRARY[index];
+    if (!gear) return;
+    
+    // Списываем деньги
+    const currentMoney = parseInt(state.money) || 0;
+    if (currentMoney < gear.price) {
+        showToast('Недостаточно денег!', 3000);
+        return;
+    }
+    
+    state.money = currentMoney - gear.price;
+    updateMoneyDisplay();
+    
+    // Создаем щепку с кастомным названием
+    const newGear = {
+        id: generateId('gear'),
+        name: `ЩЕПКА НАВЫКА "${skillName.toUpperCase()}" (уровень ${gear.name.match(/уровень (\d+)/)?.[1] || 'N'})`,
+        description: gear.description,
+        price: gear.price,
+        load: gear.load,
+        type: gear.type || 'gear',
+        isSkillChip: true,
+        awarenessLoss: gear.awarenessLoss,
+        inserted: false,
+        skillName: skillName // Сохраняем оригинальное название навыка
+    };
+    
+    state.gear.push(newGear);
+    renderGear();
+    scheduleSave();
+    
+    // Логируем покупку
+    addToRollLog('purchase', {
+        item: newGear.name,
+        price: gear.price,
+        category: 'Щепка навыка'
+    });
+    
+    // Показываем сообщение о покупке с небольшой задержкой
+    setTimeout(() => {
+        showModal('Щепка навыка куплена', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: ${getThemeColors().success}; font-size: 1.1rem; margin-bottom: 1rem;">✅ Щепка навыка куплена!</p>
+                <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">
+                    <strong>${newGear.name}</strong> добавлена в ваш инвентарь.
+                </p>
+                <button class="pill-button" onclick="closeModal(this)">
+                    Отлично
+                </button>
+            </div>
+        `);
+    }, 100);
+};
+
+// ============================================================================
 // СПЕЦИАЛЬНАЯ ОБРАБОТКА ПОКУПОК
 // ============================================================================
 
@@ -2632,44 +3065,32 @@ function decreaseShieldHP(gearIndex) {
     scheduleSave();
 }
 
-function installImplantFromGear(gearIndex) {
-    const gear = state.gear[gearIndex];
-    if (!gear || !gear.implantData) return;
-    
-    const implantData = gear.implantData;
-    const lossRoll = rollDiceForAwarenessLoss(implantData.awarenessLoss);
-    
-    // Вычитаем из текущей осознанности
-    let currentAwareness;
-    if (typeof state.awareness === 'object') {
-        currentAwareness = parseInt(state.awareness.current) || 50;
-        state.awareness.current = Math.max(0, currentAwareness - lossRoll);
-    } else {
-        // Для старых сохранений где awareness - число
-        currentAwareness = parseInt(state.awareness) || 50;
-        state.awareness = {
-            current: Math.max(0, currentAwareness - lossRoll),
-            max: parseInt(state.stats.INT || 5) * 10
-        };
+// Функция installImplantFromGear удалена - модули имплантов устанавливаются через "Управление имплантами"
+
+// ============================================================================
+// ФУНКЦИИ ДЛЯ МОДУЛЕЙ ИМПЛАНТОВ
+// ============================================================================
+
+function renderImplantFeatures(item, index) {
+    // Проверяем, является ли это укреплением костной системы
+    if (item.implantData && item.implantData.specialInstall === 'bone_reinforcement') {
+        return `
+            <div style="margin-top: 0.5rem;">
+                <button class="pill-button success-button" onclick="showReinforcementInstallation(${index})" style="font-size: 0.75rem; padding: 0.4rem 0.8rem;">
+                    🛡️ Установить укрепление
+                </button>
+            </div>
+        `;
     }
     
-    const awarenessEl = document.getElementById('awarenessCurrent');
-    if (awarenessEl) awarenessEl.value = state.awareness.current;
-    
-    // Удаляем из снаряжения
-    state.gear.splice(gearIndex, 1);
-    
-    // Обновляем отображение
-    renderGear();
-    scheduleSave();
-    
-    showModal('Имплант установлен', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: ${getThemeColors().success}; font-size: 1.1rem; margin-bottom: 1rem;">✅ ${implantData.name} успешно установлен!</p>
-            <p style="color: ${getThemeColors().danger}; margin-bottom: 1rem;">Потеря осознанности: ${lossRoll}</p>
-            <p style="color: ${getThemeColors().muted};">Текущая осознанность: ${typeof state.awareness === 'object' ? state.awareness.current : state.awareness}</p>
+    // Для обычных имплантов показываем ссылку на управление имплантами
+    return `
+        <div style="margin-top: 0.5rem;">
+            <p style="color: ${getThemeColors().muted}; font-size: 0.7rem; margin: 0;">
+                Установка через "Управление имплантами"
+            </p>
         </div>
-    `);
+    `;
 }
 
 

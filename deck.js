@@ -1172,72 +1172,838 @@ function removeProgramFromChip(chipIndex, programIndex) {
         showModal('Программа удалена', `&#x2705; Программа удалена с щепки!`);
 }
 
-// Функции для работы с киберимплантами
-function renderImplants() {
-    const container = document.getElementById('implantsContainer');
-    if (!container) return;
+// Функция для отображения встроенного оружия в стиле обычного оружия
+function renderEmbeddedWeapon(module) {
+    // Определяем название оружия в зависимости от типа
+    let weaponName = 'Пистолет-пулемёт';
+    if (module.weaponType === 'Гранатомёт') {
+        weaponName = 'Гранатомёт';
+    } else if (module.weaponType === 'Лазерная кромка') {
+        weaponName = 'Лазерная кромка';
+    } else if (module.weaponType === 'Микроракеты') {
+        weaponName = 'Микроракеты';
+    } else if (module.weaponType === 'Моноструна') {
+        weaponName = 'Моноструна';
+    } else if (module.weaponType === 'Пневматический длинный клинок') {
+        weaponName = 'Пневматический длинный клинок';
+    } else if (module.weaponType === 'Складной клинок') {
+        weaponName = 'Складной клинок';
+    } else if (module.weaponType === 'Электропроводка') {
+        weaponName = 'Электропроводка';
+    } else if (module.weaponType === 'Скрытый нож') {
+        weaponName = 'Скрытый нож';
+    }
     
-    // Собираем все установленные модули из всех имплантов
-    const installedModules = [];
-    
-    for (const [implantType, implant] of Object.entries(state.implants)) {
-        if (!implant.parts) continue;
-        
-        for (const [partName, part] of Object.entries(implant.parts)) {
-            if (!part || !part.modules) continue;
+    return `
+        <div class="weapon-item" style="background: ${getThemeColors().bgLight}; border: 1px solid ${getThemeColors().accentLight}; border-radius: 8px; padding: 0.75rem; margin-top: 0.75rem; min-height: 120px;">
+            <div class="weapon-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; gap: 0.5rem;">
+                <div style="flex: 1;">
+                    <h4 style="color: ${getThemeColors().accent}; font-size: 0.95rem; margin: 0 0 0.25rem 0;">
+                        ${weaponName}${module.weaponType === 'Лазерная кромка' ? ` ×${module.count || 1}` : ''}
+                    </h4>
+                </div>
+                <!-- Нет кнопки "Сложить в сумку" для встроенного оружия -->
+            </div>
             
-            for (const module of part.modules) {
-                if (module) {
-                    installedModules.push({
-                        ...module,
-                        implantType: implantType,
-                        partName: partName,
-                        implantName: getImplantName(implantType),
-                        partDisplayName: getPartDisplayName(implantType, partName)
+            <div class="weapon-damage" style="margin-bottom: 0.5rem;">
+                ${module.weaponType === 'Гранатомёт' ? `
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Урон:</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'primary')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">2d20</button>
+                    </div>
+                ` : module.weaponType === 'Лазерная кромка' ? `
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Урон:</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'primary')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">${module.count || 1}d3</button>
+                    </div>
+                ` : module.weaponType === 'Микроракеты' ? `
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Урон:</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'primary')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">6d6</button>
+                    </div>
+                ` : module.weaponType === 'Моноструна' ? `
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Урон базовый:</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'primary')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">3d6</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Урон от огня:</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'fire')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">1d6</button>
+                    </div>
+                ` : module.weaponType === 'Пневматический длинный клинок' ? `
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Стандарт (Тяжёлое):</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'standard')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">3d6</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Удлинённые (Среднее):</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'extended')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">2d6</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Пневмо-усиление:</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'pneumatic')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">3d6</button>
+                    </div>
+                ` : module.weaponType === 'Складной клинок' ? `
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Урон:</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'primary')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">3d6</button>
+                    </div>
+                ` : module.weaponType === 'Электропроводка' ? `
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Урон (ЭМИ):</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'primary')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">5d6</button>
+                    </div>
+                ` : module.weaponType === 'Скрытый нож' ? `
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Урон:</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'primary')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">2d6</button>
+                    </div>
+                ` : `
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Урон основной:</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'primary')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">5d4</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.85rem;">Урон альтернативный:</span>
+                        <button class="pill-button primary-button" onclick="fireEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex}, 'alt')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">3d6</button>
+                    </div>
+                `}
+            </div>
+            
+            <div class="weapon-stats" style="font-family: monospace; font-size: 0.7rem; color: ${getThemeColors().muted}; margin-bottom: 0.5rem;">
+                ${module.weaponType === 'Гранатомёт' ? `
+                    Можно скрыть: да | # рук: 1 | СКА: 1 | Гранат в магазине: ${module.magazine}
+                ` : module.weaponType === 'Лазерная кромка' ? `
+                    Можно скрыть: да | # рук: 1 | СКА: +1 | Кромок: ${module.count || 1}/5
+                ` : module.weaponType === 'Микроракеты' ? `
+                    Можно скрыть: да | # рук: 0 | СКА: 1 | Микроракет в магазине: ${module.magazine}
+                ` : module.weaponType === 'Моноструна' ? `
+                    Можно скрыть: да | # рук: 1 | СКА: -2 | Тип: Тяжёлое ОББ
+                ` : module.weaponType === 'Пневматический длинный клинок' ? `
+                    Можно скрыть: да | # рук: 1 | СКА: -2 | Тип: Тяжёлое/Среднее ОББ | Заряд: ${module.charge || 10}/${module.maxCharge || 10}
+                ` : module.weaponType === 'Складной клинок' ? `
+                    Можно скрыть: да | # рук: 1 | СКА: -2 | Тип: Тяжёлое ОББ
+                ` : module.weaponType === 'Электропроводка' ? `
+                    Можно скрыть: да | # рук: 1 | СКА: 0 | Тип: Электрическое ОББ | Не игнорирует броню
+                ` : module.weaponType === 'Скрытый нож' ? `
+                    Можно скрыть: да | # рук: 1 | СКА: 0 | Тип: Среднее ОББ
+                ` : `
+                    Можно скрыть: да | # рук: 1 | СКА: 2 | Патронов в магазине: ${module.magazine}
+                `}
+            </div>
+            
+            ${module.weaponType !== 'Лазерная кромка' && module.weaponType !== 'Моноструна' && module.weaponType !== 'Пневматический длинный клинок' && module.weaponType !== 'Складной клинок' && module.weaponType !== 'Электропроводка' && module.weaponType !== 'Скрытый нож' ? `
+            <div class="weapon-magazine" style="margin-bottom: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                    <span style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 0.85rem;">
+                        ${module.weaponType === 'Гранатомёт' ? 'Гранаты в магазине:' : module.weaponType === 'Микроракеты' ? 'Микроракеты в магазине:' : 'Патроны в магазине:'}
+                    </span>
+                    <button class="pill-button success-button" onclick="reloadEmbeddedWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex})" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;">🔄 Перезарядить</button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="background: ${getThemeColors().accentLight}; border: 1px solid ${getThemeColors().accent}; border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                        <span style="color: ${getThemeColors().accent}; font-weight: 600;">${module.currentAmmo || 0}</span>
+                        <span style="color: ${getThemeColors().muted};">/</span>
+                        <span style="color: ${getThemeColors().text};">${module.magazine}</span>
+                    </div>
+                    ${module.loadedAmmoType ? `
+                        <div style="font-size: 0.75rem; color: ${getThemeColors().success}; font-family: monospace;">
+                            ${module.loadedAmmoType}
+                        </div>
+                    ` : `
+                        <div style="font-size: 0.75rem; color: ${getThemeColors().muted}; font-style: italic;">
+                            Не заряжено
+                        </div>
+                    `}
+                </div>
+            </div>
+            ` : ''}
+            
+            <div style="font-size: 0.7rem; color: ${getThemeColors().muted}; font-style: italic; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(182, 103, 255, 0.1);">
+                ${module.weaponType === 'Лазерная кромка' ? 'Лазерная кромка не влияет на нагрузку и всегда готова к использованию. Урон суммируется с обеих рук.' : module.weaponType === 'Моноструна' ? 'Моноструна не влияет на нагрузку и всегда готова к использованию. Идеальна для бесшумных убийств.' : module.weaponType === 'Пневматический длинный клинок' ? 'Пневматический длинный клинок не влияет на нагрузку и всегда готов к использованию. Три режима атаки: стандартный, удлинённые клинки и пневматическое усиление.' : module.weaponType === 'Складной клинок' ? 'Складной клинок не влияет на нагрузку и всегда готов к использованию. Скрываемое в теле тяжёлое оружие ближнего боя.' : module.weaponType === 'Электропроводка' ? 'Электропроводка не влияет на нагрузку и всегда готова к использованию. Наносит ЭМИ урон электричеством, не игнорирует броню.' : module.weaponType === 'Скрытый нож' ? 'Скрытый нож не влияет на нагрузку и всегда готов к использованию. Скрываемое в теле среднее оружие ближнего боя.' : 'Встроенное оружие не влияет на нагрузку и всегда готово к использованию'}
+            </div>
+        </div>
+    `;
+}
+
+// Функция для отображения оружия на мини-станине
+function renderMiniStandWeapon(module) {
+    if (!module || !module.weaponSlot) return '';
+    
+    const weapon = module.weaponSlot;
+    
+    return `
+        <div style="background: ${getThemeColors().bgMedium}; border: 1px solid rgba(182, 103, 255, 0.3); border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem;">
+            <div style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                ${weapon.customName || weapon.name}
+            </div>
+            
+            <div class="weapon-damage" style="margin-bottom: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                    <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.75rem;">Урон основной:</span>
+                    <button class="pill-button primary-button" onclick="rollMiniStandWeaponDamage('${module.implantType}', '${module.partName}', ${module.slotIndex}, '${weapon.primaryDamage}', '${weapon.name}', '${weapon.id}', 'primary')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">${weapon.primaryDamage}</button>
+                </div>
+                ${weapon.altDamage && weapon.altDamage !== '—' ? `
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: ${getThemeColors().text}; font-weight: 600; font-size: 0.75rem;">Урон альтернативный:</span>
+                        <button class="pill-button primary-button" onclick="rollMiniStandWeaponDamage('${module.implantType}', '${module.partName}', ${module.slotIndex}, '${weapon.altDamage}', '${weapon.name}', '${weapon.id}', 'alt')" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">${weapon.altDamage}</button>
+                    </div>
+                ` : ''}
+            </div>
+            
+            <div class="weapon-stats" style="font-family: monospace; font-size: 0.65rem; color: ${getThemeColors().muted}; margin-bottom: 0.5rem;">
+                Можно скрыть: ${formatYesNo(weapon.concealable)} | # рук: ${weapon.hands} | СКА: ${weapon.stealth} | Патронов в магазине: ${weapon.magazine}
+            </div>
+            
+            <div class="weapon-magazine" style="margin-bottom: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                    <span style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 0.75rem;">Патроны в магазине:</span>
+                    <button class="pill-button success-button" onclick="reloadMiniStandWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex})" style="font-size: 0.65rem; padding: 0.2rem 0.4rem;">🔄 Перезарядить</button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="background: ${getThemeColors().accentLight}; border: 1px solid ${getThemeColors().accent}; border-radius: 4px; padding: 0.2rem 0.4rem; font-size: 0.7rem;">
+                        <span style="color: ${getThemeColors().accent}; font-weight: 600;">${weapon.currentAmmo || 0}</span>
+                        <span style="color: ${getThemeColors().muted};">/</span>
+                        <span style="color: ${getThemeColors().text};">${weapon.maxAmmo || weapon.magazine}</span>
+                    </div>
+                    ${weapon.loadedAmmoType ? `
+                        <div style="font-size: 0.7rem; color: ${getThemeColors().success}; font-family: monospace;">
+                            ${weapon.loadedAmmoType}
+                        </div>
+                    ` : `
+                        <div style="font-size: 0.7rem; color: ${getThemeColors().muted}; font-style: italic;">
+                            Не заряжено
+                        </div>
+                    `}
+                </div>
+            </div>
+            
+            <div style="margin-top: 0.5rem;">
+                <button class="pill-button" onclick="removeMiniStandWeapon('${module.implantType}', '${module.partName}', ${module.slotIndex})" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;">
+                    <img src="https://static.tildacdn.com/tild3133-3737-4835-a636-353135666661/pistol_1.png" style="width: 16px; height: 16px; vertical-align: middle;"> Снять оружие
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Функция для стрельбы из встроенного оружия
+function fireEmbeddedWeapon(implantType, partName, slotIndex, damageType) {
+    const module = getImplantModule(implantType, partName, slotIndex);
+    if (!module || !module.weaponType) {
+        showModal('Ошибка', 'Модуль встроенного оружия не найден!');
+        return;
+    }
+    
+    // Определяем урон и название оружия в зависимости от типа
+    let damageFormula, weaponName;
+    if (module.weaponType === 'Гранатомёт') {
+        damageFormula = '2d20';
+        weaponName = 'Гранатомёт';
+    } else if (module.weaponType === 'Лазерная кромка') {
+        damageFormula = `${module.count || 1}d3`;
+        weaponName = 'Лазерная кромка';
+    } else if (module.weaponType === 'Микроракеты') {
+        damageFormula = '6d6';
+        weaponName = 'Микроракеты';
+    } else if (module.weaponType === 'Моноструна') {
+        damageFormula = damageType === 'fire' ? '1d6' : '3d6';
+        weaponName = 'Моноструна';
+    } else if (module.weaponType === 'Пневматический длинный клинок') {
+        if (damageType === 'standard') {
+            damageFormula = '3d6';
+            weaponName = 'Пневматический длинный клинок (Стандарт)';
+        } else if (damageType === 'extended') {
+            damageFormula = '2d6';
+            weaponName = 'Пневматический длинный клинок (Удлинённые)';
+        } else if (damageType === 'pneumatic') {
+            damageFormula = '3d6';
+            weaponName = 'Пневматический длинный клинок (Пневмо-усиление)';
+        }
+    } else if (module.weaponType === 'Складной клинок') {
+        damageFormula = '3d6';
+        weaponName = 'Складной клинок';
+    } else if (module.weaponType === 'Электропроводка') {
+        damageFormula = '5d6';
+        weaponName = 'Электропроводка';
+    } else if (module.weaponType === 'Скрытый нож') {
+        damageFormula = '2d6';
+        weaponName = 'Скрытый нож';
+    } else {
+        damageFormula = damageType === 'alt' ? '3d6' : '5d4';
+        weaponName = 'Пистолет-пулемёт';
+    }
+    
+    // Проверяем доступность функции rollWeaponDamage
+    if (typeof rollWeaponDamage !== 'function') {
+        console.error('rollWeaponDamage не доступна:', typeof rollWeaponDamage);
+        console.log('Доступные функции в window:', Object.keys(window).filter(key => key.includes('roll') || key.includes('Weapon')));
+        showModal('Ошибка', 'Система стрельбы не загружена! Проверьте консоль для подробностей.');
+        return;
+    }
+    
+    // Определяем тип оружия для правильной обработки
+    const weaponType = (module.weaponType === 'Моноструна' || 
+                       module.weaponType === 'Пневматический длинный клинок' || 
+                       module.weaponType === 'Складной клинок' || 
+                       module.weaponType === 'Электропроводка' || 
+                       module.weaponType === 'Скрытый нож' || 
+                       module.weaponType === 'Лазерная кромка') ? 'melee' : 'ranged';
+    
+    // Используем существующую систему стрельбы
+    try {
+        rollWeaponDamage(damageFormula, weaponName, weaponType, `embedded_${implantType}_${partName}_${slotIndex}`, damageType);
+    } catch (error) {
+        console.error('Ошибка при вызове rollWeaponDamage:', error);
+        showModal('Ошибка', 'Ошибка при выполнении стрельбы: ' + error.message);
+    }
+}
+
+// Экспортируем функцию в глобальную область видимости
+window.fireEmbeddedWeapon = fireEmbeddedWeapon;
+
+// Функция для перезарядки встроенного оружия
+function reloadEmbeddedWeapon(implantType, partName, slotIndex) {
+    console.log('🔄 reloadEmbeddedWeapon вызвана с параметрами:', { implantType, partName, slotIndex });
+    
+    const module = getImplantModule(implantType, partName, slotIndex);
+    console.log('📦 Найденный модуль:', module);
+    
+    if (!module || !module.weaponType) {
+        console.error('❌ Модуль встроенного оружия не найден!');
+        showModal('Ошибка', 'Модуль встроенного оружия не найден!');
+        return;
+    }
+    
+    console.log('✅ Модуль найден, weaponType:', module.weaponType);
+    
+    // Принудительно исправляем данные модуля, если это необходимо
+    if (module.name === "Микроракеты") {
+        module.weaponType = "Микроракеты";
+        module.magazine = 6;
+        module.currentAmmo = module.currentAmmo || 0;
+        module.loadedAmmoType = module.loadedAmmoType || null;
+        console.log('🔧 Принудительно исправлен модуль Микроракеты:', module);
+    }
+    
+    // Используем существующую систему перезарядки
+    if (typeof reloadWeapon === 'function') {
+        console.log('✅ Функция reloadWeapon найдена');
+        
+        // Создаем временный объект оружия для совместимости с существующей системой
+        const tempWeapon = {
+            id: `embedded_${implantType}_${partName}_${slotIndex}`,
+            name: module.weaponType === 'Гранатомёт' ? 'Гранатомёт' : 
+                  module.weaponType === 'Микроракеты' ? 'Микроракеты' : 
+                  module.weaponType === 'Лазерная кромка' ? 'Лазерная кромка' :
+                  module.weaponType === 'Моноструна' ? 'Моноструна' :
+                  module.weaponType === 'Пневматический длинный клинок' ? 'Пневматический длинный клинок' :
+                  module.weaponType === 'Складной клинок' ? 'Складной клинок' :
+                  module.weaponType === 'Электропроводка' ? 'Электропроводка' :
+                  module.weaponType === 'Скрытый нож' ? 'Скрытый нож' :
+                  'Пистолет-пулемёт',
+            type: 'ranged',
+            currentAmmo: module.currentAmmo || 0,
+            maxAmmo: module.magazine || (module.weaponType === 'Гранатомёт' ? 1 : 30),
+            loadedAmmoType: module.loadedAmmoType || null,
+            magazine: module.magazine || (module.weaponType === 'Гранатомёт' ? 1 : 30),
+            isEmbedded: true,
+            embeddedData: { implantType, partName, slotIndex }
+        };
+        
+        console.log('🔧 Создан временный объект оружия:', tempWeapon);
+        console.log('🔧 module.weaponType:', module.weaponType);
+        console.log('🔧 module.name:', module.name);
+        console.log('🔧 tempWeapon.name:', tempWeapon.name);
+        console.log('🔧 tempWeapon.isEmbedded:', tempWeapon.isEmbedded);
+        
+        // Временно добавляем в массив оружия для работы с существующей системой
+        const originalWeapon = state.weapons.find(w => w.id === tempWeapon.id);
+        if (!originalWeapon) {
+            state.weapons.push(tempWeapon);
+            console.log('➕ Временное оружие добавлено в state.weapons');
+        } else {
+            console.log('⚠️ Временное оружие уже существует в state.weapons');
+        }
+        
+        // Вызываем существующую функцию перезарядки
+        console.log('🎯 Вызываем reloadWeapon с ID:', tempWeapon.id);
+        reloadWeapon(tempWeapon.id);
+        
+        // НЕ удаляем временное оружие здесь - оно будет удалено в executeReload после завершения перезарядки
+        console.log('⏳ Временное оружие оставлено для завершения перезарядки');
+    } else {
+        console.error('❌ Функция reloadWeapon не найдена!');
+        showModal('Ошибка', 'Система перезарядки не загружена!');
+    }
+}
+
+// Экспортируем функцию в глобальную область видимости
+window.reloadEmbeddedWeapon = reloadEmbeddedWeapon;
+
+// ============================================================================
+// ФУНКЦИИ ДЛЯ РАБОТЫ С МИНИ-СТАНИНОЙ
+// ============================================================================
+
+// Функция для установки оружия на мини-станину
+function installWeaponOnMiniStand(implantType, partName, slotIndex) {
+    const module = getImplantModule(implantType, partName, slotIndex);
+    if (!module || module.name !== 'Внешняя мини-станина') {
+        showModal('Ошибка', 'Модуль мини-станины не найден!');
+        return;
+    }
+    
+    // Получаем список доступного оружия
+    const availableWeapons = state.weapons.filter(w => {
+        const weaponType = w.name;
+        return weaponType.includes('Лёгкий пистолет') || 
+               weaponType.includes('Обычный пистолет') || 
+               weaponType.includes('Пистолет-пулемёт') || 
+               weaponType.includes('Гранатомёт') ||
+               weaponType.includes('Тяжёлый пистолет-пулемёт') ||
+               weaponType.includes('Штурмовая винтовка') ||
+               weaponType.includes('Снайперская винтовка');
+    });
+    
+    if (availableWeapons.length === 0) {
+        showModal('Нет подходящего оружия', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: ${getThemeColors().danger}; margin-bottom: 1rem;">У вас нет подходящего оружия!</p>
+                <p style="color: ${getThemeColors().muted}; font-size: 0.9rem;">Можно установить: Лёгкий пистолет, Обычный пистолет, Пистолет-пулемёт, Гранатомёт, Тяжёлый пистолет-пулемёт, Штурмовая винтовка, Снайперская винтовка</p>
+            </div>
+        `);
+        return;
+    }
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>🔫 Установить оружие на мини-станину</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: ${getThemeColors().muted}; margin-bottom: 1rem;">Выберите оружие для установки:</p>
+                <div style="display: grid; gap: 0.5rem; max-height: 400px; overflow-y: auto;">
+                    ${availableWeapons.map((weapon, idx) => {
+                        const weaponIndex = state.weapons.findIndex(w => w.id === weapon.id);
+                        return `
+                            <div style="padding: 0.75rem; background: rgba(0,0,0,0.2); border: 1px solid var(--accent); border-radius: 6px; cursor: pointer;" onclick="confirmInstallWeaponOnMiniStand('${implantType}', '${partName}', ${slotIndex}, ${weaponIndex})">
+                                <div style="color: ${getThemeColors().accent}; font-weight: 600; margin-bottom: 0.25rem;">${weapon.customName || weapon.name}</div>
+                                <div style="color: ${getThemeColors().muted}; font-size: 0.75rem;">
+                                    Урон: ${weapon.primaryDamage} | Магазин: ${weapon.maxAmmo || weapon.magazine}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
+}
+
+// Функция подтверждения установки оружия на мини-станину
+function confirmInstallWeaponOnMiniStand(implantType, partName, slotIndex, weaponIndex) {
+    const module = getImplantModule(implantType, partName, slotIndex);
+    const weapon = state.weapons[weaponIndex];
+    
+    if (!module || !weapon) return;
+    
+    // Перемещаем оружие на мини-станину
+    module.weaponSlot = weapon;
+    
+    // Удаляем оружие из блока "Оружие"
+    state.weapons.splice(weaponIndex, 1);
+    
+    closeModal(document.querySelector('.modal-overlay .icon-button'));
+    
+    // Пересчитываем нагрузку и обновляем отображение
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
+    
+    renderImplants();
+    renderWeapons();
+    scheduleSave();
+    
+    showModal('Оружие установлено', `✅ ${weapon.customName || weapon.name} установлено на мини-станину!`);
+}
+
+// Функция для снятия оружия с мини-станины
+function removeMiniStandWeapon(implantType, partName, slotIndex) {
+    const module = getImplantModule(implantType, partName, slotIndex);
+    if (!module || !module.weaponSlot) return;
+    
+    const weapon = module.weaponSlot;
+    
+    // Возвращаем оружие в блок "Оружие"
+    state.weapons.push(weapon);
+    
+    // Убираем оружие с мини-станины
+    module.weaponSlot = null;
+    
+    // Пересчитываем нагрузку и обновляем отображение
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
+    
+    renderImplants();
+    renderWeapons();
+    scheduleSave();
+    
+    showModal('Оружие снято', `✅ ${weapon.customName || weapon.name} снято с мини-станины!`);
+}
+
+// Функция для броска урона оружия на мини-станине
+function rollMiniStandWeaponDamage(implantType, partName, slotIndex, damageFormula, weaponName, weaponId, damageType) {
+    const module = getImplantModule(implantType, partName, slotIndex);
+    if (!module || !module.weaponSlot) return;
+    
+    const weapon = module.weaponSlot;
+    
+    // Создаем специальный ID для оружия на мини-станине
+    const miniStandWeaponId = `mini_stand_${implantType}_${partName}_${slotIndex}`;
+    
+    // Проверяем, что функция rollWeaponDamage доступна
+    if (typeof rollWeaponDamage === 'function') {
+        rollWeaponDamage(damageFormula, weaponName, 'ranged', miniStandWeaponId, damageType);
+    } else {
+        showModal('Ошибка', 'Система броска урона не загружена!');
+    }
+}
+
+// Функция перезарядки оружия на мини-станине
+function reloadMiniStandWeapon(implantType, partName, slotIndex) {
+    const module = getImplantModule(implantType, partName, slotIndex);
+    if (!module || !module.weaponSlot) return;
+    
+    const weapon = module.weaponSlot;
+    
+    // Определяем тип оружия для поиска подходящих боеприпасов
+    let weaponTypeForAmmo;
+    
+    // Проверяем, является ли это встроенным оружием
+    if (weapon.name === 'Микроракеты') {
+        weaponTypeForAmmo = 'Микроракета'; // Для микроракет
+    } else if (weapon.name === 'Гранатомёт') {
+        weaponTypeForAmmo = 'Гранаты'; // Боеприпасы имеют weaponType: "Гранаты"
+    } else {
+        weaponTypeForAmmo = getWeaponTypeForAmmo(weapon.name);
+    }
+    
+    // Находим подходящие боеприпасы
+    const compatibleAmmo = state.ammo.filter(ammo => 
+        ammo.weaponType === weaponTypeForAmmo && ammo.quantity > 0
+    );
+    
+    if (compatibleAmmo.length === 0) {
+        showModal('Нет боеприпасов', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 1rem;">У вас нет подходящих боеприпасов!</p>
+                <p style="color: ${getThemeColors().muted}; margin-bottom: 1rem;">Купите боеприпасы для ${weaponTypeForAmmo}</p>
+            </div>
+        `);
+        return;
+    }
+    
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    modal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    modal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>🔄 Перезарядка: ${weapon.name}</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: ${getThemeColors().muted}; margin-bottom: 0.5rem;">Мини-станина: ${module.name}</p>
+                <div style="margin-bottom: 1rem;">
+                    <p style="color: ${getThemeColors().text}; margin-bottom: 0.5rem;"><strong>Текущее состояние:</strong></p>
+                    <p style="color: ${getThemeColors().muted}; font-size: 0.9rem;">
+                        Патронов: ${weapon.currentAmmo || 0}/${weapon.maxAmmo || weapon.magazine}
+                        ${weapon.loadedAmmoType ? ` | Тип: ${weapon.loadedAmmoType}` : ' | Не заряжено'}
+                    </p>
+                </div>
+                
+                <div style="margin-bottom: 1rem;">
+                    <label class="input-label">Выберите тип боеприпасов</label>
+                    <select class="input-field" id="reloadMiniStandAmmoType">
+                        ${compatibleAmmo.map((ammo, index) => `
+                            <option value="${index}">${ammo.type} (${ammo.quantity} шт.)</option>
+                        `).join('')}
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 1rem;">
+                    <label class="input-label">Количество патронов для зарядки</label>
+                    <input type="number" class="input-field" id="reloadMiniStandQuantity" 
+                           min="1" max="${weapon.maxAmmo || weapon.magazine}" 
+                           value="${weapon.maxAmmo || weapon.magazine}">
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                    <button class="pill-button" onclick="closeModal(this)">Отмена</button>
+                    <button class="pill-button success-button" onclick="confirmReloadMiniStandWeapon('${implantType}', '${partName}', ${slotIndex})">Перезарядить</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal(modal.querySelector('.icon-button'));
+        }
+    });
+}
+
+// Функция подтверждения перезарядки оружия на мини-станине
+function confirmReloadMiniStandWeapon(implantType, partName, slotIndex) {
+    const module = getImplantModule(implantType, partName, slotIndex);
+    if (!module || !module.weaponSlot) return;
+    
+    const weapon = module.weaponSlot;
+    const selectedAmmoIndex = parseInt(document.getElementById('reloadMiniStandAmmoType').value);
+    const quantity = parseInt(document.getElementById('reloadMiniStandQuantity').value);
+    
+    // Определяем тип оружия для поиска подходящих боеприпасов
+    let weaponTypeForAmmo;
+    
+    // Проверяем, является ли это встроенным оружием
+    if (weapon.name === 'Микроракеты') {
+        weaponTypeForAmmo = 'Микроракета'; // Для микроракет
+    } else if (weapon.name === 'Гранатомёт') {
+        weaponTypeForAmmo = 'Гранаты'; // Боеприпасы имеют weaponType: "Гранаты"
+    } else {
+        weaponTypeForAmmo = getWeaponTypeForAmmo(weapon.name);
+    }
+    const compatibleAmmo = state.ammo.filter(ammo => 
+        ammo.weaponType === weaponTypeForAmmo && ammo.quantity > 0
+    );
+    const selectedAmmo = compatibleAmmo[selectedAmmoIndex];
+    
+    if (!selectedAmmo) {
+        showModal('Ошибка', 'Выбранные боеприпасы не найдены!');
+        return;
+    }
+    
+    if (quantity > selectedAmmo.quantity) {
+        showModal('Ошибка', 'Недостаточно боеприпасов!');
+        return;
+    }
+    
+    if (quantity > (weapon.maxAmmo || weapon.magazine)) {
+        showModal('Ошибка', 'Слишком много патронов для этого оружия!');
+        return;
+    }
+    
+    // Перезаряжаем оружие
+    weapon.currentAmmo = quantity;
+    weapon.loadedAmmoType = selectedAmmo.type;
+    
+    // Уменьшаем количество боеприпасов
+    selectedAmmo.quantity -= quantity;
+    
+    // Обновляем отображение
+    renderImplants();
+    renderAmmo();
+    scheduleSave();
+    
+    closeModal(document.querySelector('.modal-overlay .icon-button'));
+    
+    showModal('Перезарядка завершена', `
+        <div style="text-align: center; padding: 1rem;">
+            <p style="color: ${getThemeColors().success}; font-size: 1.1rem; margin-bottom: 1rem;">✅ ${weapon.name} перезаряжен!</p>
+            <p style="color: ${getThemeColors().text}; margin-bottom: 0.5rem;">Патронов: ${quantity}/${weapon.maxAmmo || weapon.magazine}</p>
+            <p style="color: ${getThemeColors().muted}; font-size: 0.9rem;">Тип: ${selectedAmmo.type} | Осталось: ${selectedAmmo.quantity}/3</p>
+        </div>
+    `);
+}
+
+// Экспортируем функции в глобальную область видимости
+window.installWeaponOnMiniStand = installWeaponOnMiniStand;
+window.confirmInstallWeaponOnMiniStand = confirmInstallWeaponOnMiniStand;
+window.removeMiniStandWeapon = removeMiniStandWeapon;
+window.rollMiniStandWeaponDamage = rollMiniStandWeaponDamage;
+window.reloadMiniStandWeapon = reloadMiniStandWeapon;
+window.confirmReloadMiniStandWeapon = confirmReloadMiniStandWeapon;
+
+// Убеждаемся, что функция rollWeaponDamage доступна
+if (typeof window.rollWeaponDamage !== 'function' && typeof rollWeaponDamage === 'function') {
+    window.rollWeaponDamage = rollWeaponDamage;
+}
+
+// Убеждаемся, что функция reloadWeapon доступна
+if (typeof window.reloadWeapon !== 'function' && typeof reloadWeapon === 'function') {
+    window.reloadWeapon = reloadWeapon;
+}
+
+// Убеждаемся, что функция getWeaponTypeForAmmo доступна
+if (typeof window.getWeaponTypeForAmmo !== 'function' && typeof getWeaponTypeForAmmo === 'function') {
+    window.getWeaponTypeForAmmo = getWeaponTypeForAmmo;
+}
+
+// Вспомогательная функция для получения модуля импланта
+function getImplantModule(implantType, partName, slotIndex) {
+    console.log('🔍 getImplantModule вызвана с параметрами:', { implantType, partName, slotIndex });
+    
+    // Специальная обработка для суммированного модуля Лазерной кромки
+    if (implantType === 'arms' && partName === 'combined') {
+        let totalLaserEdges = 0;
+        let laserEdgeModule = null;
+        
+        for (const [impType, implant] of Object.entries(state.implants)) {
+            for (const [part, partData] of Object.entries(implant.parts)) {
+                if (partData && partData.modules) {
+                    partData.modules.forEach((module) => {
+                        if (module && module.name === "Лазерная кромка") {
+                            totalLaserEdges += module.count || 1;
+                            if (!laserEdgeModule) {
+                                laserEdgeModule = module;
+                            }
+                        }
                     });
                 }
             }
         }
+        
+        if (laserEdgeModule && totalLaserEdges > 0) {
+            return {
+                ...laserEdgeModule,
+                count: totalLaserEdges,
+                implantType: 'arms',
+                partName: 'combined',
+                slotIndex: 0
+            };
+        }
+        return null;
     }
     
-    if (installedModules.length === 0) {
-        container.innerHTML = '<p style="color: ${getThemeColors().muted}; text-align: center; padding: 2rem;">Киберимпланты не установлены</p>';
-        // Показываем кнопки управления
-        const buttonContainer = container.parentElement.querySelector('div[style*="display: flex"]');
-        if (buttonContainer) buttonContainer.style.display = 'flex';
-        return;
+    const implant = state.implants[implantType];
+    console.log('🦾 Найденный имплант:', implant);
+    
+    if (!implant || !implant.parts || !implant.parts[partName]) {
+        console.error('❌ Имплант или часть не найдены!');
+        return null;
     }
     
-    // Скрываем кнопки управления когда есть установленные модули
-    const buttonContainer = container.parentElement.querySelector('div[style*="display: flex"]');
-    if (buttonContainer) buttonContainer.style.display = 'none';
+    const part = implant.parts[partName];
+    console.log('🔧 Найденная часть:', part);
     
-    container.innerHTML = installedModules.map((module, index) => `
-        <div class="implant-item" style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;">
-            <div class="implant-info">
-                <div class="implant-name" style="color: ${getThemeColors().accent}; font-size: 1.1rem; font-weight: bold; margin-bottom: 0.5rem;">${module.name}</div>
-                <div class="implant-category" style="color: ${getThemeColors().success}; font-size: 0.9rem; margin-bottom: 0.5rem;">
-                    📍 Место установки: ${module.implantName} → ${module.partDisplayName}
-                </div>
-                <div class="implant-details" style="color: ${getThemeColors().text}; font-size: 0.9rem; margin-bottom: 0.5rem;">
-                    &#x26A0;&#xFE0F; Потеря осознанности: ${module.awarenessLoss}
-                </div>
-                <div class="implant-description" style="font-size: 0.9rem; color: ${getThemeColors().muted}; line-height: 1.4;">
-                    ${module.description}
-                </div>
-            </div>
-            <div class="implant-actions" style="margin-top: 1rem;">
-                <button class="pill-button" onclick="showImplantsManagement()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Управление</button>
-            </div>
-        </div>
-    `).join('') + `
-        <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem;">
-            <button class="pill-button primary-button" onclick="showImplantShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить модуль</button>
-            <button class="pill-button" onclick="showImplantPartsShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить часть импланта</button>
-            <button class="pill-button" onclick="showImplantsManagement()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Управление имплантами</button>
-        </div>
-    `;
+    if (!part || !part.modules || !part.modules[slotIndex]) {
+        console.error('❌ Часть или модуль не найдены!');
+        return null;
+    }
+    
+    const module = part.modules[slotIndex];
+    console.log('📦 Найденный модуль:', module);
+    
+    return module;
 }
+
+// Экспортируем функцию в глобальную область видимости
+window.getImplantModule = getImplantModule;
+
+// Функция для исправления данных существующих модулей встроенного оружия
+function fixExistingEmbeddedWeapons() {
+    for (const [implantType, implant] of Object.entries(state.implants)) {
+        for (const [partName, partData] of Object.entries(implant.parts)) {
+            if (partData && partData.modules) {
+                partData.modules.forEach((module, slotIndex) => {
+                    if (module && (module.name === "Встроенное оружие" || module.name === "Интегрированный гранатомёт" || module.name === "Лазерная кромка" || module.name === "Микроракеты" || module.name === "Моноструна" || module.name === "Пневматический длинный клинок" || module.name === "Складной клинок" || module.name === "Электропроводка" || module.name === "Скрытый нож")) {
+                        // Исправляем данные модуля
+                        if (module.name === "Встроенное оружие") {
+                            module.magazine = 20;
+                            module.currentAmmo = 0;
+                            module.loadedAmmoType = null;
+                            module.weaponType = "ПП";
+                        } else if (module.name === "Интегрированный гранатомёт") {
+                            module.magazine = 1;
+                            module.currentAmmo = 1;
+                            module.loadedAmmoType = null;
+                            module.weaponType = "Гранатомёт";
+                        } else if (module.name === "Лазерная кромка") {
+                            module.weaponType = "Лазерная кромка";
+                            module.count = module.count || 1;
+                            module.damagePerEdge = 1;
+                        } else if (module.name === "Микроракеты") {
+                            module.weaponType = "Микроракеты";
+                            module.magazine = 6;
+                            module.currentAmmo = 0; // Исправляем на 0
+                            module.loadedAmmoType = null; // Исправляем на null
+                        } else if (module.name === "Моноструна") {
+            module.weaponType = "Моноструна";
+            module.meleeType = "Тяжёлое";
+            module.baseDamage = "3d6";
+            module.fireDamage = "1d6";
+        } else if (module.name === "Пневматический длинный клинок") {
+            module.weaponType = "Пневматический длинный клинок";
+            module.meleeType = "Тяжёлое/Среднее";
+            module.standardDamage = "3d6";
+            module.extendedDamage = "2d6";
+            module.pneumaticDamage = "3d6";
+            module.charge = module.charge || 10;
+            module.maxCharge = module.maxCharge || 10;
+        } else if (module.name === "Складной клинок") {
+            module.weaponType = "Складной клинок";
+            module.meleeType = "Тяжёлое";
+            module.baseDamage = "3d6";
+        } else if (module.name === "Электропроводка") {
+            module.weaponType = "Электропроводка";
+            module.meleeType = "Электрическое";
+            module.baseDamage = "5d6";
+            module.damageType = "ЭМИ";
+            module.ignoresArmor = false;
+        } else if (module.name === "Скрытый нож") {
+            module.weaponType = "Скрытый нож";
+            module.meleeType = "Среднее";
+            module.baseDamage = "2d6";
+        }
+                        
+                        // Добавляем недостающие поля для идентификации модуля
+                        if (!module.implantType) {
+                            module.implantType = implantType;
+                        }
+                        if (!module.partName) {
+                            module.partName = partName;
+                        }
+                        if (module.slotIndex === undefined) {
+                            module.slotIndex = slotIndex;
+                        }
+                        console.log('Исправлен модуль встроенного оружия:', module);
+                    }
+                });
+            }
+        }
+    }
+}
+
+// Вызываем функцию при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    fixExistingEmbeddedWeapons();
+    // Обновляем отображение имплантов
+    if (typeof renderImplants === 'function') {
+        renderImplants();
+    }
+});
+
+// Экспортируем функцию для ручного вызова из консоли
+window.fixEmbeddedWeapons = fixExistingEmbeddedWeapons;
+
+// Функции для работы с киберимплантами
 
 function showImplantShop() {
     // Используем новую систему с блокировкой скролла
@@ -1354,13 +2120,14 @@ function filterImplantsByCategory(category) {
                 
                 <div class="shop-item-stats">
                     <div class="shop-stat">Потеря осознанности: ${implant.awarenessLoss}</div>
+                    ${implant.options ? `<div class="shop-stat" style="color: var(--accent); font-weight: 600;">Требует: ${implant.options}</div>` : ''}
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
                     <span class="implant-module-price-display" style="color: ${getThemeColors().muted}; font-size: 0.9rem; font-weight: 600;" data-original-price="${implant.price}" data-awareness="${implant.awarenessLoss}">
                         ${implant.price} уе
                     </span>
-                    <button class="pill-button primary-button implant-module-buy-button" onclick="buyAndInstallImplant('${category}', '${implant.name}', ${implant.price}, '${implant.awarenessLoss}', '${implant.description.replace(/'/g, "\\'")}')" data-category="${category}" data-name="${implant.name}" data-price="${implant.price}" data-awareness="${implant.awarenessLoss}" data-description="${implant.description.replace(/'/g, "\\'")}" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
+                    <button class="pill-button primary-button implant-module-buy-button" onclick="buyAndInstallImplant('${category}', '${implant.name}', ${implant.price}, '${implant.awarenessLoss}', '${implant.description.replace(/'/g, "\\'")}', '${implant.options || ''}')" data-category="${category}" data-name="${implant.name}" data-price="${implant.price}" data-awareness="${implant.awarenessLoss}" data-description="${implant.description.replace(/'/g, "\\'")}" data-options="${implant.options || ''}" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
                         Купить
                     </button>
                 </div>
@@ -1399,7 +2166,7 @@ function filterImplants(searchTerm) {
     });
 }
 
-function buyAndInstallImplant(category, name, price, awarenessLoss, description, catalogPrice = null) {
+function buyAndInstallImplant(category, name, price, awarenessLoss, description, options = '', catalogPrice = null) {
     const currentMoney = parseInt(state.money) || 0;
     
     if (currentMoney < price) {
@@ -1427,6 +2194,23 @@ function buyAndInstallImplant(category, name, price, awarenessLoss, description,
     // const awarenessEl = document.getElementById('awarenessCurrent');
     // if (awarenessEl) awarenessEl.value = state.awareness.current;
     
+    // Находим модуль в библиотеке для копирования всех полей
+    let moduleFromLibrary = null;
+    if (typeof CYBERIMPLANTS_LIBRARY !== 'undefined' && CYBERIMPLANTS_LIBRARY[category]) {
+        moduleFromLibrary = CYBERIMPLANTS_LIBRARY[category].find(m => m.name === name);
+    }
+    
+    // Если не нашли в указанной категории, ищем во всех категориях (для укреплений)
+    if (!moduleFromLibrary && typeof CYBERIMPLANTS_LIBRARY !== 'undefined') {
+        for (const cat in CYBERIMPLANTS_LIBRARY) {
+            moduleFromLibrary = CYBERIMPLANTS_LIBRARY[cat].find(m => m.name === name);
+            if (moduleFromLibrary) {
+                category = cat; // Обновляем категорию
+                break;
+            }
+        }
+    }
+    
     // Добавляем модуль в снаряжение
     const newGear = {
         id: generateId('gear'),
@@ -1435,12 +2219,18 @@ function buyAndInstallImplant(category, name, price, awarenessLoss, description,
         price: price,
         load: 1,
         type: 'implant',
-        implantData: {
+        implantData: moduleFromLibrary ? {
+            ...moduleFromLibrary,
+            // Переопределяем некоторые поля
+            price: price,
+            category: category
+        } : {
             category: category,
             name: name,
             price: price,
             awarenessLoss: awarenessLoss,
-            description: description
+            description: description,
+            options: options
         },
         catalogPrice: catalogPrice,
         purchasePrice: price,
@@ -1450,6 +2240,15 @@ function buyAndInstallImplant(category, name, price, awarenessLoss, description,
     state.gear.push(newGear);
     renderGear();
     scheduleSave();
+    
+    // Пересчитываем нагрузку, так как модуль добавлен в снаряжение
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
+    
+    // Обновляем список модулей в модале управления (если он открыт)
+    if (document.getElementById('implantModules')) {
+        filterImplantModules();
+    }
     
     // Добавляем в лог
     addToRollLog('purchase', {
@@ -1461,16 +2260,46 @@ function buyAndInstallImplant(category, name, price, awarenessLoss, description,
     // НЕ закрываем магазин - оставляем его открытым
     // closeModal(document.querySelector('.modal-overlay .icon-button'));
     
-    showModal('Модуль куплен и готов к установке', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: ${getThemeColors().success}; font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${name} куплен и добавлен в снаряжение!</p>
-            <p style="color: ${getThemeColors().muted};">Осознанность будет потеряна при установке модуля</p>
-            <p style="color: ${getThemeColors().muted};">Теперь установите его через "Управление имплантами"</p>
-            <button class="pill-button" onclick="closeModal(this)">
-                Закрыть
-            </button>
-        </div>
-    `);
+    // Проверяем, является ли модуль укреплением костной системы
+    if (moduleFromLibrary && moduleFromLibrary.specialInstall === 'bone_reinforcement') {
+        showModal('Укрепление куплено', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: ${getThemeColors().success}; font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${name} куплено!</p>
+                <p style="color: ${getThemeColors().muted}; margin-bottom: 1.5rem;">Что хотите сделать?</p>
+                <div style="display: flex; gap: 1rem; justify-content: center;">
+                    <button class="pill-button success-button" onclick="closeModal(this); showReinforcementInstallation(${state.gear.length - 1});" style="padding: 0.75rem 1.5rem;">
+                        Установить
+                    </button>
+                    <button class="pill-button" onclick="closeModal(this);" style="padding: 0.75rem 1.5rem;">
+                        В снаряжение
+                    </button>
+                </div>
+            </div>
+        `);
+    } else {
+        showModal('Модуль куплен и готов к установке', `
+            <div style="text-align: center; padding: 1rem;">
+                <p style="color: ${getThemeColors().success}; font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${name} куплен и добавлен в снаряжение!</p>
+                <p style="color: ${getThemeColors().muted};">Осознанность будет потеряна при установке модуля</p>
+                <p style="color: ${getThemeColors().muted};">Теперь установите его через "Управление имплантами"</p>
+                <button class="pill-button" onclick="closeModal(this)">
+                    Закрыть
+                </button>
+            </div>
+        `);
+    }
+}
+
+// Функция для установки укрепления костной системы
+function showReinforcementInstallation(gearIndex) {
+    const gearItem = state.gear[gearIndex];
+    if (!gearItem || !gearItem.implantData) return;
+    
+    const module = gearItem.implantData;
+    if (module.specialInstall !== 'bone_reinforcement') return;
+    
+    // Показываем интерактивную установку
+    showSpecialModuleInstallationInteractive(gearIndex, module);
 }
 
 function toggleImplantModulesFreeMode() {
@@ -1489,7 +2318,8 @@ function toggleImplantModulesFreeMode() {
             const price = btn.getAttribute('data-price');
             const awareness = btn.getAttribute('data-awareness');
             const description = btn.getAttribute('data-description');
-            btn.setAttribute('onclick', `buyAndInstallImplant('${category}', '${name}', ${price}, '${awareness}', '${description}')`);
+            const options = btn.getAttribute('data-options') || '';
+            btn.setAttribute('onclick', `buyAndInstallImplant('${category}', '${name}', ${price}, '${awareness}', '${description}', '${options}')`);
         });
         
         // Возвращаем оригинальные цены визуально
@@ -1512,7 +2342,8 @@ function toggleImplantModulesFreeMode() {
             const name = btn.getAttribute('data-name');
             const awareness = btn.getAttribute('data-awareness');
             const description = btn.getAttribute('data-description');
-            btn.setAttribute('onclick', `buyAndInstallImplant('${category}', '${name}', 0, '${awareness}', '${description}')`);
+            const options = btn.getAttribute('data-options') || '';
+            btn.setAttribute('onclick', `buyAndInstallImplant('${category}', '${name}', 0, '${awareness}', '${description}', '${options}')`);
         });
         
         // Меняем цены визуально на 0
@@ -1534,42 +2365,129 @@ function renderImplants() {
     const container = document.getElementById('implantsContainer');
     if (!container) return;
     
-    // Собираем все установленные модули из всех имплантов
-    const installedModules = [];
+    // Собираем все установленные модули из всех имплантов (без дубликатов по groupId)
+    const uniqueModules = [];
+    const seenGroupIds = new Set();
+    
+    // Специальная обработка для Лазерной кромки - суммируем все кромки
+    let totalLaserEdges = 0;
+    let laserEdgeLocations = [];
+    let laserEdgeModule = null;
     
     for (const [implantType, implant] of Object.entries(state.implants)) {
         for (const [partName, partData] of Object.entries(implant.parts)) {
             if (partData && partData.modules) {
                 partData.modules.forEach((module, slotIndex) => {
-                    if (module) {
+                    if (module && module.name === "Лазерная кромка") {
+                        totalLaserEdges += module.count || 1;
                         const partDisplayName = getPartDisplayName(implantType, partName);
-                        installedModules.push({
-                            ...module,
-                            location: `${getImplantTypeDisplayName(implantType)} → ${partDisplayName} → Слот ${slotIndex + 1}`
-                        });
+                        laserEdgeLocations.push(`${getImplantTypeDisplayName(implantType)} → ${partDisplayName}`);
+                        if (!laserEdgeModule) {
+                            laserEdgeModule = module;
+                        }
                     }
                 });
             }
         }
     }
     
-    if (installedModules.length === 0) {
+    // Если есть Лазерные кромки, добавляем их как один суммированный модуль
+    if (totalLaserEdges > 0 && laserEdgeModule) {
+        const combinedLaserEdge = {
+            ...laserEdgeModule,
+            count: totalLaserEdges,
+            implantType: 'arms',
+            partName: 'combined',
+            slotIndex: 0,
+            location: laserEdgeLocations.join(', '),
+            weaponType: 'Лазерная кромка'
+        };
+        uniqueModules.push(combinedLaserEdge);
+    }
+    
+    // Собираем остальные модули (исключая Лазерные кромки)
+    for (const [implantType, implant] of Object.entries(state.implants)) {
+        for (const [partName, partData] of Object.entries(implant.parts)) {
+            if (partData && partData.modules) {
+                partData.modules.forEach((module, slotIndex) => {
+                    if (module && module.name !== "Лазерная кромка") {
+                        const gId = module.groupId || `single_${implantType}_${partName}_${slotIndex}`;
+                        if (!seenGroupIds.has(gId)) {
+                            seenGroupIds.add(gId);
+                        const partDisplayName = getPartDisplayName(implantType, partName);
+                            uniqueModules.push({
+                            ...module,
+                                implantType: implantType,
+                                partName: partName,
+                                slotIndex: slotIndex,
+                                location: `${getImplantTypeDisplayName(implantType)} → ${partDisplayName}`
+                        });
+                        }
+                    }
+                });
+            }
+        }
+    }
+    
+    if (uniqueModules.length === 0) {
         container.innerHTML = '<p style="color: ${getThemeColors().muted}; text-align: center; padding: 2rem;">Киберимпланты не установлены</p>';
         return;
     }
     
-    container.innerHTML = installedModules.map((implant, index) => `
-        <div class="implant-item" style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem; background: ${getThemeColors().bgLight}; border: 1px solid ${getThemeColors().accentLight}; border-radius: 8px; margin-bottom: 0.5rem;">
-            <div style="flex: 1;">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span style="color: ${getThemeColors().accent}; font-weight: 600;">${implant.name}</span>
+    container.innerHTML = uniqueModules.map((module, index) => {
+        const descId = `implant_desc_${index}`;
+        return `
+        <div class="implant-item" style="background: ${getThemeColors().bgLight}; border: 1px solid ${getThemeColors().accentLight}; border-radius: 12px; padding: 1rem; margin-bottom: 0.75rem;">
+            <div style="margin-bottom: 0.75rem;">
+                <div onclick="toggleImplantDesc('${descId}')" style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; cursor: pointer; user-select: none;"
+                     onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+                    ${module.name}
                 </div>
-                <div style="color: white; font-weight: bold; font-size: 0.8rem; margin-top: 0.25rem;">${implant.location}</div>
-                ${implant.description ? `<div style="color: ${getThemeColors().muted}; font-size: 0.8rem; margin-top: 0.25rem;">${implant.description}</div>` : ''}
+                <div style="color: ${getThemeColors().success}; font-size: 0.75rem; margin-bottom: 0.25rem;">📍 ${module.location}</div>
+                
+                ${module.durability ? `
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 8px; margin-bottom: 0.5rem;">
+                        <span style="color: ${getThemeColors().accent}; font-size: 0.75rem;">ПЗ:</span>
+                        <button onclick="changeModuleDurability('${module.implantType}', '${module.partName}', ${module.slotIndex}, -1)" 
+                                style="background: transparent; border: 1px solid var(--accent); color: ${getThemeColors().accent}; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem;">−</button>
+                        <input type="text" value="${module.durability}" 
+                            onchange="setModuleDurability('${module.implantType}', '${module.partName}', ${module.slotIndex}, this.value)" 
+                            onkeypress="return event.charCode >= 48 && event.charCode <= 57"
+                            style="width: 50px; background: ${getThemeColors().bgMedium}; border: 1px solid var(--accent); color: ${getThemeColors().text}; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.75rem; text-align: center;" />
+                        <span style="color: ${getThemeColors().muted}; font-size: 0.7rem;">/${module.maxDurability}</span>
+                        <button onclick="changeModuleDurability('${module.implantType}', '${module.partName}', ${module.slotIndex}, 1)" 
+                                style="background: transparent; border: 1px solid var(--accent); color: ${getThemeColors().accent}; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem;">+</button>
+                    </div>
+                ` : ''}
+                
+                <div id="${descId}" style="color: ${getThemeColors().muted}; font-size: 0.8rem; line-height: 1.3;">${module.description}</div>
             </div>
+            
+            ${module.weaponType ? renderEmbeddedWeapon(module) : ''}
+            ${module.name === 'Внешняя мини-станина' ? `
+                <div style="margin-top: 0.5rem;">
+                    <div style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 0.75rem; margin-bottom: 0.5rem;">Оружие на мини-станине:</div>
+                    ${module.weaponSlot ? `
+                        ${renderMiniStandWeapon(module)}
+                    ` : `
+                        <button class="pill-button success-button" onclick="installWeaponOnMiniStand('${module.implantType}', '${module.partName}', ${module.slotIndex})" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;">
+                            Установить оружие
+                        </button>
+                    `}
+                </div>
+            ` : ''}
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
+
+// Функция для переключения видимости описания импланта
+window.toggleImplantDesc = function(descId) {
+    const desc = document.getElementById(descId);
+    if (desc) {
+        desc.style.display = desc.style.display === 'none' ? 'block' : 'none';
+    }
+};
 
 function getImplantTypeDisplayName(implantType) {
     const typeNames = {
@@ -1584,8 +2502,8 @@ function getImplantTypeDisplayName(implantType) {
 }
 
 
-function rollDiceForAwarenessLoss(awarenessLoss) {
-    if (awarenessLoss === '0') return 0;
+window.rollDiceForAwarenessLoss = function(awarenessLoss) {
+    if (awarenessLoss === '0' || awarenessLoss === 'нет') return 0;
     
     const match = awarenessLoss.match(/(\d+)d(\d+)/);
     if (match) {
@@ -1612,6 +2530,23 @@ function giftImplant(category, name, price, awarenessLoss, description) {
     const awarenessEl = document.getElementById('awarenessCurrent');
     if (awarenessEl) awarenessEl.value = state.awareness.current;
     
+    // Находим модуль в библиотеке для копирования всех полей
+    let moduleFromLibrary = null;
+    if (typeof CYBERIMPLANTS_LIBRARY !== 'undefined' && CYBERIMPLANTS_LIBRARY[category]) {
+        moduleFromLibrary = CYBERIMPLANTS_LIBRARY[category].find(m => m.name === name);
+    }
+    
+    // Если не нашли в указанной категории, ищем во всех категориях (для укреплений)
+    if (!moduleFromLibrary && typeof CYBERIMPLANTS_LIBRARY !== 'undefined') {
+        for (const cat in CYBERIMPLANTS_LIBRARY) {
+            moduleFromLibrary = CYBERIMPLANTS_LIBRARY[cat].find(m => m.name === name);
+            if (moduleFromLibrary) {
+                category = cat; // Обновляем категорию
+                break;
+            }
+        }
+    }
+    
     // Добавляем модуль в снаряжение
     const newGear = {
         name: name,
@@ -1619,7 +2554,12 @@ function giftImplant(category, name, price, awarenessLoss, description) {
         price: price,
         load: 1,
         type: 'implant',
-        implantData: {
+        implantData: moduleFromLibrary ? {
+            ...moduleFromLibrary,
+            // Переопределяем некоторые поля
+            price: price,
+            category: category
+        } : {
             category: category,
             name: name,
             price: price,
@@ -1631,6 +2571,10 @@ function giftImplant(category, name, price, awarenessLoss, description) {
     state.gear.push(newGear);
     renderGear();
     scheduleSave();
+    
+    // Пересчитываем нагрузку, так как модуль добавлен в снаряжение
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
     
     closeModal(document.querySelector('.modal-overlay .icon-button'));
     
@@ -1685,6 +2629,7 @@ function addGiftedImplant() {
                                 <div class="implant-details">
                                     Потеря осознанности: ${implant.awarenessLoss}
                                 </div>
+                                ${implant.options ? `<div class="implant-details" style="color: ${getThemeColors().accent}; font-weight: 600; margin-top: 0.25rem;">Требует: ${implant.options}</div>` : ''}
                                 <div class="implant-description" style="font-size: 0.8rem; color: ${getThemeColors().muted}; margin-top: 0.25rem;">
                                     ${implant.description}
                                 </div>
@@ -1749,6 +2694,10 @@ function installGiftedImplant(category, name, price, awarenessLoss, description)
     renderGear();
     scheduleSave();
     
+    // Пересчитываем нагрузку, так как модуль добавлен в снаряжение
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
+    
     closeModal(document.querySelector('.modal-overlay .icon-button'));
     
     showModal('Модуль получен', `
@@ -1780,134 +2729,282 @@ function showImplantsManagement() {
         originalRemove();
     };
     
+    // Функция для генерации спойлеров с деталями имплантов
+    function generateImplantDetailsSpoilers() {
+        let html = '';
+        
+        for (const [implantType, implant] of Object.entries(state.implants)) {
+            for (const [partName, partData] of Object.entries(implant.parts)) {
+                if (!partData || !partData.slots) continue;
+                
+                const partDisplayName = getPartDisplayName(implantType, partName);
+                const implantDisplayName = getImplantName(implantType);
+                const spoilerId = `spoiler_${implantType}_${partName}`;
+                
+                // Подсчитываем занятые слоты (уникальные модули по groupId)
+                const uniqueModules = new Map(); // groupId -> module
+                partData.modules.forEach((m, idx) => {
+                    if (m) {
+                        const gId = m.groupId || `single_${idx}`;
+                        if (!uniqueModules.has(gId)) {
+                            uniqueModules.set(gId, m);
+                        }
+                    }
+                });
+                
+                // Подсчитываем занятые слоты (просто количество непустых)
+                const occupiedSlots = partData.modules.filter(m => m !== null).length;
+                
+                html += `
+                    <div style="margin-bottom: 0.75rem; border: 1px solid ${getThemeColors().border}; border-radius: 8px; overflow: hidden;">
+                        <div onclick="toggleSpoiler('${spoilerId}')" 
+                             style="padding: 0.75rem; background: ${getThemeColors().bg}; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s;"
+                             onmouseover="this.style.background='${getThemeColors().accentLight}'"
+                             onmouseout="this.style.background='${getThemeColors().bg}'">
+                            <div>
+                                <div style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 0.9rem;">${implantDisplayName}</div>
+                                <div style="color: ${getThemeColors().muted}; font-size: 0.75rem;">${partDisplayName}</div>
+                            </div>
+                            <div style="color: ${getThemeColors().success}; font-size: 0.75rem; font-weight: 500;">
+                                ${occupiedSlots}/${partData.slots} слотов
+                            </div>
+                        </div>
+                        <div id="${spoilerId}" style="display: none; padding: 1rem; background: ${getThemeColors().bgLight};">
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                                ${Array.from({length: partData.slots}, (_, i) => {
+                                    const module = partData.modules[i];
+                                    const isOccupied = module !== null;
+        return `
+                                        <div style="width: 24px; height: 24px; border-radius: 50%; 
+                                                    background: ${isOccupied ? getThemeColors().success : getThemeColors().bg}; 
+                                                    border: 2px solid ${isOccupied ? getThemeColors().success : getThemeColors().border}; 
+                                                    display: flex; align-items: center; justify-content: center;
+                                                    font-size: 0.7rem; color: white; font-weight: bold;
+                                                    transition: all 0.2s;"
+                                             title="${isOccupied ? module.name : 'Слот ' + (i + 1)}">
+                                            ${isOccupied ? '✓' : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            ${uniqueModules.size > 0 ? `
+                                <div style="margin-top: 0.75rem;">
+                                    <div style="font-size: 0.75rem; color: ${getThemeColors().muted}; margin-bottom: 0.5rem; font-weight: 600;">Установленные модули:</div>
+                                    ${Array.from(uniqueModules.values()).map((module, idx) => `
+                                        <div style="padding: 0.5rem; background: ${getThemeColors().bg}; border-radius: 6px; margin-bottom: 0.5rem;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                                <span style="color: ${getThemeColors().success}; font-size: 0.75rem; font-weight: 500;">${module.name}</span>
+                                                <button onclick="removeModuleByGroupId('${implantType}', '${partName}', '${module.groupId || 'single_' + partData.modules.indexOf(module)}')" 
+                                                        style="background: transparent; border: none; cursor: pointer; padding: 0.25rem; transition: all 0.2s;"
+                                                        onmouseover="this.style.transform='scale(1.2)'"
+                                                        onmouseout="this.style.transform='scale(1)'">
+                                                    <img src="https://static.tildacdn.com/tild6166-3331-4338-b038-623539346365/x-button.png" style="width: 16px; height: 16px; opacity: 0.7;" 
+                                                         onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                                                </button>
+                                            </div>
+                                            ${module.durability ? `
+                                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                    <span style="color: ${getThemeColors().accent}; font-size: 0.7rem;">ПЗ:</span>
+                                                    <button onclick="changeModuleDurability('${implantType}', '${partName}', ${partData.modules.indexOf(module)}, -1)" 
+                                                            style="background: transparent; border: 1px solid var(--accent); color: ${getThemeColors().accent}; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.6rem;">−</button>
+                                                    <input type="text" value="${module.durability}" 
+                                                        onchange="setModuleDurability('${implantType}', '${partName}', ${partData.modules.indexOf(module)}, this.value)" 
+                                                        onkeypress="return event.charCode >= 48 && event.charCode <= 57"
+                                                        style="width: 40px; background: ${getThemeColors().bgMedium}; border: 1px solid var(--accent); color: ${getThemeColors().text}; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem; text-align: center;" />
+                                                    <span style="color: ${getThemeColors().muted}; font-size: 0.7rem;">/${module.maxDurability}</span>
+                                                    <button onclick="changeModuleDurability('${implantType}', '${partName}', ${partData.modules.indexOf(module)}, 1)" 
+                                                            style="background: transparent; border: 1px solid var(--accent); color: ${getThemeColors().accent}; cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.6rem;">+</button>
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                </div>
+            </div>
+        `;
+            }
+        }
+        
+        return html || `<p style="color: ${getThemeColors().muted}; text-align: center; padding: 2rem;">Нет установленных частей имплантов</p>`;
+    }
+    
+    // Функция для переключения спойлера
+    window.toggleSpoiler = function(spoilerId) {
+        const spoiler = document.getElementById(spoilerId);
+        if (spoiler) {
+            spoiler.style.display = spoiler.style.display === 'none' ? 'block' : 'none';
+        }
+    };
+    
+    // Функция для обновления блока "Детали импланта" в реальном времени
+    window.updateImplantDetails = function() {
+        const detailsContainer = document.getElementById('implantDetails');
+        if (detailsContainer) {
+            detailsContainer.innerHTML = generateImplantDetailsSpoilers();
+        }
+    };
+
     let managementHTML = `
-        <div class="modal" style="max-width: 95vw; max-height: 95vh; overflow-y: auto;">
+        <div class="modal" style="max-width: 98vw; max-height: 95vh; overflow-y: auto;">
             <div class="modal-header">
-                <h3>🦾 Управление имплантами</h3>
+                <h3><img src="https://static.tildacdn.com/tild3864-3638-4361-b139-616436373366/woman.png" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 0.5rem;"> Управление имплантами</h3>
                 <button class="icon-button" onclick="closeModal(this)">×</button>
             </div>
             <div class="modal-body">
-                <div style="display: grid; grid-template-columns: 300px 1fr; gap: 2rem; min-height: 600px;">
-                    <!-- Левая панель: Схема тела -->
-                    <div style="background: ${getThemeColors().bgLight}; border-radius: 12px; padding: 1rem; border: 1px solid var(--border);">
-                        <h4 style="color: ${getThemeColors().accent}; text-align: center; margin-bottom: 1rem;">Схема тела</h4>
-                        <div style="position: relative; height: 500px; background: linear-gradient(135deg, #1a1a2e, #16213e); border-radius: 8px; border: 1px solid var(--border);">
+                <div style="display: grid; grid-template-columns: 320px 1fr 1fr; gap: 1.5rem; min-height: 600px;">
+                    <!-- Колонка 1: Схема тела -->
+                    <div style="background: ${getThemeColors().bgLight}; border-radius: 16px; padding: 1.5rem; border: 1px solid ${getThemeColors().border}; box-shadow: ${getThemeColors().shadow};">
+                        <h4 style="color: ${getThemeColors().accent}; text-align: center; margin-bottom: 1.5rem; font-size: 1.1rem; font-weight: 600;">Схема тела</h4>
+                        <div style="position: relative; height: 520px; background: linear-gradient(135deg, rgba(26, 26, 46, 0.8), rgba(22, 33, 62, 0.8)); border-radius: 12px; border: 1px solid ${getThemeColors().border}; overflow: hidden;">
                             <!-- ГОЛОВА -->
-                            <div style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px; background: ${state.implants.head.parts.main ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 50%; border: 2px solid ${state.implants.head.parts.main ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.head.parts.main ? 'pointer' : 'not-allowed'};" onclick="${state.implants.head.parts.main ? "selectImplant('head', 'main')" : 'showUnpurchasedError()'}" title="Кибер-голова">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.head.parts.main ? 'var(--success)' : 'var(--danger)'}; font-size: 0.8rem; font-weight: bold;">ГОЛОВА</div>
-                                ${!state.implants.head.parts.main ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1.2rem;">✖</div>' : ''}
+                            <div style="position: absolute; top: 25px; left: 50%; transform: translateX(-50%); width: 70px; height: 70px; background: ${state.implants.head.parts.main ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 50%; border: 2px solid ${state.implants.head.parts.main ? 'var(--success)' : 'var(--danger)'};" title="Кибер-голова">
+                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.head.parts.main ? 'var(--success)' : 'var(--danger)'}; font-size: 0.7rem; font-weight: bold;">ГОЛОВА</div>
+                                ${!state.implants.head.parts.main ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
                             <!-- НЕЙРОМОДУЛЬ -->
-                            <div style="position: absolute; top: 100px; left: 50%; transform: translateX(-50%); width: 40px; height: 40px; background: ${state.implants.neuromodule.parts.main ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 50%; border: 2px solid ${state.implants.neuromodule.parts.main ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.neuromodule.parts.main ? 'pointer' : 'not-allowed'};" onclick="${state.implants.neuromodule.parts.main ? 'selectImplant(\'neuromodule\')' : 'showUnpurchasedError()'}" title="Нейромодуль">
+                            <div style="position: absolute; top: 110px; left: 50%; transform: translateX(-50%); width: 50px; height: 50px; background: ${state.implants.neuromodule.parts.main ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 50%; border: 2px solid ${state.implants.neuromodule.parts.main ? 'var(--success)' : 'var(--danger)'};" title="Нейромодуль">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.neuromodule.parts.main ? 'var(--success)' : 'var(--danger)'}; font-size: 0.6rem; font-weight: bold;">НЕЙРО</div>
                                 ${!state.implants.neuromodule.parts.main ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
                             <!-- СПИНА - отдельные части -->
-                            <div style="position: absolute; top: 150px; left: 50%; transform: translateX(-50%); width: 60px; height: 15px; background: ${state.implants.spine.parts.cervical ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.cervical ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.spine.parts.cervical ? 'pointer' : 'not-allowed'};" onclick="${state.implants.spine.parts.cervical ? "selectImplant('spine', 'cervical')" : 'showUnpurchasedError()'}" title="Шейная">
-                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.spine.parts.cervical ? 'var(--success)' : 'var(--danger)'}; font-size: 0.3rem; font-weight: bold;">ШЕЙНАЯ</div>
+                            <div style="position: absolute; top: 170px; left: 50%; transform: translateX(-50%); width: 70px; height: 18px; background: ${state.implants.spine.parts.cervical ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.cervical ? 'var(--success)' : 'var(--danger)'};" title="Шейный отдел">
+                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.spine.parts.cervical ? 'var(--success)' : 'var(--danger)'}; font-size: 0.4rem; font-weight: bold;">ШЕЙНАЯ</div>
                                 ${!state.implants.spine.parts.cervical ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 0.6rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 170px; left: 30%; transform: translateX(-50%); width: 50px; height: 15px; background: ${state.implants.spine.parts.thoracicLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.thoracicLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.spine.parts.thoracicLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.spine.parts.thoracicLeft ? "selectImplant('spine', 'thoracicLeft')" : 'showUnpurchasedError()'}" title="Грудная левая">
+                            <div style="position: absolute; top: 170px; left: 30%; transform: translateX(-50%); width: 50px; height: 15px; background: ${state.implants.spine.parts.thoracicLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.thoracicLeft ? 'var(--success)' : 'var(--danger)'};" title="Грудная левая">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.spine.parts.thoracicLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.25rem; font-weight: bold;">ГРУД Л</div>
                                 ${!state.implants.spine.parts.thoracicLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 0.6rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 170px; right: 30%; transform: translateX(50%); width: 50px; height: 15px; background: ${state.implants.spine.parts.thoracicRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.thoracicRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.spine.parts.thoracicRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.spine.parts.thoracicRight ? "selectImplant('spine', 'thoracicRight')" : 'showUnpurchasedError()'}" title="Грудная правая">
+                            <div style="position: absolute; top: 170px; right: 30%; transform: translateX(50%); width: 50px; height: 15px; background: ${state.implants.spine.parts.thoracicRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.thoracicRight ? 'var(--success)' : 'var(--danger)'};" title="Грудная правая">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.spine.parts.thoracicRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.25rem; font-weight: bold;">ГРУД П</div>
                                 ${!state.implants.spine.parts.thoracicRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 0.6rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 190px; left: 50%; transform: translateX(-50%); width: 60px; height: 15px; background: ${state.implants.spine.parts.lumbar ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.lumbar ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.spine.parts.lumbar ? 'pointer' : 'not-allowed'};" onclick="${state.implants.spine.parts.lumbar ? "selectImplant('spine', 'lumbar')" : 'showUnpurchasedError()'}" title="Поясничная">
+                            <div style="position: absolute; top: 190px; left: 50%; transform: translateX(-50%); width: 60px; height: 15px; background: ${state.implants.spine.parts.lumbar ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.lumbar ? 'var(--success)' : 'var(--danger)'};" title="Поясничная">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.spine.parts.lumbar ? 'var(--success)' : 'var(--danger)'}; font-size: 0.3rem; font-weight: bold;">ПОЯСНИЧ</div>
                                 ${!state.implants.spine.parts.lumbar ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 0.6rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 210px; left: 50%; transform: translateX(-50%); width: 60px; height: 15px; background: ${state.implants.spine.parts.sacral ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.sacral ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.spine.parts.sacral ? 'pointer' : 'not-allowed'};" onclick="${state.implants.spine.parts.sacral ? "selectImplant('spine', 'sacral')" : 'showUnpurchasedError()'}" title="Крестцовая">
+                            <div style="position: absolute; top: 210px; left: 50%; transform: translateX(-50%); width: 60px; height: 15px; background: ${state.implants.spine.parts.sacral ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.spine.parts.sacral ? 'var(--success)' : 'var(--danger)'};" title="Крестцовая">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.spine.parts.sacral ? 'var(--success)' : 'var(--danger)'}; font-size: 0.3rem; font-weight: bold;">КРЕСТЦОВ</div>
                                 ${!state.implants.spine.parts.sacral ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 0.6rem;">✖</div>' : ''}
                             </div>
                             
                             <!-- ЛЕВАЯ РУКА - отдельные части -->
-                            <div style="position: absolute; top: 160px; left: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.wristLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.wristLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.wristLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.wristLeft ? "selectImplant('arms', 'wristLeft')" : 'showUnpurchasedError()'}" title="Кисть левая">
+                            <div style="position: absolute; top: 160px; left: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.wristLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.wristLeft ? 'var(--success)' : 'var(--danger)'};" title="Кисть левая">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.wristLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">КИСТЬ</div>
                                 ${!state.implants.arms.parts.wristLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 190px; left: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.forearmLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.forearmLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.forearmLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.forearmLeft ? "selectImplant('arms', 'forearmLeft')" : 'showUnpurchasedError()'}" title="Предплечье левое">
+                            <div style="position: absolute; top: 190px; left: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.forearmLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.forearmLeft ? 'var(--success)' : 'var(--danger)'};" title="Предплечье левое">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.forearmLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.4rem; font-weight: bold;">ПРЕДПЛЕЧЬЕ</div>
                                 ${!state.implants.arms.parts.forearmLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 220px; left: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.shoulderLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.shoulderLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.shoulderLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.shoulderLeft ? "selectImplant('arms', 'shoulderLeft')" : 'showUnpurchasedError()'}" title="Плечо левое">
+                            <div style="position: absolute; top: 220px; left: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.shoulderLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.shoulderLeft ? 'var(--success)' : 'var(--danger)'};" title="Плечо левое">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.shoulderLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">ПЛЕЧО</div>
                                 ${!state.implants.arms.parts.shoulderLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
                             <!-- ПРАВАЯ РУКА - отдельные части -->
-                            <div style="position: absolute; top: 160px; right: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.wristRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.wristRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.wristRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.wristRight ? "selectImplant('arms', 'wristRight')" : 'showUnpurchasedError()'}" title="Кисть правая">
+                            <div style="position: absolute; top: 160px; right: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.wristRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.wristRight ? 'var(--success)' : 'var(--danger)'};" title="Кисть правая">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.wristRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">КИСТЬ</div>
                                 ${!state.implants.arms.parts.wristRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 190px; right: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.forearmRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.forearmRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.forearmRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.forearmRight ? "selectImplant('arms', 'forearmRight')" : 'showUnpurchasedError()'}" title="Предплечье правое">
+                            <div style="position: absolute; top: 190px; right: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.forearmRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.forearmRight ? 'var(--success)' : 'var(--danger)'};" title="Предплечье правое">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.forearmRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.4rem; font-weight: bold;">ПРЕДПЛЕЧЬЕ</div>
                                 ${!state.implants.arms.parts.forearmRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 220px; right: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.shoulderRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.shoulderRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.arms.parts.shoulderRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.arms.parts.shoulderRight ? "selectImplant('arms', 'shoulderRight')" : 'showUnpurchasedError()'}" title="Плечо правое">
+                            <div style="position: absolute; top: 220px; right: 20px; width: 45px; height: 25px; background: ${state.implants.arms.parts.shoulderRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.arms.parts.shoulderRight ? 'var(--success)' : 'var(--danger)'};" title="Плечо правое">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.arms.parts.shoulderRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">ПЛЕЧО</div>
                                 ${!state.implants.arms.parts.shoulderRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
                             <!-- ВНУТРЕННОСТИ -->
-                            <div style="position: absolute; top: 300px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px; background: ${state.implants.organs.parts.main ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 8px; border: 2px solid ${state.implants.organs.parts.main ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.organs.parts.main ? 'pointer' : 'not-allowed'};" onclick="${state.implants.organs.parts.main ? 'selectImplant(\'organs\')' : 'showUnpurchasedError()'}" title="Кибер-внутренности">
+                            <div style="position: absolute; top: 300px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px; background: ${state.implants.organs.parts.main ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 8px; border: 2px solid ${state.implants.organs.parts.main ? 'var(--success)' : 'var(--danger)'};" title="Кибер-внутренности">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.organs.parts.main ? 'var(--success)' : 'var(--danger)'}; font-size: 0.6rem; font-weight: bold;">ВНУТРЕННОСТИ</div>
                                 ${!state.implants.organs.parts.main ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
                             <!-- ЛЕВАЯ НОГА - отдельные части -->
-                            <div style="position: absolute; top: 380px; left: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.footLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.footLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.footLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.footLeft ? "selectImplant('legs', 'footLeft')" : 'showUnpurchasedError()'}" title="Стопа левая">
+                            <div style="position: absolute; top: 380px; left: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.footLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.footLeft ? 'var(--success)' : 'var(--danger)'};" title="Стопа левая">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.footLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">СТОПА</div>
                                 ${!state.implants.legs.parts.footLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 410px; left: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.shinLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.shinLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.shinLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.shinLeft ? "selectImplant('legs', 'shinLeft')" : 'showUnpurchasedError()'}" title="Голень левая">
+                            <div style="position: absolute; top: 410px; left: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.shinLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.shinLeft ? 'var(--success)' : 'var(--danger)'};" title="Голень левая">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.shinLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">ГОЛЕНЬ</div>
                                 ${!state.implants.legs.parts.shinLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 440px; left: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.thighLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.thighLeft ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.thighLeft ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.thighLeft ? "selectImplant('legs', 'thighLeft')" : 'showUnpurchasedError()'}" title="Бедро левое">
+                            <div style="position: absolute; top: 440px; left: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.thighLeft ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.thighLeft ? 'var(--success)' : 'var(--danger)'};" title="Бедро левое">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.thighLeft ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">БЕДРО</div>
                                 ${!state.implants.legs.parts.thighLeft ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
                             <!-- ПРАВАЯ НОГА - отдельные части -->
-                            <div style="position: absolute; top: 380px; right: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.footRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.footRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.footRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.footRight ? "selectImplant('legs', 'footRight')" : 'showUnpurchasedError()'}" title="Стопа правая">
+                            <div style="position: absolute; top: 380px; right: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.footRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.footRight ? 'var(--success)' : 'var(--danger)'};" title="Стопа правая">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.footRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">СТОПА</div>
                                 ${!state.implants.legs.parts.footRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 410px; right: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.shinRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.shinRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.shinRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.shinRight ? "selectImplant('legs', 'shinRight')" : 'showUnpurchasedError()'}" title="Голень правая">
+                            <div style="position: absolute; top: 410px; right: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.shinRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.shinRight ? 'var(--success)' : 'var(--danger)'};" title="Голень правая">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.shinRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">ГОЛЕНЬ</div>
                                 ${!state.implants.legs.parts.shinRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                             
-                            <div style="position: absolute; top: 440px; right: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.thighRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.thighRight ? 'var(--success)' : 'var(--danger)'}; cursor: ${state.implants.legs.parts.thighRight ? 'pointer' : 'not-allowed'};" onclick="${state.implants.legs.parts.thighRight ? "selectImplant('legs', 'thighRight')" : 'showUnpurchasedError()'}" title="Бедро правое">
+                            <div style="position: absolute; top: 440px; right: 20px; width: 45px; height: 25px; background: ${state.implants.legs.parts.thighRight ? 'rgba(125, 244, 198, 0.3)' : 'rgba(255, 91, 135, 0.3)'}; border-radius: 4px; border: 2px solid ${state.implants.legs.parts.thighRight ? 'var(--success)' : 'var(--danger)'};" title="Бедро правое">
                                 <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${state.implants.legs.parts.thighRight ? 'var(--success)' : 'var(--danger)'}; font-size: 0.5rem; font-weight: bold;">БЕДРО</div>
                                 ${!state.implants.legs.parts.thighRight ? '<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: ${getThemeColors().danger}; font-size: 1rem;">✖</div>' : ''}
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Правая панель: Детали импланта -->
-                    <div style="background: ${getThemeColors().bgLight}; border-radius: 12px; padding: 1rem; border: 1px solid var(--border);">
-                        <h4 style="color: ${getThemeColors().accent}; text-align: center; margin-bottom: 1rem;">Детали импланта</h4>
-                        <div id="implantDetails">
-                            <p style="color: ${getThemeColors().muted}; text-align: center; padding: 2rem;">Выберите имплант на схеме тела</p>
+                    <!-- Колонка 2: Детали импланта -->
+                    <div style="background: ${getThemeColors().bgLight}; border-radius: 16px; padding: 1.5rem; border: 1px solid ${getThemeColors().border}; box-shadow: ${getThemeColors().shadow}; overflow-y: auto; max-height: 700px;">
+                        <h4 style="color: ${getThemeColors().accent}; text-align: center; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600;">Детали импланта</h4>
+                            <div id="implantDetails">
+                            ${generateImplantDetailsSpoilers()}
+                            </div>
                         </div>
+                        
+                    <!-- Колонка 3: Модули имплантов -->
+                        <div style="background: ${getThemeColors().bgLight}; border-radius: 16px; padding: 1.5rem; border: 1px solid ${getThemeColors().border}; box-shadow: ${getThemeColors().shadow};">
+                        <h4 style="color: ${getThemeColors().accent}; text-align: center; margin-bottom: 1rem; font-size: 1.1rem; font-weight: 600;">Модули имплантов</h4>
+                            
+                            <!-- Поиск и фильтрация -->
+                            <div style="margin-bottom: 1rem;">
+                                <input type="text" id="moduleSearchInput" placeholder="Поиск модулей..." 
+                                       style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid ${getThemeColors().border}; 
+                                              background: ${getThemeColors().bg}; color: ${getThemeColors().text}; font-size: 0.9rem; margin-bottom: 0.75rem;"
+                                       oninput="filterImplantModules(this.value, document.getElementById('moduleCategoryFilter').value)">
+                                
+                                <select id="moduleCategoryFilter" 
+                                        style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid ${getThemeColors().border}; 
+                                               background: ${getThemeColors().bg}; color: ${getThemeColors().text}; font-size: 0.9rem;"
+                                        onchange="filterImplantModules(document.getElementById('moduleSearchInput').value, this.value)">
+                                    <option value="">Все категории</option>
+                                    <option value="Внутренние органы">Внутренние органы</option>
+                                    <option value="Нейронные">Нейронные</option>
+                                    <option value="Оружие">Оружие</option>
+                                    <option value="Перемещение">Перемещение</option>
+                                    <option value="Слух, зрение, голос">Слух, зрение, голос</option>
+                                    <option value="Дополнительная всячина">Дополнительная всячина</option>
+                                    <!-- Кибер-броня не показываем, так как укрепления устанавливаются из снаряжения -->
+                                </select>
+                                                </div>
+                            
+                            <div id="implantModules" style="max-height: 600px; overflow-y: auto; padding-right: 0.5rem;">
+                                <!-- Купленные модули будут загружены после рендера -->
+                                                </div>
+                                            </div>
                     </div>
                 </div>
             </div>
@@ -1927,27 +3024,1134 @@ function showImplantsManagement() {
     
     // Добавляем обработчики клавиатуры для правильной работы Enter
     addModalKeyboardHandlers(modal);
+    
+    // Загружаем купленные модули сразу после открытия модала
+    filterImplantModules();
 }
 
-// Функция для выбора импланта
-function selectImplant(implantType, partName = null) {
+// Вспомогательные функции для работы с модулями имплантов
+function getModuleGroup(implantType, partName, slotIndex) {
+    const partData = state.implants[implantType].parts[partName];
+    if (!partData || !partData.modules[slotIndex]) return null;
+    
+    const module = partData.modules[slotIndex];
+    return module.groupId || null;
+}
+
+function getModuleGroupColor(groupId) {
+    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'];
+    return colors[groupId % colors.length] || '#95A5A6';
+}
+
+function getAvailableModules(categoryFilter = null, searchQuery = '') {
+    // Возвращаем список доступных модулей из CYBERIMPLANTS_LIBRARY
+    const allModules = [];
+    
+    for (const category in CYBERIMPLANTS_LIBRARY) {
+        CYBERIMPLANTS_LIBRARY[category].forEach(module => {
+            // Добавляем категорию к модулю
+            allModules.push({
+                ...module,
+                category: category
+            });
+        });
+    }
+    
+    // Фильтруем по категории если указана
+    let filtered = categoryFilter ? 
+        allModules.filter(m => m.category === categoryFilter) : 
+        allModules;
+    
+    // Фильтруем по поисковому запросу
+    if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filtered = filtered.filter(m => 
+            m.name.toLowerCase().includes(query) || 
+            m.description.toLowerCase().includes(query)
+        );
+    }
+    
+    return filtered;
+}
+
+// Функция для получения купленных модулей из снаряжения
+function getPurchasedImplantModules(searchQuery = '', categoryFilter = null) {
+    // Получаем модули из снаряжения (купленные, но не установленные)
+    let purchasedModules = state.gear.filter(item => item.type === 'implant' && item.implantData);
+    
+    // Исключаем укрепления костной системы из "Управления имплантами"
+    purchasedModules = purchasedModules.filter(item => 
+        !item.implantData.specialInstall || item.implantData.specialInstall !== 'bone_reinforcement'
+    );
+    
+    // Фильтруем по категории
+    if (categoryFilter) {
+        purchasedModules = purchasedModules.filter(item => item.implantData.category === categoryFilter);
+    }
+    
+    // Фильтруем по поисковому запросу
+    if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        purchasedModules = purchasedModules.filter(item => 
+            item.implantData.name.toLowerCase().includes(query) || 
+            item.implantData.description.toLowerCase().includes(query)
+        );
+    }
+    
+    return purchasedModules;
+}
+
+// Функция для фильтрации и отображения купленных модулей имплантов
+function filterImplantModules(searchQuery = '', categoryFilter = null) {
+    const modulesContainer = document.getElementById('implantModules');
+    if (!modulesContainer) return;
+    
+    const purchasedModules = getPurchasedImplantModules(searchQuery, categoryFilter);
+    
+    if (purchasedModules.length === 0) {
+        modulesContainer.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+                <p style="color: ${getThemeColors().muted}; margin-bottom: 1rem;">
+                    ${searchQuery || categoryFilter ? 'Купленные модули не найдены' : 'Нет купленных модулей'}
+                </p>
+                <button class="pill-button primary-button" onclick="showImplantShop()" style="font-size: 0.85rem; padding: 0.5rem 1rem;">
+                    Купить модули в магазине
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    modulesContainer.innerHTML = `
+        <div style="display: grid; gap: 0.75rem;">
+            ${purchasedModules.map((item, index) => {
+                const module = item.implantData;
+                const gearIndex = state.gear.indexOf(item);
+                return `
+                <div style="background: ${getThemeColors().bg}; border-radius: 10px; padding: 0.75rem; border: 1px solid ${getThemeColors().border}; transition: all 0.2s ease;"
+                     onmouseover="this.style.borderColor='${getThemeColors().accent}'"
+                     onmouseout="this.style.borderColor='${getThemeColors().border}'">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                        <div style="flex: 1;">
+                            <h6 style="color: ${getThemeColors().accent}; margin: 0 0 0.25rem 0; font-size: 0.95rem; font-weight: 600;">${module.name}</h6>
+                            <p style="color: ${getThemeColors().text}; font-size: 0.75rem; margin: 0; line-height: 1.3; opacity: 0.9;">${module.description.substring(0, 120)}${module.description.length > 120 ? '...' : ''}</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <span style="background: ${getThemeColors().accentLight}; color: ${getThemeColors().accent}; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600;">
+                                ${module.options || 'Модуль'}
+                            </span>
+                            ${module.category ? `<span style="background: ${getThemeColors().successLight}; color: ${getThemeColors().success}; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.65rem;">${module.category}</span>` : ''}
+                        </div>
+                        <button class="pill-button secondary-button" onclick="showModuleInstallationFromGear(${gearIndex})" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; white-space: nowrap;">
+                            Установить
+                        </button>
+                    </div>
+                </div>
+            `;
+            }).join('')}
+        </div>
+    `;
+}
+
+// Функция для установки модуля из снаряжения (купленного в магазине)
+function showModuleInstallationFromGear(gearIndex) {
+    console.log('=== showModuleInstallationFromGear ВЫЗВАНА ===');
+    console.log('gearIndex:', gearIndex);
+    console.trace('Стек вызовов showModuleInstallationFromGear:');
+    const gearItem = state.gear[gearIndex];
+    if (!gearItem || !gearItem.implantData) return;
+    
+    const module = gearItem.implantData;
+    const installType = getModuleInstallType(module.options);
+    
+    // Специальная обработка для Лазерной кромки
+    if (module.name === "Лазерная кромка") {
+        showLaserEdgeInstallation(gearIndex, module);
+        return;
+    }
+    
+    // Проверяем если это сложный модуль с особыми правилами установки
+    if (installType !== 'simple') {
+        console.log('Модуль:', module.name, 'Тип установки:', installType);
+        // Специальные модули, которые должны использовать интерактивную установку
+        if (module.name === "Прыжковый ускоритель" || module.name === "Реактивные стабилизаторы") {
+            console.log('Используем интерактивную установку для:', module.name);
+            // Используем интерактивную установку
+            showSpecialModuleInstallationInteractive(gearIndex, module);
+            return;
+        }
+        
+        console.log('Используем интерактивную установку для:', module.name, 'с типом:', installType);
+        // Для всех сложных модулей используем интерактивную установку
+        showSpecialModuleInstallationInteractive(gearIndex, module);
+        return;
+    }
+    
+    // Парсим количество слотов из options
+    const slots = parseSlotsFromOptions(module.options);
+    
+    // Находим все доступные части имплантов для установки
+    const availableParts = [];
+    for (const [implantType, implant] of Object.entries(state.implants)) {
+        if (!implant.installed) continue;
+        
+        for (const [partName, partData] of Object.entries(implant.parts)) {
+            if (!partData || !partData.slots) continue;
+            
+            // Проверяем, есть ли достаточно свободных слотов подряд
+            let freeSlots = 0;
+            for (let i = 0; i < partData.slots; i++) {
+                if (partData.modules[i] === null) {
+                    freeSlots++;
+                } else {
+                    freeSlots = 0;
+                }
+                if (freeSlots >= slots) {
+                    availableParts.push({
+                        implantType,
+                        partName,
+                        partDisplayName: getPartDisplayName(implantType, partName),
+                        implantDisplayName: getImplantName(implantType),
+                        startSlot: i - slots + 1
+                    });
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (availableParts.length === 0) {
+        showNotification('Нет доступных слотов для установки этого модуля!', 'error');
+        return;
+    }
+    
+    // Создаем модальное окно выбора места установки
+    document.body.style.overflow = 'hidden';
+    const installModal = document.createElement('div');
+    installModal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    installModal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    installModal.innerHTML = `
+        <div class="modal" style="max-width: 700px;">
+        <div class="modal-header">
+                <h3 class="modal-title">Установка: ${module.name}</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+        </div>
+        <div class="modal-body">
+                <div style="background: ${getThemeColors().accentLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().accent};">
+                            <div>
+                                <h6 style="color: ${getThemeColors().accent}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600;">${module.name}</h6>
+                        <p style="color: ${getThemeColors().text}; font-size: 0.85rem; margin: 0 0 0.75rem 0; line-height: 1.4;">${module.description}</p>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <span style="background: ${getThemeColors().bg}; color: ${getThemeColors().accent}; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">
+                                ${module.options}
+                            </span>
+                            </div>
+                            <div style="text-align: right;">
+                            <div style="color: ${getThemeColors().danger}; font-size: 0.75rem;">ПО: ${module.awarenessLoss}</div>
+                            </div>
+                        </div>
+                            </div>
+                
+                <h6 style="color: ${getThemeColors().accent}; margin-bottom: 1rem; font-size: 1rem; font-weight: 600;">Выберите место установки:</h6>
+                <div style="display: grid; gap: 0.75rem; max-height: 400px; overflow-y: auto; padding-right: 0.5rem;">
+                    ${availableParts.map(part => `
+                        <div style="background: ${getThemeColors().bgLight}; border-radius: 10px; padding: 1rem; border: 1px solid ${getThemeColors().border}; cursor: pointer; transition: all 0.2s ease;" 
+                             onclick="installModuleInSlot('${part.implantType}', '${part.partName}', ${part.startSlot}, ${gearIndex}); closeModal(this);"
+                             onmouseover="this.style.borderColor='${getThemeColors().accent}'; this.style.transform='translateX(4px)'"
+                             onmouseout="this.style.borderColor='${getThemeColors().border}'; this.style.transform='translateX(0)'">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem;">${part.implantDisplayName}</div>
+                                    <div style="color: ${getThemeColors().muted}; font-size: 0.8rem;">${part.partDisplayName}</div>
+                                </div>
+                                <div style="color: ${getThemeColors().success}; font-size: 0.8rem; font-weight: 500;">
+                                    Слоты ${part.startSlot + 1}-${part.startSlot + slots}
+                                </div>
+                        </div>
+                    </div>
+                `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(installModal);
+    
+    installModal.addEventListener('click', (e) => {
+        if (e.target === installModal) {
+            closeModal(installModal.querySelector('.icon-button'));
+        }
+    });
+}
+
+// Функция для интерактивной установки сложных модулей с особыми правилами
+function showSpecialModuleInstallationInteractive(gearIndex, module) {
+    const gearItem = state.gear[gearIndex];
+    if (!gearItem) return;
+    
+    // Определяем доступные части в зависимости от типа установки
+    let availableParts = [];
+    let installInstructions = '';
+    
+    switch(module.specialInstall) {
+        case "spine_all_parts":
+            // Крылья для планирования - 4 слота в разных частях спины
+            installInstructions = "Выберите 4 разные части спины (по 1 слоту в каждой):";
+            for (const [partName, partData] of Object.entries(state.implants.spine.parts)) {
+                if (partData && partData.slots && partData.modules.filter(m => m).length < partData.slots) {
+                    availableParts.push({
+                        implantType: 'spine',
+                        partName: partName,
+                        partDisplayName: getPartDisplayName('spine', partName),
+                        slotsNeeded: 1,
+                        freeSlots: partData.modules.filter(m => !m).length
+                    });
+                }
+            }
+            showInteractiveMultiPartInstallation(gearIndex, module, availableParts, 4, installInstructions);
+            break;
+            
+        case "two_locations_2slots":
+            // Прыжковый ускоритель - два места по 2 слота
+            installInstructions = "Выберите 2 места установки (каждое по 2 слота):";
+            for (const [implantType, implant] of Object.entries(state.implants)) {
+                for (const [partName, partData] of Object.entries(implant.parts)) {
+                    if (partData && partData.slots >= 2) {
+                        // Проверяем есть ли 2 свободных слота подряд
+                        for (let i = 0; i <= partData.slots - 2; i++) {
+                            if (!partData.modules[i] && !partData.modules[i + 1]) {
+                                availableParts.push({
+                                    implantType,
+                                    partName,
+                                    partDisplayName: getPartDisplayName(implantType, partName),
+                                    implantDisplayName: getImplantName(implantType),
+                                    startSlot: i,
+                                    slotsNeeded: 2
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            showInteractiveMultiPartInstallation(gearIndex, module, availableParts, 2, installInstructions);
+            break;
+            
+        case "four_parts_1slot":
+            // Реактивные стабилизаторы - 4 разных части по 1 слоту
+            installInstructions = "Выберите 4 разные части (по 1 слоту в каждой):";
+            for (const [implantType, implant] of Object.entries(state.implants)) {
+                for (const [partName, partData] of Object.entries(implant.parts)) {
+                    if (partData && partData.slots && partData.modules.filter(m => !m).length > 0) {
+                        availableParts.push({
+                            implantType,
+                            partName,
+                            partDisplayName: getPartDisplayName(implantType, partName),
+                            implantDisplayName: getImplantName(implantType),
+                            slotsNeeded: 1,
+                            freeSlots: partData.modules.filter(m => !m).length
+                        });
+                    }
+                }
+            }
+            showInteractiveMultiPartInstallation(gearIndex, module, availableParts, 4, installInstructions);
+            break;
+            
+        case "arms_legs_spine_each":
+            // Эндоскелет - по 1 в каждой части рук, ног и спины
+            installInstructions = "Нужно установить по 1 слоту в каждую часть рук, ног и спины (всего 17 частей):";
+            ['arms', 'legs', 'spine'].forEach(implantType => {
+                for (const [partName, partData] of Object.entries(state.implants[implantType].parts)) {
+                    if (partData && partData.slots && partData.modules.filter(m => !m).length > 0) {
+                        availableParts.push({
+                            implantType,
+                            partName,
+                            partDisplayName: getPartDisplayName(implantType, partName),
+                            implantDisplayName: getImplantName(implantType),
+                            slotsNeeded: 1,
+                            required: true
+                        });
+                    }
+                }
+            });
+            showInteractiveMultiPartInstallation(gearIndex, module, availableParts, availableParts.length, installInstructions);
+            break;
+            
+        case "external_parts_2slots":
+            // Оптический камуфляж - по 2 слота в одной части каждого основного импланта
+            installInstructions = "Выберите одну часть в каждом из основных имплантов (голова, руки, ноги, спина) - по 2 слота:";
+            ['head', 'arms', 'legs', 'spine'].forEach(implantType => {
+                for (const [partName, partData] of Object.entries(state.implants[implantType].parts)) {
+                    if (partData && partData.slots >= 2) {
+                        // Проверяем есть ли 2 свободных слота подряд
+                        for (let i = 0; i <= partData.slots - 2; i++) {
+                            if (!partData.modules[i] && !partData.modules[i + 1]) {
+                                availableParts.push({
+                                    implantType,
+                                    partName,
+                                    partDisplayName: getPartDisplayName(implantType, partName),
+                                    implantDisplayName: getImplantName(implantType),
+                                    startSlot: i,
+                                    slotsNeeded: 2
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+            });
+            showInteractiveMultiPartInstallation(gearIndex, module, availableParts, 4, installInstructions);
+            break;
+            
+        case "bone_reinforcement":
+            // Укрепления костной системы - установка в зоны тела
+            installInstructions = "Выберите зону тела для установки укрепления:";
+            const bodyZones = ['head', 'body', 'arms', 'legs'];
+            const zoneNames = {
+                'head': 'Голова',
+                'body': 'Тело', 
+                'arms': 'Руки',
+                'legs': 'Ноги'
+            };
+            
+            bodyZones.forEach(zone => {
+                availableParts.push({
+                    implantType: 'armor',
+                    partName: zone,
+                    partDisplayName: zoneNames[zone],
+                    implantDisplayName: '', // Убираем "Кибер-броня"
+                    slotsNeeded: 0,
+                    isReinforcement: true
+                });
+            });
+            showInteractiveMultiPartInstallation(gearIndex, module, availableParts, 1, installInstructions);
+            break;
+            
+        default:
+            showNotification(
+                `Модуль "${module.name}" требует особой установки. Инструкция: ${module.options}`,
+                'info'
+            );
+    }
+}
+
+// Функция для интерактивного выбора частей при установке составных модулей
+function showInteractiveMultiPartInstallation(gearIndex, module, availableParts, requiredParts, instructions) {
+    console.log('=== ИНТЕРАКТИВНАЯ ФУНКЦИЯ ВЫЗВАНА ===');
+    console.log('Модуль:', module.name, 'Доступных частей:', availableParts.length, 'Требуется:', requiredParts);
+    console.log('Вызвана новая интерактивная функция установки для:', module.name);
+    if (availableParts.length < requiredParts) {
+        showNotification(
+            `Недостаточно доступных частей для установки "${module.name}". ` +
+            `Требуется ${requiredParts} подходящих частей, доступно ${availableParts.length}.`,
+            'error'
+        );
+        return;
+    }
+    
+    // Создаем модальное окно
+    document.body.style.overflow = 'hidden';
+    const installModal = document.createElement('div');
+    installModal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    installModal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    // Массив для хранения выбранных частей
+    const selectedParts = [];
+    
+    // Функция для обновления интерфейса
+    function updateInterface() {
+        const selectedCount = selectedParts.length;
+        const confirmButton = installModal.querySelector('#confirmInstallation');
+        
+        if (confirmButton) {
+            confirmButton.disabled = selectedCount !== requiredParts;
+            confirmButton.textContent = selectedCount === requiredParts ? 
+                `Установить в ${selectedCount} частей` : 
+                `Выберите еще ${requiredParts - selectedCount} частей`;
+        }
+        
+        // Обновляем счетчик
+        const counter = installModal.querySelector('#selectionCounter');
+        if (counter) {
+            counter.textContent = `Выбрано: ${selectedCount}/${requiredParts}`;
+            counter.style.color = selectedCount === requiredParts ? 
+                getThemeColors().success : getThemeColors().warning;
+        }
+    }
+    
+    // Функция для переключения выбора части
+    function togglePartSelection(partIndex) {
+        const part = availableParts[partIndex];
+        const existingIndex = selectedParts.findIndex(p => 
+            p.implantType === part.implantType && p.partName === part.partName
+        );
+        
+        if (existingIndex !== -1) {
+            // Убираем из выбранных
+            selectedParts.splice(existingIndex, 1);
+        } else if (selectedParts.length < requiredParts) {
+            // Добавляем в выбранные
+            selectedParts.push(part);
+        }
+        
+        updateInterface();
+        updatePartButtons();
+    }
+    
+    // Функция для обновления кнопок частей
+    function updatePartButtons() {
+        const buttons = installModal.querySelectorAll('.part-button');
+        buttons.forEach((button, index) => {
+            const part = availableParts[index];
+            const isSelected = selectedParts.some(p => 
+                p.implantType === part.implantType && p.partName === part.partName
+            );
+            
+            if (isSelected) {
+                button.style.background = getThemeColors().successLight;
+                button.style.borderColor = getThemeColors().success;
+                button.style.color = getThemeColors().success;
+            } else {
+                button.style.background = getThemeColors().bgLight;
+                button.style.borderColor = getThemeColors().border;
+                button.style.color = getThemeColors().text;
+            }
+        });
+    }
+    
+    // Функция для подтверждения установки
+    function confirmInstallation() {
+        if (selectedParts.length !== requiredParts) {
+            showNotification('Выберите все необходимые части!', 'error');
+            return;
+        }
+        
+        // Устанавливаем модуль во все выбранные части
+        const groupId = Date.now();
+        let installationSuccess = true;
+        
+        for (const part of selectedParts) {
+            // Обработка укреплений костной системы
+            if (part.isReinforcement && part.implantType === 'armor') {
+                const zone = part.partName; // head, body, arms, legs
+                const existingReinforcement = state.armor.reinforcement[zone];
+                
+                // Проверяем можно ли установить укрепление
+                if (existingReinforcement) {
+                    const existingType = existingReinforcement.type;
+                    const newType = module.type;
+                    
+                    // Можно заменить полимер на полиметалл и наоборот
+                    if ((existingType === 'polymer' && newType === 'polymetal') ||
+                        (existingType === 'polymetal' && newType === 'polymer')) {
+                        // Заменяем укрепление
+                        state.armor.reinforcement[zone] = {
+                            type: newType,
+                            os: module.os,
+                            description: module.description
+                        };
+                    } else {
+                        // Нельзя установить то же самое укрепление
+                        const typeName = existingType === 'polymer' ? 'полимером' : 'полиметаллом';
+                        showNotification(`В зоне "${part.partDisplayName}" уже установлено укрепление ${typeName}!`, 'error');
+                        installationSuccess = false;
+                        break;
+                    }
+                } else {
+                    // Устанавливаем новое укрепление
+                    state.armor.reinforcement[zone] = {
+                        type: module.type,
+                        os: module.os,
+                        description: module.description
+                    };
+                }
+            } else {
+                // Обычная установка в импланты
+                const partData = state.implants[part.implantType].parts[part.partName];
+                if (!partData) continue;
+                
+                if (part.slotsNeeded === 1) {
+                    // Для модулей с 1 слотом
+                    const freeSlotIndex = partData.modules.findIndex(m => m === null);
+                    if (freeSlotIndex !== -1) {
+                        partData.modules[freeSlotIndex] = {
+                            ...module,
+                            groupId: groupId,
+                            slotIndex: freeSlotIndex
+                        };
+                    } else {
+                        installationSuccess = false;
+                        break;
+                    }
+                } else if (part.slotsNeeded === 2) {
+                    // Для модулей с 2 слотами
+                    const startSlot = part.startSlot;
+                    if (partData.modules[startSlot] === null && partData.modules[startSlot + 1] === null) {
+                        partData.modules[startSlot] = {
+                            ...module,
+                            groupId: groupId,
+                            slotIndex: startSlot
+                        };
+                        partData.modules[startSlot + 1] = {
+                            ...module,
+                            groupId: groupId,
+                            slotIndex: startSlot + 1
+                        };
+                    } else {
+                        installationSuccess = false;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (installationSuccess) {
+            // Удаляем модуль из снаряжения
+            state.gear.splice(gearIndex, 1);
+            
+            // Обновляем все блоки
+            renderGear();
+            renderImplants();
+            filterImplantModules();
+            recalculateLoadFromInventory();
+            updateLoadDisplay();
+            
+            // Обновляем отображение брони если установили укрепление
+            if (selectedParts.some(part => part.isReinforcement)) {
+                if (typeof updateArmorDisplay === 'function') updateArmorDisplay();
+            }
+            
+            scheduleSave();
+            
+            // Закрываем модал
+            installModal.remove();
+            document.body.style.overflow = '';
+            
+            // Обновляем отображение брони
+            if (typeof updateArmorDisplay === 'function') updateArmorDisplay();
+            
+            showNotification(`Модуль "${module.name}" успешно установлен!`, 'success');
+        } else {
+            // Конкретная ошибка уже была показана выше, не показываем общую ошибку
+            console.log('Установка модуля не удалась');
+        }
+    }
+    
+    installModal.innerHTML = `
+        <div class="modal" style="max-width: 900px; max-height: 85vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h3 class="modal-title">Установка: ${module.name}</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="background: ${getThemeColors().accentLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().accent};">
+                    <h6 style="color: ${getThemeColors().accent}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600;">${module.name}</h6>
+                    <p style="color: ${getThemeColors().text}; font-size: 0.85rem; margin: 0 0 0.75rem 0; line-height: 1.4;">${module.description}</p>
+                    <div style="background: ${getThemeColors().bg}; padding: 0.75rem; border-radius: 8px; margin-top: 0.75rem;">
+                        <div style="color: ${getThemeColors().accent}; font-size: 0.85rem; font-weight: 600;">${module.options}</div>
+                        <div style="color: ${getThemeColors().danger}; font-size: 0.75rem; margin-top: 0.25rem;">ПО: ${module.awarenessLoss}</div>
+                    </div>
+                </div>
+                
+                <div style="background: ${getThemeColors().successLight}; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().success};">
+                    <div id="selectionCounter" style="color: ${getThemeColors().warning}; font-size: 1rem; font-weight: 600; text-align: center;">
+                        Выбрано: 0/${requiredParts}
+                    </div>
+                    <p style="color: ${getThemeColors().text}; font-size: 0.85rem; margin: 0.5rem 0 0 0; text-align: center;">
+                        ${instructions}
+                    </p>
+                </div>
+                
+                <div style="display: grid; gap: 0.75rem; margin-bottom: 1.5rem;">
+                    ${availableParts.map((part, index) => `
+                        <button class="part-button" onclick="togglePartSelection(${index})" 
+                                style="background: ${getThemeColors().bgLight}; border: 1px solid ${getThemeColors().border}; border-radius: 10px; padding: 1rem; cursor: pointer; transition: all 0.2s; text-align: left;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem;">
+                                        ${part.isReinforcement ? part.partDisplayName : (part.implantDisplayName || getImplantName(part.implantType))}
+                                    </div>
+                                    ${!part.isReinforcement ? `<div style="color: ${getThemeColors().muted}; font-size: 0.8rem;">${part.partDisplayName}</div>` : ''}
+                                </div>
+                                <div style="color: ${getThemeColors().success}; font-size: 0.8rem; font-weight: 500;">
+                                    ${part.slotsNeeded} слот${part.slotsNeeded > 1 ? 'а' : ''}
+                                </div>
+                            </div>
+                        </button>
+                    `).join('')}
+                </div>
+                
+                <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: center;">
+                    <button class="pill-button secondary-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem;">
+                        Отмена
+                    </button>
+                    <button id="confirmInstallation" class="pill-button primary-button" onclick="confirmInstallation()" 
+                            style="padding: 0.75rem 2rem;" disabled>
+                        Выберите все части
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Добавляем функции в глобальную область видимости для кнопок
+    window.togglePartSelection = togglePartSelection;
+    window.confirmInstallation = confirmInstallation;
+    
+    document.body.appendChild(installModal);
+    
+    installModal.addEventListener('click', (e) => {
+        if (e.target === installModal) {
+            closeModal(installModal.querySelector('.icon-button'));
+        }
+    });
+    
+    // Инициализируем интерфейс
+    updateInterface();
+}
+
+// Функция для установки модуля и обновления детального блока
+window.installModuleAndUpdate = function(implantType, partName, slotIndex, moduleName) {
+    const module = getAvailableModules().find(m => m.name === moduleName);
+    if (!module) return;
+    
+    const partData = state.implants[implantType].parts[partName];
+    if (!partData) return;
+        
+        // Проверяем, что все необходимые слоты свободны
+        for (let i = slotIndex; i < slotIndex + module.slots; i++) {
+            if (partData.modules[i] !== null) {
+                showNotification('Слоты заняты!', 'error');
+                return;
+            }
+        }
+        
+        // Устанавливаем модуль
+    const groupId = Date.now(); // Уникальный ID группы для связывания слотов
+        for (let i = slotIndex; i < slotIndex + module.slots; i++) {
+            partData.modules[i] = {
+                ...module,
+                groupId: groupId,
+                slotIndex: i
+            };
+        }
+    
+    // Обновляем блок "Детали импланта"
+    if (typeof updateImplantDetails === 'function') {
+        updateImplantDetails();
+    }
+    
+    // Обновляем главный блок киберимплантов на странице
+    renderImplants();
+    
+    showModal('Модуль установлен', `
+        <div style="text-align: center; padding: 1.5rem;">
+            <div style="background: ${getThemeColors().bgLight}; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().border};">
+                <div style="font-size: 2rem; margin-bottom: 0.75rem; color: ${getThemeColors().accent};">✓</div>
+                <h4 style="color: ${getThemeColors().text}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 500;">Модуль "${moduleName}" установлен</h4>
+            </div>
+            <button class="pill-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem; background: ${getThemeColors().accent}; color: ${getThemeColors().bg}; border: none;">
+                Отлично
+            </button>
+        </div>
+    `);
+};
+
+// Функция удаления модуля по groupId с подтверждением
+window.removeModuleByGroupId = function(implantType, partName, groupId) {
+    const partData = state.implants[implantType].parts[partName];
+    if (!partData) return;
+    
+    // Находим модуль по groupId (сравниваем как строку)
+    let module = null;
+    let foundGroupId = null;
+    for (let i = 0; i < partData.modules.length; i++) {
+        const m = partData.modules[i];
+        if (m) {
+            const mGroupId = String(m.groupId || `single_${i}`);
+            const searchGroupId = String(groupId);
+            if (mGroupId === searchGroupId) {
+                module = m;
+                foundGroupId = mGroupId;
+                    break;
+                }
+            }
+    }
+    
+    if (!module) {
+        console.error('Модуль не найден. groupId:', groupId);
+        return;
+    }
+    
+    // Показываем красивый модал подтверждения
+    const confirmModal = document.createElement('div');
+    confirmModal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    confirmModal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    confirmModal.innerHTML = `
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Подтвердите действие</h3>
+                <button class="icon-button" onclick="this.closest('.modal-overlay').remove(); document.body.style.overflow='';">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: ${getThemeColors().text}; font-size: 1rem; margin-bottom: 1rem; line-height: 1.5;">
+                    Вы уверены, что хотите извлечь модуль <strong style="color: ${getThemeColors().accent};">"${module.name}"</strong>?
+                </p>
+                <p style="color: ${getThemeColors().success}; font-size: 0.9rem; background: ${getThemeColors().successLight}; padding: 0.75rem; border-radius: 8px;">
+                    ✓ Модуль будет возвращен в снаряжение.
+                </p>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                <button class="pill-button secondary-button" onclick="this.closest('.modal-overlay').remove(); document.body.style.overflow='';" style="padding: 0.5rem 1.5rem;">
+                    Отмена
+                </button>
+                <button class="pill-button primary-button" onclick="confirmRemoveModule('${implantType}', '${partName}', '${foundGroupId}', this.closest('.modal-overlay'))" style="padding: 0.5rem 1.5rem;">
+                    Извлечь модуль
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.style.overflow = 'hidden';
+    document.body.appendChild(confirmModal);
+    
+    // Функция подтверждения удаления
+    window.confirmRemoveModule = function(implType, pName, gId, modalElement) {
+        const pData = state.implants[implType].parts[pName];
+        if (!pData) return;
+        
+        // Находим модуль
+        let mod = null;
+        for (let i = 0; i < pData.modules.length; i++) {
+            const m = pData.modules[i];
+            if (m && String(m.groupId || `single_${i}`) === gId) {
+                mod = m;
+                break;
+            }
+        }
+        
+        if (!mod) return;
+        
+        // Возвращаем модуль в снаряжение
+        state.gear.push({
+            name: mod.name,
+            description: `${mod.description} | Потеря осознанности: ${mod.awarenessLoss}`,
+            price: mod.price || 0,
+            load: 1,
+            type: 'implant',
+            implantData: {
+                ...mod,
+                category: mod.category
+            }
+        });
+        
+        // Удаляем все слоты с этим groupId из всех имплантов
+        for (const [currentImplantType, implant] of Object.entries(state.implants)) {
+            if (!implant.installed) continue;
+            
+            for (const [currentPartName, partData] of Object.entries(implant.parts)) {
+                if (!partData || !partData.modules) continue;
+                
+                for (let i = 0; i < partData.modules.length; i++) {
+                    const currentModule = partData.modules[i];
+                    if (currentModule && String(currentModule.groupId || `single_${i}`) === gId) {
+                        partData.modules[i] = null;
+                    }
+                }
+            }
+        }
+        
+        // Пересчитываем нагрузку, так как модуль возвращен в снаряжение
+        recalculateLoadFromInventory();
+        updateLoadDisplay();
+        
+        // Обновляем все блоки
+        renderGear();
+        updateImplantDetails();
+        renderImplants();
+        filterImplantModules();
+        scheduleSave();
+        
+        // Закрываем модал подтверждения
+        if (modalElement) {
+            modalElement.remove();
+            document.body.style.overflow = '';
+        }
+        
+        showNotification(`Модуль "${mod.name}" возвращен в снаряжение!`, 'success');
+    };
+};
+
+function removeModule(implantType, partName, slotIndex) {
+    const partData = state.implants[implantType].parts[partName];
+    if (!partData || !partData.modules[slotIndex]) return;
+    
+    const module = partData.modules[slotIndex];
+    const groupId = module.groupId || `single_${slotIndex}`;
+    
+    // Вызываем функцию удаления по groupId
+    removeModuleByGroupId(implantType, partName, groupId);
+}
+
+function changeModuleDurability(implantType, partName, slotIndex, change) {
+    const partData = state.implants[implantType].parts[partName];
+    if (!partData || !partData.modules[slotIndex]) return;
+    
+    const module = partData.modules[slotIndex];
+    if (!module.durability) return;
+    
+    const newDurability = Math.max(0, Math.min(module.maxDurability, module.durability + change));
+    
+    // Обновляем ПЗ во всех слотах этого модуля
+    const groupId = module.groupId;
+    for (let i = 0; i < partData.modules.length; i++) {
+        if (partData.modules[i] && String(partData.modules[i].groupId) === String(groupId)) {
+            partData.modules[i].durability = newDurability;
+        }
+    }
+    
+    updateImplantDetails();
+    renderImplants();
+    scheduleSave();
+}
+
+function setModuleDurability(implantType, partName, slotIndex, value) {
+    const partData = state.implants[implantType].parts[partName];
+    if (!partData || !partData.modules[slotIndex]) return;
+    
+    const module = partData.modules[slotIndex];
+    if (!module.durability) return;
+    
+    const newDurability = Math.max(0, Math.min(module.maxDurability, parseInt(value) || 0));
+    
+    // Обновляем ПЗ во всех слотах этого модуля
+    const groupId = module.groupId;
+    for (let i = 0; i < partData.modules.length; i++) {
+        if (partData.modules[i] && String(partData.modules[i].groupId) === String(groupId)) {
+            partData.modules[i].durability = newDurability;
+        }
+    }
+    
+    updateImplantDetails();
+    renderImplants();
+    scheduleSave();
+}
+
+function fireImplantWeapon(implantType, partName, slotIndex) {
+    const partData = state.implants[implantType].parts[partName];
+    if (!partData || !partData.modules[slotIndex]) return;
+    
+    const module = partData.modules[slotIndex];
+    if (!module.weaponType) return;
+    
+    // Проверяем наличие боеприпасов
+    const ammoType = getAmmoTypeForWeapon(module.weaponType);
+    const availableAmmo = state.ammo.find(ammo => ammo.type === ammoType && ammo.quantity > 0);
+    
+    if (!availableAmmo) {
+        showNotification(`Нет боеприпасов для ${module.weaponType}!`, 'error');
+        return;
+    }
+    
+    // Расходуем боеприпасы
+    availableAmmo.quantity--;
+    
+    // Генерируем урон в зависимости от типа оружия
+    const damage = calculateWeaponDamage(module.weaponType);
+    
+    showNotification(`Выстрел из ${module.name}! Урон: ${damage}`, 'success');
+    
+    // Обновляем отображение
+    selectImplant(implantType, partName);
+}
+
+function reloadImplantWeapon(implantType, partName, slotIndex) {
+    const partData = state.implants[implantType].parts[partName];
+    if (!partData || !partData.modules[slotIndex]) return;
+    
+    const module = partData.modules[slotIndex];
+    if (!module.weaponType) return;
+    
+    showNotification(`Перезарядка ${module.name}...`, 'info');
+    
+    // Здесь можно добавить логику перезарядки
+    setTimeout(() => {
+        showNotification(`${module.name} перезаряжен!`, 'success');
+    }, 1000);
+}
+
+function getAmmoTypeForWeapon(weaponType) {
+    const ammoMap = {
+        'ПП': '9мм',
+        'Ракетное': 'Ракеты',
+        'Лазерное': 'Энергия'
+    };
+    return ammoMap[weaponType] || 'Универсальные';
+}
+
+function calculateWeaponDamage(weaponType) {
+    const damageMap = {
+        'ПП': '2d6',
+        'Ракетное': '4d6',
+        'Лазерное': '1d6'
+    };
+    return damageMap[weaponType] || '1d4';
+}
+
+function showModuleInstallation(moduleName) {
+    const module = getAvailableModules().find(m => m.name === moduleName);
+    if (!module) return;
+    
+    // Проверяем если модуль требует несколько частей одновременно
+    if (module.requiredParts && module.requiredParts > 1) {
+        showNotification(
+            `Модуль "${moduleName}" требует установки в ${module.requiredParts} разных частях одновременно. ` +
+            `Эта функция находится в разработке. Используйте модал "Управление имплантами" для ручной установки.`,
+            'info'
+        );
+        return;
+    }
+    
+    // Находим все доступные части имплантов для установки
+    const availableParts = [];
+    for (const [implantType, implant] of Object.entries(state.implants)) {
+        if (!implant.installed) continue;
+        
+        for (const [partName, partData] of Object.entries(implant.parts)) {
+            if (!partData || !partData.slots) continue;
+            
+            // Проверяем, есть ли достаточно свободных слотов
+            let freeSlots = 0;
+            for (let i = 0; i < partData.slots; i++) {
+                if (partData.modules[i] === null) {
+                    freeSlots++;
+                } else {
+                    freeSlots = 0; // Сбрасываем счетчик, если слот занят
+                }
+                if (freeSlots >= module.slots) {
+                    availableParts.push({
+                        implantType,
+                        partName,
+                        partDisplayName: getPartDisplayName(implantType, partName),
+                        implantDisplayName: getImplantName(implantType),
+                        startSlot: i - module.slots + 1
+                    });
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (availableParts.length === 0) {
+        showNotification('Нет доступных слотов для установки этого модуля!', 'error');
+        return;
+    }
+    
+    // Создаем модальное окно выбора места установки
+    document.body.style.overflow = 'hidden';
+    const installModal = document.createElement('div');
+    installModal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    installModal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    installModal.innerHTML = `
+        <div class="modal" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Установка модуля: ${moduleName}</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+        </div>
+        <div class="modal-body">
+            <div style="background: ${getThemeColors().accentLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().accent};">
+                    <div style="display: flex; align-items: start; margin-bottom: 1rem;">
+                    <div>
+                        <h6 style="color: ${getThemeColors().accent}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600;">${module.name}</h6>
+                            <p style="color: ${getThemeColors().text}; font-size: 0.85rem; margin: 0; line-height: 1.4;">${module.description}</p>
+                    </div>
+                </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <span style="background: ${getThemeColors().accentLight}; color: ${getThemeColors().accent}; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">
+                                ${module.slots} слот${module.slots > 1 ? (module.slots > 4 ? 'ов' : 'а') : ''}
+                            </span>
+                            ${module.durability ? `<span style="background: rgba(100, 150, 255, 0.2); color: #6496FF; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.75rem;">ПЗ: ${module.durability}</span>` : ''}
+                            ${module.weaponType ? `<span style="background: rgba(255, 100, 100, 0.2); color: #FF6464; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.75rem;">${module.weaponType}</span>` : ''}
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 1rem;">${module.price}уе</div>
+                            <div style="color: ${getThemeColors().danger}; font-size: 0.75rem;">ПО: ${module.awarenessLoss}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <h6 style="color: ${getThemeColors().accent}; margin-bottom: 1rem; font-size: 1rem; font-weight: 600;">Выберите место установки:</h6>
+                <div style="display: grid; gap: 0.75rem; max-height: 400px; overflow-y: auto; padding-right: 0.5rem;">
+                ${availableParts.map(part => `
+                        <div style="background: ${getThemeColors().bgLight}; border-radius: 10px; padding: 1rem; border: 1px solid ${getThemeColors().border}; cursor: pointer; transition: all 0.2s ease;" 
+                             onclick="installModuleAndUpdate('${part.implantType}', '${part.partName}', ${part.startSlot}, '${moduleName.replace(/'/g, "\\'")}'); closeModal(this);"
+                             onmouseover="this.style.borderColor='${getThemeColors().accent}'; this.style.transform='translateX(4px)'"
+                             onmouseout="this.style.borderColor='${getThemeColors().border}'; this.style.transform='translateX(0)'">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                    <div style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem;">${part.implantDisplayName}</div>
+                                <div style="color: ${getThemeColors().muted}; font-size: 0.8rem;">${part.partDisplayName}</div>
+                            </div>
+                                <div style="color: ${getThemeColors().success}; font-size: 0.8rem; font-weight: 500;">
+                                    Слоты ${part.startSlot + 1}-${part.startSlot + module.slots}
+                                </div>
+                        </div>
+                    </div>
+                `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(installModal);
+    
+    installModal.addEventListener('click', (e) => {
+        if (e.target === installModal) {
+            closeModal(installModal.querySelector('.icon-button'));
+        }
+    });
+}
+
+// Старая функция selectImplant удалена - теперь используется спойлерная система
+function selectImplantDEPRECATED_OLD(implantType, partName = null) {
     const detailsContainer = document.getElementById('implantDetails');
     if (!detailsContainer) return;
     
     const implant = state.implants[implantType];
     if (!implant || !implant.installed) {
         detailsContainer.innerHTML = `
-            <p style="color: ${getThemeColors().muted}; text-align: center; padding: 2rem;">
-                Имплант не установлен. Купите части импланта в магазине.
-            </p>
+            <div style="text-align: center; padding: 2rem;">
+                <div style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.6;">⚠️</div>
+                <h3 style="color: ${getThemeColors().danger}; margin-bottom: 1rem; font-size: 1.1rem;">Имплант не установлен</h3>
+                <p style="color: ${getThemeColors().muted}; font-size: 0.9rem; line-height: 1.5;">
+                    Купите части импланта в магазине<br>для установки и управления модулями
+                </p>
+            </div>
         `;
         return;
     }
     
     let detailsHTML = `
-        <div style="margin-bottom: 1rem;">
-            <h5 style="color: ${getThemeColors().accent}; margin-bottom: 0.5rem;">${getImplantName(implantType)}</h5>
-            <p style="color: ${getThemeColors().muted}; font-size: 0.9rem;">${getImplantDescription(implantType)}</p>
+        <div style="background: ${getThemeColors().accentLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().accent};">
+            <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+                <div style="font-size: 2rem; margin-right: 1rem;">🦾</div>
+                <div>
+                    <h3 style="color: ${getThemeColors().accent}; margin-bottom: 0.25rem; font-size: 1.2rem; font-weight: 600;">${getImplantName(implantType)}</h3>
+                    <p style="color: ${getThemeColors().muted}; font-size: 0.9rem; line-height: 1.4;">${getImplantDescription(implantType)}</p>
+                </div>
+            </div>
         </div>
     `;
     
@@ -1965,25 +4169,73 @@ function selectImplant(implantType, partName = null) {
         
         const partDisplayName = getPartDisplayName(implantType, partName);
         detailsHTML += `
-            <div style="background: ${getThemeColors().bgMedium}; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--border);">
-                <h6 style="color: ${getThemeColors().accent}; margin-bottom: 0.5rem;">${partDisplayName}</h6>
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                    ${Array.from({length: partData.slots}, (_, i) => `
-                        <div class="implant-slot" style="width: 40px; height: 40px; background: ${partData.modules[i] ? 'rgba(125, 244, 198, 0.3)' : 'rgba(182, 103, 255, 0.2)'}; border: 2px solid ${partData.modules[i] ? 'var(--success)' : 'var(--border)'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="manageSlot('${implantType}', '${partName}', ${i})">
-                            ${partData.modules[i] ? '✓' : '○'}
-                        </div>
-                    `).join('')}
-                </div>
-                <p style="color: ${getThemeColors().muted}; font-size: 0.8rem;">Слотов: ${partData.modules.filter(m => m).length}/${partData.slots}</p>
-                ${partData.modules.filter(m => m).length > 0 ? `
-                    <div style="margin-top: 0.5rem;">
-                        <h7 style="color: ${getThemeColors().success}; font-size: 0.8rem;">Установленные модули:</h7>
-                        ${partData.modules.map((module, i) => module ? `
-                            <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 6px; padding: 0.75rem; margin-top: 0.25rem;">
-                                <div style="color: ${getThemeColors().success}; font-weight: bold; font-size: 0.8rem;">${module.name}</div>
-                                <div style="color: ${getThemeColors().muted}; font-size: 0.7rem;">${module.description}</div>
+            <div style="background: ${getThemeColors().bgLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().border};">
+                <h6 style="color: ${getThemeColors().accent}; margin-bottom: 1rem; font-size: 1rem; font-weight: 600;">${partDisplayName}</h6>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                    ${Array.from({length: partData.slots}, (_, i) => {
+                        const module = partData.modules[i];
+                        const isOccupied = module !== null;
+                        const moduleGroup = module ? getModuleGroup(implantType, partName, i) : null;
+                        
+                        return `
+                            <div class="implant-slot" style="width: 80px; height: 80px; background: ${isOccupied ? 
+                                `linear-gradient(135deg, rgba(125, 244, 198, 0.3), rgba(125, 244, 198, 0.1))` : 
+                                `linear-gradient(135deg, rgba(182, 103, 255, 0.2), rgba(182, 103, 255, 0.1))`}; 
+                                border-radius: 12px; border: 2px solid ${isOccupied ? getThemeColors().success : getThemeColors().accent}; 
+                                cursor: pointer; transition: all 0.3s ease; position: relative;
+                                ${moduleGroup ? `border-color: ${getModuleGroupColor(moduleGroup)};` : ''}"
+                                 onclick="${isOccupied ? `removeModule('${implantType}', '${partName}', ${i})` : `showModuleSelector('${implantType}', '${partName}', ${i})`}"
+                                 onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.2)'"
+                                 onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none'">
+                                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                            color: ${isOccupied ? getThemeColors().success : getThemeColors().text}; 
+                                            font-size: 0.7rem; font-weight: 600; text-align: center;">
+                                    ${isOccupied ? module.name : `Слот ${i + 1}`}
+                                </div>
+                                ${isOccupied ? `
+                                    <div style="position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; 
+                                                background: ${getThemeColors().success}; border-radius: 50%;"></div>
+                                ` : ''}
+                                ${moduleGroup ? `
+                                    <div style="position: absolute; bottom: 4px; left: 4px; width: 12px; height: 12px; 
+                                                background: ${getModuleGroupColor(moduleGroup)}; border-radius: 2px; 
+                                                display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: white;">
+                                        ${moduleGroup}
+                                    </div>
+                                ` : ''}
                             </div>
-                        ` : '').join('')}
+                        `;
+                    }).join('')}
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <p style="color: ${getThemeColors().muted}; font-size: 0.9rem;">Слотов: ${partData.modules.filter(m => m).length}/${partData.slots}</p>
+                <button class="pill-button secondary-button" onclick="showModuleSelector('${implantType}', '${partName}', null)" style="width: 100%;">
+                    Добавить модуль
+                </button>
+                </div>
+                ${partData.modules.filter(m => m).length > 0 ? `
+                    <div style="margin-top: 1rem;">
+                        <h7 style="color: ${getThemeColors().success}; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">Установленные модули:</h7>
+                        <div style="display: grid; gap: 0.5rem;">
+                            ${partData.modules.map((module, i) => module ? `
+                                <div style="background: ${getThemeColors().successLight}; border: 1px solid ${getThemeColors().success}; border-radius: 8px; padding: 0.75rem; position: relative;">
+                                    <button onclick="removeModule('${implantType}', '${partName}', ${i})" style="position: absolute; top: 0.5rem; right: 0.5rem; background: transparent; border: none; color: ${getThemeColors().danger}; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: all 0.2s ease;" onmouseover="this.style.background='rgba(255, 91, 135, 0.2)'" onmouseout="this.style.background='transparent'" title="Удалить модуль">×</button>
+                                    <div style="color: ${getThemeColors().success}; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">${module.name}</div>
+                                    <div style="color: ${getThemeColors().text}; font-size: 0.8rem; line-height: 1.3; margin-bottom: 0.5rem;">${module.description}</div>
+                                    
+                                    ${module.durability ? `
+                                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                            <span style="color: ${getThemeColors().muted}; font-size: 0.8rem;">ПЗ:</span>
+                                            <button onclick="changeModuleDurability('${implantType}', '${partName}', ${i}, -1)" style="background: ${getThemeColors().danger}; color: white; border: none; border-radius: 4px; width: 24px; height: 24px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center;">-</button>
+                                            <span style="color: ${getThemeColors().text}; font-weight: 600; min-width: 30px; text-align: center;">${module.durability}/${module.maxDurability}</span>
+                                            <button onclick="changeModuleDurability('${implantType}', '${partName}', ${i}, 1)" style="background: ${getThemeColors().success}; color: white; border: none; border-radius: 4px; width: 24px; height: 24px; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center;">+</button>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${module.weaponType ? renderEmbeddedWeapon({...module, implantType, partName, slotIndex: i}) : ''}
+                                </div>
+                            ` : '').join('')}
+                        </div>
                     </div>
                 ` : ''}
             </div>
@@ -1995,25 +4247,43 @@ function selectImplant(implantType, partName = null) {
             
             const partDisplayName = getPartDisplayName(implantType, partName);
             detailsHTML += `
-                <div style="background: ${getThemeColors().bgMedium}; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--border);">
-                    <h6 style="color: ${getThemeColors().accent}; margin-bottom: 0.5rem;">${partDisplayName}</h6>
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div style="background: ${getThemeColors().bgLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().border};">
+                    <h6 style="color: ${getThemeColors().accent}; margin-bottom: 1rem; font-size: 1rem; font-weight: 600;">${partDisplayName}</h6>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(50px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
                         ${Array.from({length: partData.slots}, (_, i) => `
-                            <div class="implant-slot" style="width: 40px; height: 40px; background: ${partData.modules[i] ? 'rgba(125, 244, 198, 0.3)' : 'rgba(182, 103, 255, 0.2)'}; border: 2px solid ${partData.modules[i] ? 'var(--success)' : 'var(--border)'}; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="manageSlot('${implantType}', '${partName}', ${i})">
-                                ${partData.modules[i] ? '✓' : '○'}
+                            <div class="implant-slot" style="width: 50px; height: 50px; background: ${partData.modules[i] ? 
+                                `linear-gradient(135deg, rgba(125, 244, 198, 0.3), rgba(125, 244, 198, 0.1))` : 
+                                `linear-gradient(135deg, rgba(182, 103, 255, 0.2), rgba(182, 103, 255, 0.1))`}; 
+                                border: 2px solid ${partData.modules[i] ? getThemeColors().success : getThemeColors().accent}; 
+                                border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; 
+                                transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.2);" 
+                                onclick="manageSlot('${implantType}', '${partName}', ${i})"
+                                onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)'"
+                                onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 2px 8px rgba(0,0,0,0.2)'">
+                                <span style="font-size: 1.2rem; color: ${partData.modules[i] ? getThemeColors().success : getThemeColors().text};">
+                                    ${partData.modules[i] ? '✓' : '○'}
+                                </span>
                             </div>
                         `).join('')}
                     </div>
-                    <p style="color: ${getThemeColors().muted}; font-size: 0.8rem;">Слотов: ${partData.modules.filter(m => m).length}/${partData.slots}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <p style="color: ${getThemeColors().muted}; font-size: 0.9rem;">Слотов: ${partData.modules.filter(m => m).length}/${partData.slots}</p>
+                        <button onclick="showImplantShop()" style="background: ${getThemeColors().accent}; color: white; border: none; border-radius: 6px; padding: 0.4rem 0.8rem; cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all 0.2s ease;" onmouseover="this.style.background='${getThemeColors().accent2}'" onmouseout="this.style.background='${getThemeColors().accent}'">
+                            + Добавить модуль
+                        </button>
+                    </div>
                     ${partData.modules.filter(m => m).length > 0 ? `
-                        <div style="margin-top: 0.5rem;">
-                            <h7 style="color: ${getThemeColors().success}; font-size: 0.8rem;">Установленные модули:</h7>
-                            ${partData.modules.map((module, i) => module ? `
-                                <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 6px; padding: 0.75rem; margin-top: 0.25rem;">
-                                    <div style="color: ${getThemeColors().success}; font-weight: bold; font-size: 0.8rem;">${module.name}</div>
-                                    <div style="color: ${getThemeColors().muted}; font-size: 0.7rem;">${module.description}</div>
-                                </div>
-                            ` : '').join('')}
+                        <div style="margin-top: 1rem;">
+                            <h7 style="color: ${getThemeColors().success}; font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; display: block;">Установленные модули:</h7>
+                            <div style="display: grid; gap: 0.5rem;">
+                                ${partData.modules.map((module, i) => module ? `
+                                    <div style="background: ${getThemeColors().successLight}; border: 1px solid ${getThemeColors().success}; border-radius: 8px; padding: 0.75rem; position: relative;">
+                                        <button onclick="removeImplantModule('${implantType}', '${partName}', ${i})" style="position: absolute; top: 0.5rem; right: 0.5rem; background: transparent; border: none; color: ${getThemeColors().danger}; cursor: pointer; font-size: 1rem; padding: 0.25rem; border-radius: 4px; transition: all 0.2s ease;" onmouseover="this.style.background='rgba(255, 91, 135, 0.2)'" onmouseout="this.style.background='transparent'" title="Удалить модуль">×</button>
+                                        <div style="color: ${getThemeColors().success}; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem;">${module.name}</div>
+                                        <div style="color: ${getThemeColors().text}; font-size: 0.8rem; line-height: 1.3;">${module.description}</div>
+                                    </div>
+                                ` : '').join('')}
+                            </div>
                         </div>
                     ` : ''}
                 </div>
@@ -2024,14 +4294,7 @@ function selectImplant(implantType, partName = null) {
     detailsContainer.innerHTML = detailsHTML;
 }
 
-function showUnpurchasedError() {
-    showModal('Часть не куплена', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: ${getThemeColors().danger}; font-size: 1.1rem; margin-bottom: 1rem;">&#x274C; Эта часть импланта не куплена!</p>
-            <p style="color: ${getThemeColors().muted}; margin-bottom: 1rem;">Купите её в магазине частей имплантов.</p>
-        </div>
-    `);
-}
+// Старая функция showUnpurchasedError удалена
 
 // Вспомогательные функции для имплантов
 function getImplantName(type) {
@@ -2148,7 +4411,7 @@ function showSlotManagement(implantType, partName, slotIndex) {
     if (currentModule) {
         slotHTML += `
             <div style="background: rgba(125, 244, 198, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                <h5 style="color: ${getThemeColors().success}; margin-bottom: 0.5rem;">Установленный модуль:</h5>
+                <h3 style="color: ${getThemeColors().success}; margin-bottom: 0.5rem;">Установленный модуль:</h3>
                 <p style="color: ${getThemeColors().text}; font-weight: 600;">${currentModule.name}</p>
                 <p style="color: ${getThemeColors().muted}; font-size: 0.9rem;">${currentModule.description}</p>
                 <button class="pill-button danger-button" onclick="removeModuleFromSlot('${implantType}', '${partName}', ${slotIndex}); updateImplantManagementModal();" style="margin-top: 0.5rem;">Удалить модуль</button>
@@ -2157,7 +4420,7 @@ function showSlotManagement(implantType, partName, slotIndex) {
     } else {
         slotHTML += `
             <div style="background: rgba(182, 103, 255, 0.1); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                <h5 style="color: ${getThemeColors().accent}; margin-bottom: 0.5rem;">Свободный слот</h5>
+                <h3 style="color: ${getThemeColors().accent}; margin-bottom: 0.5rem;">Свободный слот</h3>
                 <div class="drop-zone" data-implant-type="${implantType}" data-part-name="${partName}" data-slot-index="${slotIndex}" style="background: rgba(125, 244, 198, 0.1); border: 2px dashed var(--success); border-radius: 8px; padding: 2rem; text-align: center; margin-bottom: 1rem; min-height: 80px; display: flex; align-items: center; justify-content: center;">
                     <p style="color: ${getThemeColors().success}; font-weight: 600; margin: 0;">Перетащите модуль сюда</p>
                 </div>
@@ -2264,29 +4527,192 @@ function addDragAndDropHandlers(implantType, partName, slotIndex) {
 }
 
 function installModuleInSlot(implantType, partName, slotIndex, gearIndex) {
-    const module = state.gear[gearIndex];
-    if (!module) return;
+    const gearItem = state.gear[gearIndex];
+    if (!gearItem || !gearItem.implantData) return;
     
-    // Проверяем, нужно ли терять осознанность (исключаем очки с оптическими слотами)
-    const isOpticalGlasses = module.name && module.name.includes('ОЧКИ С ОПТИЧЕСКИМИ СЛОТАМИ');
+    const partData = state.implants[implantType].parts[partName];
+    if (!partData) return;
+    
+    const module = gearItem.implantData;
+    
+    // Проверяем, является ли модуль модулем с множественной установкой
+    if (module.specialInstall) {
+        console.log('Модуль требует специальной установки:', module.name, 'Тип:', module.specialInstall);
+        // Закрываем текущий модал управления слотом
+        const currentModal = document.querySelector('.modal-overlay');
+        if (currentModal) {
+            currentModal.remove();
+            document.body.style.overflow = '';
+        }
+        // Показываем интерактивную установку
+        showSpecialModuleInstallationInteractive(gearIndex, module);
+        return;
+    }
+    
+    const installType = getModuleInstallType(module.options);
+    
+    // Парсим количество слотов которое требует модуль
+    const requiredSlots = parseSlotsFromOptions(module.options);
+    
+    // Специальная логика для Лазерной кромки
+    if (module.name === "Лазерная кромка") {
+        // Проверяем, что устанавливаем в кисть
+        if (partName !== 'wristLeft' && partName !== 'wristRight') {
+            showNotification('Лазерная кромка может быть установлена только в кисти!', 'error');
+            return;
+        }
+        
+        // Проверяем, есть ли уже Лазерная кромка в этой кисти
+        const existingLaserEdge = partData.modules.find(m => m && m.name === "Лазерная кромка");
+        if (existingLaserEdge) {
+            // Если уже есть, добавляем к счётчику
+            if (existingLaserEdge.count >= 5) {
+                showNotification('Максимум 5 лазерных кромок на кисть!', 'error');
+                return;
+            }
+            // Добавляем к существующему модулю
+            existingLaserEdge.count += 1;
+            existingLaserEdge.awarenessLoss = `${existingLaserEdge.count}d4 за каждый`;
+            
+            // Удаляем модуль из снаряжения
+            state.gear.splice(gearIndex, 1);
+            
+            // Пересчитываем нагрузку
+            recalculateLoadFromInventory();
+            updateLoadDisplay();
+            
+            // Обновляем отображение
+            renderGear();
+            renderImplants();
+            scheduleSave();
+            
+            showModal('Лазерная кромка добавлена', `✅ Добавлена лазерная кромка! Всего: ${existingLaserEdge.count}/5`);
+            return;
+        }
+        // Если это первая кромка, продолжаем обычную установку
+    }
+    
+    // Для простых модулей проверяем слоты подряд
+    if (installType === 'simple') {
+        for (let i = slotIndex; i < slotIndex + requiredSlots; i++) {
+            if (i >= partData.modules.length || partData.modules[i] !== null) {
+                showNotification('Недостаточно свободных слотов подряд!', 'error');
+                return;
+            }
+        }
+    }
+    
+    // Проверяем, нужно ли терять осознанность
+    const isOpticalGlasses = gearItem.name && gearItem.name.includes('ОЧКИ С ОПТИЧЕСКИМИ СЛОТАМИ');
     let lossRoll = 0;
     
-    if (!isOpticalGlasses && module.implantData && module.implantData.awarenessLoss) {
-        // Бросаем кубики для потери осознанности
-        lossRoll = rollDiceForAwarenessLoss(module.implantData.awarenessLoss);
-        
-        // Вычитаем из текущей осознанности
+    if (!isOpticalGlasses && module.awarenessLoss && module.awarenessLoss !== 'нет' && module.awarenessLoss !== '0') {
+        lossRoll = rollDiceForAwarenessLoss(module.awarenessLoss);
         const currentAwareness = parseInt(state.awareness.current) || 50;
         state.awareness.current = Math.max(0, currentAwareness - lossRoll);
         const awarenessEl = document.getElementById('awarenessCurrent');
         if (awarenessEl) awarenessEl.value = state.awareness.current;
     }
     
-    // Устанавливаем модуль в слот
-    state.implants[implantType].parts[partName].modules[slotIndex] = module.implantData;
+    // Устанавливаем модуль во ВСЕ требуемые слоты с одинаковым groupId
+    const groupId = Date.now();
+    
+    // Добавляем специальные поля для известных модулей
+    const moduleData = {
+        ...module,
+        groupId: groupId
+    };
+    
+    // Добавляем durability для щита
+    if (module.name === "Баллистический щит") {
+        moduleData.durability = 20;
+        moduleData.maxDurability = 20;
+    }
+    
+    // Добавляем weaponType для оружия
+    if (module.name === "Встроенное оружие") {
+        moduleData.weaponType = "ПП";
+        moduleData.magazine = 20;
+        moduleData.currentAmmo = 0; // Изначально не заряжено
+        moduleData.loadedAmmoType = null; // Изначально не заряжено
+    }
+    
+    if (module.name === "Интегрированный гранатомёт") {
+        moduleData.weaponType = "Гранатомёт";
+        moduleData.magazine = 1;
+        moduleData.currentAmmo = 1;
+    }
+    
+    // Добавляем специальные поля для Лазерной кромки
+    if (module.name === "Лазерная кромка") {
+        moduleData.weaponType = "Лазерная кромка";
+        moduleData.count = 1; // Количество установленных кромок
+        moduleData.damagePerEdge = 1; // Урон за каждую кромку (1d3)
+    }
+    
+    // Добавляем специальные поля для Микроракет
+    if (module.name === "Микроракеты") {
+        moduleData.weaponType = "Микроракеты";
+        moduleData.magazine = 6; // Магазин 6 микроракет
+        moduleData.currentAmmo = 0; // Изначально НЕ заряжено
+        moduleData.loadedAmmoType = null; // Изначально НЕ заряжено
+    }
+    
+    // Добавляем специальные поля для Моноструны
+    if (module.name === "Моноструна") {
+        moduleData.weaponType = "Моноструна";
+        moduleData.meleeType = "Тяжёлое"; // Тип оружия ближнего боя
+        moduleData.baseDamage = "3d6"; // Базовый урон тяжёлого оружия
+        moduleData.fireDamage = "1d6"; // Дополнительный урон от огня
+    }
+    
+    // Добавляем специальные поля для Пневматического длинного клинка
+    if (module.name === "Пневматический длинный клинок") {
+        moduleData.weaponType = "Пневматический длинный клинок";
+        moduleData.meleeType = "Тяжёлое/Среднее"; // Два типа оружия ближнего боя
+        moduleData.standardDamage = "3d6"; // Стандартное использование - Тяжёлое ОББ
+        moduleData.extendedDamage = "2d6"; // Удлинённые клинки - Среднее ОББ
+        moduleData.pneumaticDamage = "3d6"; // Пневматическое усиление - игнорирует броню <15
+        moduleData.charge = 10; // Заряд для удлинённых клинков и пневматического усиления
+        moduleData.maxCharge = 10; // Максимальный заряд
+    }
+    
+    // Добавляем специальные поля для Складного клинка
+    if (module.name === "Складной клинок") {
+        moduleData.weaponType = "Складной клинок";
+        moduleData.meleeType = "Тяжёлое"; // Тип оружия ближнего боя
+        moduleData.baseDamage = "3d6"; // Базовый урон тяжёлого оружия
+    }
+    
+    // Добавляем специальные поля для Электропроводки
+    if (module.name === "Электропроводка") {
+        moduleData.weaponType = "Электропроводка";
+        moduleData.meleeType = "Электрическое"; // Специальный тип оружия ближнего боя
+        moduleData.baseDamage = "5d6"; // Урон электричеством
+        moduleData.damageType = "ЭМИ"; // Тип урона
+        moduleData.ignoresArmor = false; // Не игнорирует броню
+    }
+    
+    // Добавляем специальные поля для Скрытого ножа
+    if (module.name === "Скрытый нож") {
+        moduleData.weaponType = "Скрытый нож";
+        moduleData.meleeType = "Среднее"; // Тип оружия ближнего боя
+        moduleData.baseDamage = "2d6"; // Базовый урон среднего оружия
+    }
+    
+    for (let i = slotIndex; i < slotIndex + requiredSlots; i++) {
+        partData.modules[i] = {
+            ...moduleData,
+            slotIndex: i
+        };
+    }
     
     // Удаляем модуль из снаряжения
     state.gear.splice(gearIndex, 1);
+    
+    // Пересчитываем нагрузку, так как модуль удален из снаряжения
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
     
     // Обновляем отображение
     renderGear();
@@ -2301,45 +4727,866 @@ function installModuleInSlot(implantType, partName, slotIndex, gearIndex) {
         slotElement.innerHTML = '✓';
     }
     
-    // Обновляем блок "Детали импланта" в модале управления
-    selectImplant(implantType, partName);
+    // Обновляем все блоки
+    updateImplantDetails();
+    filterImplantModules(); // Обновляем список купленных модулей
     
-    // Показываем сообщение с потерей осознанности (если была)
-    const awarenessMessage = lossRoll > 0 ? `<p style="color: ${getThemeColors().danger}; margin-bottom: 1rem;">Потеря осознанности: ${lossRoll}</p>` : '';
-    showModal('Модуль установлен', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: ${getThemeColors().success}; font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${module.implantData.name} установлен в слот!</p>
-            ${awarenessMessage}
-        </div>
-    `);
+    // Показываем уведомление с потерей осознанности
+    if (lossRoll > 0) {
+        showModal('Модуль установлен', `
+            <div style="text-align: center; padding: 1.5rem;">
+                <div style="background: ${getThemeColors().bgLight}; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().border};">
+                    <div style="font-size: 2rem; margin-bottom: 0.75rem; color: ${getThemeColors().accent};">✓</div>
+                    <h4 style="color: ${getThemeColors().text}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 500;">Модуль "${module.name}" установлен</h4>
+                </div>
+                <div style="background: ${getThemeColors().bgMedium}; padding: 1.25rem; border-radius: 8px; border: 1px solid ${getThemeColors().border}; margin-bottom: 1.5rem;">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.5rem; color: ${getThemeColors().muted};">⚠</div>
+                    <h3 style="color: ${getThemeColors().text}; margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 500;">Потеря осознанности</h3>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: ${getThemeColors().text}; margin-bottom: 0.5rem;">-${lossRoll}</div>
+                    <div style="color: ${getThemeColors().muted}; font-size: 0.9rem;">
+                        Текущая осознанность: <strong style="color: ${getThemeColors().text};">${state.awareness.current}</strong> / ${state.awareness.max}
+                    </div>
+                </div>
+                <button class="pill-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem; background: ${getThemeColors().accent}; color: ${getThemeColors().bg}; border: none;">
+                    Понятно
+                </button>
+            </div>
+        `);
+        
+        // Добавляем запись в лог
+        addToRollLog('implant_install', {
+            moduleName: module.name,
+            awarenessLoss: lossRoll,
+            awarenessBefore: parseInt(state.awareness.current) + lossRoll,
+            awarenessAfter: state.awareness.current,
+            location: `${getImplantName(implantType)} - ${getPartDisplayName(implantType, partName)}`,
+            slotsUsed: requiredSlots
+        });
+    } else {
+        showModal('Модуль установлен', `
+            <div style="text-align: center; padding: 1rem;">
+                <div style="background: ${getThemeColors().successLight}; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid ${getThemeColors().success};">
+                    <div style="font-size: 3rem; margin-bottom: 0.5rem;">✓</div>
+                    <h4 style="color: ${getThemeColors().success}; margin: 0 0 0.5rem 0; font-size: 1.2rem; font-weight: 600;">Модуль "${module.name}" установлен!</h4>
+                    <div style="color: ${getThemeColors().text}; font-size: 0.9rem; opacity: 0.8;">
+                        Установка прошла без потери осознанности
+                    </div>
+                </div>
+                <button class="pill-button success-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem;">
+                    Отлично
+                </button>
+            </div>
+        `);
+        
+        // Добавляем запись в лог даже без потери осознанности
+        addToRollLog('implant_install', {
+            moduleName: module.name,
+            awarenessLoss: 0,
+            awarenessBefore: state.awareness.current,
+            awarenessAfter: state.awareness.current,
+            location: `${getImplantName(implantType)} - ${getPartDisplayName(implantType, partName)}`,
+            slotsUsed: requiredSlots
+        });
+    }
 }
 
-function removeModuleFromSlot(implantType, partName, slotIndex) {
-    const module = state.implants[implantType].parts[partName].modules[slotIndex];
-    if (!module) return;
+// Функция для установки сложных модулей с особыми правилами
+function showSpecialModuleInstallation(gearIndex, module, installType) {
+    const gearItem = state.gear[gearIndex];
+    if (!gearItem || !gearItem.implantData) return;
     
-    // Возвращаем модуль в снаряжение
-    state.gear.push({
-        name: module.name,
-        description: `${module.description} | Потеря осознанности: ${module.awarenessLoss}`,
-        price: module.price,
-        load: 1,
-        type: 'implant',
-        implantData: module
+    // Создаем модальное окно для сложных модулей
+    document.body.style.overflow = 'hidden';
+    const installModal = document.createElement('div');
+    installModal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    installModal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    let installContent = '';
+    let installButtonText = '';
+    
+    switch (installType) {
+        case 'two_locations':
+            installContent = `
+                <div style="background: ${getThemeColors().warningLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().warning};">
+                    <h6 style="color: ${getThemeColors().warning}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600;">⚠️ Специальная установка</h6>
+                    <p style="color: ${getThemeColors().text}; font-size: 0.85rem; margin: 0; line-height: 1.4;">
+                        Этот модуль требует установки в <strong>два места по 2 слота</strong> для синхронизации и устойчивости.
+                        Система автоматически найдет подходящие места для установки.
+                    </p>
+                </div>
+            `;
+            installButtonText = 'Установить в два места';
+            break;
+            
+        case 'distributed_spine':
+            installContent = `
+                <div style="background: ${getThemeColors().infoLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().info};">
+                    <h6 style="color: ${getThemeColors().info}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600;">🦅 Распределенная установка</h6>
+                    <p style="color: ${getThemeColors().text}; font-size: 0.85rem; margin: 0; line-height: 1.4;">
+                        Этот модуль будет установлен в <strong>4 разных части спины</strong> (верхняя, средняя, нижняя, хвостовая).
+                        Система автоматически найдет по одному свободному слоту в каждой части.
+                    </p>
+                </div>
+            `;
+            installButtonText = 'Установить в спину';
+            break;
+            
+        case 'multiple_single_slots':
+            installContent = `
+                <div style="background: ${getThemeColors().successLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().success};">
+                    <h6 style="color: ${getThemeColors().success}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600;">⚡ Множественная установка</h6>
+                    <p style="color: ${getThemeColors().text}; font-size: 0.85rem; margin: 0; line-height: 1.4;">
+                        Этот модуль требует установки в <strong>4 отдельных слота</strong> (не обязательно подряд).
+                        Система автоматически найдет подходящие свободные слоты.
+                    </p>
+                </div>
+            `;
+            installButtonText = 'Установить в 4 слота';
+            break;
+            
+        default:
+            installContent = `
+                <div style="background: ${getThemeColors().accentLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().accent};">
+                    <h6 style="color: ${getThemeColors().accent}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600;">🔧 Специальная установка</h6>
+                    <p style="color: ${getThemeColors().text}; font-size: 0.85rem; margin: 0; line-height: 1.4;">
+                        Этот модуль имеет особые правила установки. Система автоматически определит подходящие места.
+                    </p>
+                </div>
+            `;
+            installButtonText = 'Установить';
+    }
+    
+    installModal.innerHTML = `
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Установка: ${module.name}</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="background: ${getThemeColors().accentLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().accent};">
+                    <div>
+                        <h6 style="color: ${getThemeColors().accent}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600;">${module.name}</h6>
+                        <p style="color: ${getThemeColors().text}; font-size: 0.85rem; margin: 0 0 0.75rem 0; line-height: 1.4;">${module.description}</p>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <span style="background: ${getThemeColors().bg}; color: ${getThemeColors().accent}; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">
+                                ${module.options}
+                            </span>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: ${getThemeColors().danger}; font-size: 0.75rem;">ПО: ${module.awarenessLoss}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                ${installContent}
+                
+                <div style="text-align: center; margin-top: 1.5rem;">
+                    <button class="pill-button primary-button" onclick="installSpecialModule(${gearIndex}, '${installType}'); closeModal(this);" style="padding: 0.75rem 2rem; font-size: 1rem;">
+                        ${installButtonText}
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(installModal);
+    
+    // Добавляем обработчики для закрытия модала
+    installModal.addEventListener('click', (e) => {
+        if (e.target === installModal) {
+            closeModal(installModal.querySelector('.icon-button'));
+        }
     });
     
-    // Удаляем модуль из слота
-    state.implants[implantType].parts[partName].modules[slotIndex] = null;
+    // Добавляем обработчики клавиатуры
+    addModalKeyboardHandlers(installModal);
+}
+
+// Функция для установки Лазерной кромки
+function showLaserEdgeInstallation(gearIndex, module) {
+    // Находим доступные кисти для установки
+    const availableHands = [];
+    
+    for (const [implantType, implant] of Object.entries(state.implants)) {
+        if (!implant.installed) continue;
+        
+        // Ищем кисти
+        if (implantType === 'arms') {
+            for (const [partName, partData] of Object.entries(implant.parts)) {
+                if (!partData || !partData.slots) continue;
+                
+                // Проверяем, что это кисть
+                if (partName === 'wristLeft' || partName === 'wristRight') {
+                    // Проверяем, есть ли уже Лазерная кромка в этой кисти
+                    const existingLaserEdge = partData.modules.find(m => m && m.name === "Лазерная кромка");
+                    
+                    if (existingLaserEdge) {
+                        // Если уже есть кромки, проверяем лимит
+                        if (existingLaserEdge.count < 5) {
+                            availableHands.push({
+                                implantType,
+                                partName,
+                                partDisplayName: getPartDisplayName(implantType, partName),
+                                implantDisplayName: getImplantName(implantType),
+                                existingCount: existingLaserEdge.count,
+                                canAdd: true
+                            });
+                        }
+                    } else {
+                        // Если нет кромок, можно установить первую
+                        availableHands.push({
+                            implantType,
+                            partName,
+                            partDisplayName: getPartDisplayName(implantType, partName),
+                            implantDisplayName: getImplantName(implantType),
+                            existingCount: 0,
+                            canAdd: true
+                        });
+                    }
+                }
+            }
+        }
+    }
+    
+    if (availableHands.length === 0) {
+        showNotification('Нет доступных кистей для установки Лазерной кромки!', 'error');
+        return;
+    }
+    
+    // Создаем модальное окно для установки Лазерной кромки
+    document.body.style.overflow = 'hidden';
+    const installModal = document.createElement('div');
+    installModal.className = 'modal-overlay';
+    const existingModals = document.querySelectorAll('.modal-overlay');
+    installModal.style.zIndex = 1000 + (existingModals.length * 100);
+    
+    installModal.innerHTML = `
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Установка: ${module.name}</h3>
+                <button class="icon-button" onclick="closeModal(this)">×</button>
+            </div>
+            <div class="modal-body">
+                <div style="background: ${getThemeColors().accentLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().accent};">
+                    <div>
+                        <h6 style="color: ${getThemeColors().accent}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600;">${module.name}</h6>
+                        <p style="color: ${getThemeColors().text}; font-size: 0.85rem; margin: 0 0 0.75rem 0; line-height: 1.4;">${module.description}</p>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <span style="background: ${getThemeColors().bg}; color: ${getThemeColors().accent}; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600;">
+                                ${module.options}
+                            </span>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: ${getThemeColors().danger}; font-size: 0.75rem;">ПО: ${module.awarenessLoss}</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="background: ${getThemeColors().warningLight}; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().warning};">
+                    <h6 style="color: ${getThemeColors().warning}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 600;">⚡ Специальная установка</h6>
+                    <p style="color: ${getThemeColors().text}; font-size: 0.85rem; margin: 0; line-height: 1.4;">
+                        <strong>Лазерная кромка может быть установлена только в кисти</strong> (левая или правая).
+                        В одну кисть можно установить до <strong>5 кромок</strong>. 
+                        Каждая дополнительная кромка увеличивает урон на 1d3.
+                    </p>
+                </div>
+                
+                <h6 style="color: ${getThemeColors().accent}; margin-bottom: 1rem; font-size: 1rem; font-weight: 600;">Выберите кисть для установки:</h6>
+                <div style="display: grid; gap: 0.75rem; max-height: 300px; overflow-y: auto; padding-right: 0.5rem;">
+                    ${availableHands.map(hand => `
+                        <div style="background: ${getThemeColors().bgLight}; border-radius: 10px; padding: 1rem; border: 1px solid ${getThemeColors().border}; cursor: pointer; transition: all 0.2s ease;" 
+                             onclick="installLaserEdge('${hand.implantType}', '${hand.partName}', ${gearIndex}); closeModal(this);"
+                             onmouseover="this.style.borderColor='${getThemeColors().accent}'; this.style.transform='translateX(4px)'"
+                             onmouseout="this.style.borderColor='${getThemeColors().border}'; this.style.transform='translateX(0)'">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="color: ${getThemeColors().accent}; font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem;">${hand.implantDisplayName}</div>
+                                    <div style="color: ${getThemeColors().muted}; font-size: 0.8rem;">${hand.partDisplayName}</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="color: ${getThemeColors().success}; font-size: 0.8rem; font-weight: 500;">
+                                        ${hand.existingCount > 0 ? `${hand.existingCount}/5 кромок` : 'Свободно'}
+                                    </div>
+                                    ${hand.existingCount > 0 ? `
+                                        <div style="color: ${getThemeColors().muted}; font-size: 0.7rem;">
+                                            Урон: ${hand.existingCount + 1}d3
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(installModal);
+    
+    // Добавляем обработчики для закрытия модала
+    installModal.addEventListener('click', (e) => {
+        if (e.target === installModal) {
+            closeModal(installModal.querySelector('.icon-button'));
+        }
+    });
+    
+    // Добавляем обработчики клавиатуры
+    addModalKeyboardHandlers(installModal);
+}
+
+// Функция для установки Лазерной кромки в конкретную кисть
+function installLaserEdge(implantType, partName, gearIndex) {
+    const gearItem = state.gear[gearIndex];
+    if (!gearItem || !gearItem.implantData) return;
+    
+    const module = gearItem.implantData;
+    const partData = state.implants[implantType].parts[partName];
+    
+    if (!partData) return;
+    
+    // Проверяем, что устанавливаем в кисть
+    if (partName !== 'wristLeft' && partName !== 'wristRight') {
+        showNotification('Лазерная кромка может быть установлена только в кисти!', 'error');
+        return;
+    }
+    
+    // Проверяем, есть ли уже Лазерная кромка в этой кисти
+    const existingLaserEdge = partData.modules.find(m => m && m.name === "Лазерная кромка");
+    
+    if (existingLaserEdge) {
+        // Если уже есть кромки, добавляем к счётчику
+        if (existingLaserEdge.count >= 5) {
+            showNotification('Максимум 5 лазерных кромок на кисть!', 'error');
+            return;
+        }
+        
+        // Добавляем к существующему модулю
+        existingLaserEdge.count += 1;
+        existingLaserEdge.awarenessLoss = `${existingLaserEdge.count}d4 за каждый`;
+        
+        // Удаляем модуль из снаряжения
+        state.gear.splice(gearIndex, 1);
+        
+        // Пересчитываем нагрузку
+        recalculateLoadFromInventory();
+        updateLoadDisplay();
+        
+        // Обновляем отображение
+        renderGear();
+        renderImplants();
+        scheduleSave();
+        
+        // Обновляем все блоки
+        updateImplantDetails();
+        filterImplantModules();
+        
+        showModal('Лазерная кромка добавлена', `
+            <div style="text-align: center; padding: 1rem;">
+                <div style="background: ${getThemeColors().successLight}; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid ${getThemeColors().success};">
+                    <div style="font-size: 3rem; margin-bottom: 0.5rem;">⚡</div>
+                    <h4 style="color: ${getThemeColors().success}; margin: 0 0 0.5rem 0; font-size: 1.2rem; font-weight: 600;">Лазерная кромка добавлена!</h4>
+                    <div style="color: ${getThemeColors().text}; font-size: 0.9rem; opacity: 0.8;">
+                        Всего кромок: <strong>${existingLaserEdge.count}/5</strong>
+                    </div>
+                    <div style="color: ${getThemeColors().text}; font-size: 0.9rem; opacity: 0.8; margin-top: 0.5rem;">
+                        Урон: <strong>${existingLaserEdge.count}d3</strong>
+                    </div>
+                </div>
+                <button class="pill-button success-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem;">
+                    Отлично
+                </button>
+            </div>
+        `);
+        
+    } else {
+        // Если это первая кромка, устанавливаем как обычный модуль
+        // Проверяем, есть ли свободный слот
+        let freeSlotIndex = -1;
+        for (let i = 0; i < partData.slots; i++) {
+            if (partData.modules[i] === null) {
+                freeSlotIndex = i;
+                break;
+            }
+        }
+        
+        if (freeSlotIndex === -1) {
+            showNotification('Нет свободных слотов в этой кисти!', 'error');
+            return;
+        }
+        
+        // Проверяем, нужно ли терять осознанность
+        let lossRoll = 0;
+        if (module.awarenessLoss && module.awarenessLoss !== 'нет' && module.awarenessLoss !== '0') {
+            lossRoll = rollDiceForAwarenessLoss(module.awarenessLoss);
+            const currentAwareness = parseInt(state.awareness.current) || 50;
+            state.awareness.current = Math.max(0, currentAwareness - lossRoll);
+            const awarenessEl = document.getElementById('awarenessCurrent');
+            if (awarenessEl) awarenessEl.value = state.awareness.current;
+        }
+        
+        // Устанавливаем модуль
+        const moduleData = {
+            ...module,
+            count: 1,
+            weaponType: "Лазерная кромка",
+            damagePerEdge: 1
+        };
+        
+        partData.modules[freeSlotIndex] = {
+            ...moduleData,
+            slotIndex: freeSlotIndex
+        };
+        
+        // Удаляем модуль из снаряжения
+        state.gear.splice(gearIndex, 1);
+        
+        // Пересчитываем нагрузку
+        recalculateLoadFromInventory();
+        updateLoadDisplay();
+        
+        // Обновляем отображение
+        renderGear();
+        renderImplants();
+        scheduleSave();
+        
+        // Обновляем все блоки
+        updateImplantDetails();
+        filterImplantModules();
+        
+        // Показываем уведомление об успешной установке
+        if (lossRoll > 0) {
+            showModal('Лазерная кромка установлена', `
+                <div style="text-align: center; padding: 1.5rem;">
+                    <div style="background: ${getThemeColors().bgLight}; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().border};">
+                        <div style="font-size: 2rem; margin-bottom: 0.75rem; color: ${getThemeColors().accent};">⚡</div>
+                        <h4 style="color: ${getThemeColors().text}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 500;">Лазерная кромка установлена</h4>
+                    </div>
+                    <div style="background: ${getThemeColors().bgMedium}; padding: 1.25rem; border-radius: 8px; border: 1px solid ${getThemeColors().border}; margin-bottom: 1.5rem;">
+                        <div style="font-size: 1.5rem; margin-bottom: 0.5rem; color: ${getThemeColors().muted};">⚠</div>
+                        <h3 style="color: ${getThemeColors().text}; margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 500;">Потеря осознанности</h3>
+                        <div style="font-size: 1.5rem; font-weight: 600; color: ${getThemeColors().text}; margin-bottom: 0.5rem;">-${lossRoll}</div>
+                        <div style="color: ${getThemeColors().muted}; font-size: 0.9rem;">
+                            Текущая осознанность: <strong style="color: ${getThemeColors().text};">${state.awareness.current}</strong> / ${state.awareness.max}
+                        </div>
+                    </div>
+                    <button class="pill-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem; background: ${getThemeColors().accent}; color: ${getThemeColors().bg}; border: none;">
+                        Понятно
+                    </button>
+                </div>
+            `);
+        } else {
+            showModal('Лазерная кромка установлена', `
+                <div style="text-align: center; padding: 1rem;">
+                    <div style="background: ${getThemeColors().successLight}; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid ${getThemeColors().success};">
+                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">⚡</div>
+                        <h4 style="color: ${getThemeColors().success}; margin: 0 0 0.5rem 0; font-size: 1.2rem; font-weight: 600;">Лазерная кромка установлена!</h4>
+                        <div style="color: ${getThemeColors().text}; font-size: 0.9rem; opacity: 0.8;">
+                            Установка прошла без потери осознанности
+                        </div>
+                        <div style="color: ${getThemeColors().text}; font-size: 0.9rem; opacity: 0.8; margin-top: 0.5rem;">
+                            Урон: <strong>1d3</strong>
+                        </div>
+                    </div>
+                    <button class="pill-button success-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem;">
+                        Отлично
+                    </button>
+                </div>
+            `);
+        }
+    }
+}
+
+// Функция для установки специального модуля
+function installSpecialModule(gearIndex, installType) {
+    console.log('=== АВТОМАТИЧЕСКАЯ ФУНКЦИЯ ВЫЗВАНА ===');
+    console.log('gearIndex:', gearIndex, 'installType:', installType);
+    console.trace('Стек вызовов:');
+    
+    // Проверяем на undefined installType
+    if (installType === undefined || installType === null) {
+        console.log('ОШИБКА: installType равен undefined/null');
+        console.log('Попытка определить тип установки из модуля...');
+        
+        const gearItem = state.gear[gearIndex];
+        if (!gearItem || !gearItem.implantData) {
+            console.log('ОШИБКА: Не удалось получить данные модуля');
+            return;
+        }
+        
+        const module = gearItem.implantData;
+        
+        // Если это интерактивный модуль, перенаправляем
+        if (module.name === "Прыжковый ускоритель" || module.name === "Реактивные стабилизаторы") {
+        console.log('Перенаправляем на интерактивную установку для:', module.name);
+        showSpecialModuleInstallationInteractive(gearIndex, module);
+            return;
+        }
+        
+        // Для остальных модулей пытаемся определить тип
+        const detectedType = getModuleInstallType(module.options);
+        console.log('Определен тип установки:', detectedType);
+        
+        if (detectedType === 'simple') {
+            console.log('ОШИБКА: Модуль должен использовать простую установку, но вызвана специальная функция');
+            return;
+        }
+        
+        // Рекурсивно вызываем с правильным типом
+        installSpecialModule(gearIndex, detectedType);
+        return;
+    }
+    
+    const gearItem = state.gear[gearIndex];
+    if (!gearItem || !gearItem.implantData) return;
+    
+    const module = gearItem.implantData;
+    
+    // Проверяем, не является ли это модулем для интерактивной установки
+    if (module.name === "Прыжковый ускоритель" || module.name === "Реактивные стабилизаторы") {
+        console.log('ОШИБКА: Автоматическая функция вызвана для интерактивного модуля:', module.name);
+        console.log('Перенаправляем на интерактивную установку...');
+        showSpecialModuleInstallationInteractive(gearIndex, module);
+        return;
+    }
+    
+    // Проверяем, нужно ли терять осознанность
+    let lossRoll = 0;
+    if (module.awarenessLoss && module.awarenessLoss !== 'нет' && module.awarenessLoss !== '0') {
+        lossRoll = rollDiceForAwarenessLoss(module.awarenessLoss);
+        const currentAwareness = parseInt(state.awareness.current) || 50;
+        state.awareness.current = Math.max(0, currentAwareness - lossRoll);
+        const awarenessEl = document.getElementById('awarenessCurrent');
+        if (awarenessEl) awarenessEl.value = state.awareness.current;
+    }
+    
+    // Устанавливаем модуль во ВСЕ требуемые слоты с одинаковым groupId
+    const groupId = Date.now();
+    
+    // Добавляем специальные поля для известных модулей
+    const moduleData = {
+        ...module,
+        groupId: groupId
+    };
+    
+    // Устанавливаем модуль в зависимости от типа установки
+    let installationSuccess = false;
+    console.log('installSpecialModule: Модуль:', module.name, 'Тип установки:', installType);
+    switch (installType) {
+        case 'two_locations':
+            installationSuccess = installTwoLocationsModuleSpecial(moduleData, module);
+            break;
+        case 'distributed_spine':
+            installationSuccess = installDistributedSpineModule(moduleData, module);
+            break;
+        case 'multiple_single_slots':
+            installationSuccess = installMultipleSingleSlotsModuleSpecial(moduleData, module);
+            break;
+        default:
+            showNotification('Неизвестный тип установки!', 'error');
+            return;
+    }
+    
+    if (!installationSuccess) {
+        return; // Установка не удалась
+    }
+    
+    // Удаляем модуль из снаряжения
+    state.gear.splice(gearIndex, 1);
+    
+    // Пересчитываем нагрузку, так как модуль удален из снаряжения
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
     
     // Обновляем отображение
     renderGear();
     renderImplants();
     scheduleSave();
     
-    // Обновляем блок "Детали импланта" в модале управления
-    selectImplant(implantType, partName);
+    // Обновляем все блоки
+    updateImplantDetails();
+    filterImplantModules(); // Обновляем список купленных модулей
     
-    showModal('Модуль удален', `&#x2705; ${module.name} возвращен в снаряжение!`);
+    // Показываем уведомление об успешной установке
+    if (lossRoll > 0) {
+        showModal('Модуль установлен', `
+            <div style="text-align: center; padding: 1.5rem;">
+                <div style="background: ${getThemeColors().bgLight}; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().border};">
+                    <div style="font-size: 2rem; margin-bottom: 0.75rem; color: ${getThemeColors().accent};">✓</div>
+                    <h4 style="color: ${getThemeColors().text}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 500;">Модуль "${module.name}" установлен</h4>
+                </div>
+                <div style="background: ${getThemeColors().bgMedium}; padding: 1.25rem; border-radius: 8px; border: 1px solid ${getThemeColors().border}; margin-bottom: 1.5rem;">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.5rem; color: ${getThemeColors().muted};">⚠</div>
+                    <h3 style="color: ${getThemeColors().text}; margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 500;">Потеря осознанности</h3>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: ${getThemeColors().text}; margin-bottom: 0.5rem;">-${lossRoll}</div>
+                    <div style="color: ${getThemeColors().muted}; font-size: 0.9rem;">
+                        Текущая осознанность: <strong style="color: ${getThemeColors().text};">${state.awareness.current}</strong> / ${state.awareness.max}
+                    </div>
+                </div>
+                <button class="pill-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem; background: ${getThemeColors().accent}; color: ${getThemeColors().bg}; border: none;">
+                    Понятно
+                </button>
+            </div>
+        `);
+    } else {
+        showModal('Модуль установлен', `
+            <div style="text-align: center; padding: 1rem;">
+                <div style="background: ${getThemeColors().successLight}; padding: 1.5rem; border-radius: 12px; margin-bottom: 1rem; border: 2px solid ${getThemeColors().success};">
+                    <div style="font-size: 3rem; margin-bottom: 0.5rem;">✓</div>
+                    <h4 style="color: ${getThemeColors().success}; margin: 0 0 0.5rem 0; font-size: 1.2rem; font-weight: 600;">Модуль "${module.name}" установлен!</h4>
+                    <div style="color: ${getThemeColors().text}; font-size: 0.9rem; opacity: 0.8;">
+                        Установка прошла без потери осознанности
+                    </div>
+                </div>
+                <button class="pill-button success-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem;">
+                    Отлично
+                </button>
+            </div>
+        `);
+    }
+}
+
+// Специальные функции установки для сложных модулей
+function installTwoLocationsModuleSpecial(moduleData, module) {
+    // Для прыжкового ускорителя нужно найти подходящие импланты
+    const availableImplants = [];
+    
+    for (const [implantType, implant] of Object.entries(state.implants)) {
+        if (!implant.installed) continue;
+        
+        for (const [partName, partData] of Object.entries(implant.parts)) {
+            if (!partData || !partData.slots) continue;
+            
+            // Проверяем, есть ли 2 свободных слота подряд
+            for (let i = 0; i < partData.slots - 1; i++) {
+                if (partData.modules[i] === null && partData.modules[i + 1] === null) {
+                    availableImplants.push({
+                        implantType,
+                        partName,
+                        partDisplayName: getPartDisplayName(implantType, partName),
+                        implantDisplayName: getImplantName(implantType),
+                        startSlot: i
+                    });
+                    break; // Берем только первое подходящее место
+                }
+            }
+        }
+    }
+    
+    if (availableImplants.length < 2) {
+        showNotification('Недостаточно мест для установки модуля в два места!', 'error');
+        return false;
+    }
+    
+    // Устанавливаем в первые два найденных места
+    for (let i = 0; i < 2; i++) {
+        const location = availableImplants[i];
+        const partData = state.implants[location.implantType].parts[location.partName];
+        
+        for (let j = location.startSlot; j < location.startSlot + 2; j++) {
+            partData.modules[j] = {
+                ...moduleData,
+                slotIndex: j,
+                location: i + 1
+            };
+        }
+    }
+    
+    return true;
+}
+
+function installDistributedSpineModule(moduleData, module) {
+    // Для крыльев планирования нужно найти по одному слоту в разных частях спины
+    const spineParts = [];
+    
+    // Ищем части кибер-спины
+    for (const [implantType, implant] of Object.entries(state.implants)) {
+        if (!implant.installed) continue;
+        
+        for (const [partName, partData] of Object.entries(implant.parts)) {
+            if (!partData || !partData.slots) continue;
+            
+            // Проверяем, что это часть спины
+            if (partName.includes('спина') || partName.includes('позвоночник') || 
+                partName.includes('грудная') || partName.includes('поясничная') ||
+                partName.includes('крестцовая') || partName.includes('хвостовая') ||
+                partName.includes('thoracic') || partName.includes('lumbar') ||
+                partName.includes('cervical') || partName.includes('sacral')) {
+                
+                // Ищем первый свободный слот в этой части
+                for (let i = 0; i < partData.slots; i++) {
+                    if (partData.modules[i] === null) {
+                        spineParts.push({
+                            implantType,
+                            partName,
+                            slotIndex: i,
+                            partDisplayName: getPartDisplayName(implantType, partName),
+                            implantDisplayName: getImplantName(implantType)
+                        });
+                        break; // Берем только первый свободный слот
+                    }
+                }
+            }
+        }
+    }
+    
+    if (spineParts.length < 4) {
+        showNotification('Недостаточно свободных слотов в частях спины для установки модуля!', 'error');
+        return false;
+    }
+    
+    // Устанавливаем в первые 4 найденных части спины
+    for (let i = 0; i < 4; i++) {
+        const spinePart = spineParts[i];
+        const partData = state.implants[spinePart.implantType].parts[spinePart.partName];
+        
+        partData.modules[spinePart.slotIndex] = {
+            ...moduleData,
+            slotIndex: spinePart.slotIndex,
+            spineLocation: i + 1, // Номер части спины (1-4)
+            spinePartName: spinePart.partDisplayName,
+            groupId: moduleData.groupId // Добавляем groupId для связывания модулей
+        };
+    }
+    
+    return true;
+}
+
+function installMultipleSingleSlotsModuleSpecial(moduleData, module) {
+    // Для реактивных стабилизаторов нужно найти 4 свободных слота
+    const availableSlots = [];
+    
+    for (const [implantType, implant] of Object.entries(state.implants)) {
+        if (!implant.installed) continue;
+        
+        for (const [partName, partData] of Object.entries(implant.parts)) {
+            if (!partData || !partData.slots) continue;
+            
+            for (let i = 0; i < partData.slots; i++) {
+                if (partData.modules[i] === null) {
+                    availableSlots.push({
+                        implantType,
+                        partName,
+                        slotIndex: i
+                    });
+                }
+            }
+        }
+    }
+    
+    if (availableSlots.length < 4) {
+        showNotification('Недостаточно свободных слотов для установки модуля!', 'error');
+        return false;
+    }
+    
+    // Устанавливаем в первые 4 найденных слота
+    for (let i = 0; i < 4; i++) {
+        const slot = availableSlots[i];
+        const partData = state.implants[slot.implantType].parts[slot.partName];
+        
+        partData.modules[slot.slotIndex] = {
+            ...moduleData,
+            slotIndex: slot.slotIndex,
+            installationStep: i + 1,
+            groupId: moduleData.groupId // Добавляем groupId для связывания модулей
+        };
+    }
+    
+    return true;
+}
+
+function removeModuleFromSlot(implantType, partName, slotIndex) {
+    const module = state.implants[implantType].parts[partName].modules[slotIndex];
+    if (!module) return;
+    
+    // Проверяем, есть ли у модуля groupId (модуль установлен в несколько слотов)
+    // или это Лазерная кромка с count > 1
+    if (module.groupId || (module.name === "Лазерная кромка" && module.count > 1)) {
+        let removedCount = 0;
+        
+        if (module.name === "Лазерная кромка" && module.count > 1) {
+            // Специальная обработка для Лазерной кромки
+            // Уменьшаем счетчик вместо удаления всего модуля
+            module.count--;
+            console.log(`Удалена одна лазерная кромка. Осталось: ${module.count}`);
+            
+            // Возвращаем одну кромку в снаряжение
+            state.gear.push({
+                name: module.name,
+                description: `${module.description} | Потеря осознанности: ${module.awarenessLoss}`,
+                price: module.price,
+                load: 1,
+                type: 'implant',
+                implantData: {
+                    ...module,
+                    count: 1 // Возвращаем одну кромку
+                }
+            });
+            
+        } else {
+            // Удаляем ВСЕ модули с этим groupId из всех имплантов
+            for (const [currentImplantType, implant] of Object.entries(state.implants)) {
+                if (!implant.installed) continue;
+                
+                for (const [currentPartName, partData] of Object.entries(implant.parts)) {
+                    if (!partData || !partData.modules) continue;
+                    
+                    for (let i = 0; i < partData.modules.length; i++) {
+                        const currentModule = partData.modules[i];
+                        if (currentModule && currentModule.groupId === module.groupId) {
+                            partData.modules[i] = null;
+                            removedCount++;
+                        }
+                    }
+                }
+            }
+            
+            console.log(`Удален модуль "${module.name}" из ${removedCount} слотов`);
+            
+            // Возвращаем только ОДИН модуль в снаряжение
+            state.gear.push({
+                name: module.name,
+                description: `${module.description} | Потеря осознанности: ${module.awarenessLoss}`,
+                price: module.price,
+                load: 1,
+                type: 'implant',
+                implantData: module
+            });
+        }
+        
+    } else {
+        // Обычный модуль в одном слоте
+        state.gear.push({
+            name: module.name,
+            description: `${module.description} | Потеря осознанности: ${module.awarenessLoss}`,
+            price: module.price,
+            load: 1,
+            type: 'implant',
+            implantData: module
+        });
+        
+        // Удаляем модуль из слота
+        state.implants[implantType].parts[partName].modules[slotIndex] = null;
+    }
+    
+    // Пересчитываем нагрузку, так как модуль возвращен в снаряжение
+    recalculateLoadFromInventory();
+    updateLoadDisplay();
+    
+    // Обновляем отображение
+    renderGear();
+    renderImplants();
+    scheduleSave();
+    
+    // Обновляем все блоки
+    updateImplantDetails();
+    filterImplantModules(); // Обновляем список купленных модулей
+    
+    showNotification(`Модуль "${module.name}" возвращен в снаряжение!`, 'success');
 }
 
 // Магазин частей имплантов
@@ -2471,7 +5718,7 @@ function showImplantPartsShop() {
                     ${isPurchased ? 
                         `<div style="display: flex; gap: 0.5rem;">
                             <button class="pill-button" disabled style="font-size: 0.8rem; padding: 0.3rem 0.6rem; opacity: 0.6; cursor: not-allowed;">Куплено</button>
-                            <button class="pill-button danger-button" onclick="removeImplantPart('${implant.category}', '${part.name}', '${implant.name}', '${part.displayName}', ${implant.price}, '${implant.awarenessLoss}')" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Удалить</button>
+                            <button class="pill-button danger-button" onclick="removeImplantPart('${implant.category}', '${part.name}', '${implant.name}', '${part.displayName}', ${implant.price}, '${implant.awarenessLoss}')" data-description="${implant.description.replace(/'/g, "\\'")}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Удалить</button>
                         </div>` :
                         `<button class="pill-button primary-button implant-part-buy-button" onclick="buyImplantPart('${implant.category}', '${part.name}', '${implant.name}', '${part.displayName}', ${implant.price}, '${implant.awarenessLoss}', '${implant.description.replace(/'/g, "\\'")}', ${part.slots})" data-category="${implant.category}" data-part-name="${part.name}" data-implant-name="${implant.name}" data-display-name="${part.displayName}" data-price="${implant.price}" data-awareness-loss="${implant.awarenessLoss}" data-description="${implant.description.replace(/'/g, "\\'")}" data-slots="${part.slots}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>`
                     }
@@ -2564,20 +5811,33 @@ function buyImplantPart(category, partName, implantName, partDisplayName, price,
         category: 'Киберимпланты'
     });
     
-    // НЕ закрываем магазин - оставляем его открытым
-    // closeModal(document.querySelector('.modal-overlay .icon-button'));
+    // Обновляем кнопку покупки в магазине на месте
+    const buyButton = document.querySelector(`.implant-part-buy-button[data-category="${category}"][data-part-name="${partName}"]`);
+    if (buyButton) {
+        // Сначала обновляем текст названия, добавляя "(куплена)"
+        const partContainer = buyButton.closest('[style*="padding: 0.75rem"]');
+        if (partContainer) {
+            const strongElement = partContainer.querySelector('strong');
+            if (strongElement && !strongElement.textContent.includes('(куплена)')) {
+                strongElement.textContent += ' (куплена)';
+            }
+        }
+        
+        // Создаем новый контейнер с кнопками
+        const newButtonsDiv = document.createElement('div');
+        newButtonsDiv.style.cssText = 'display: flex; gap: 0.5rem;';
+        const btnDescription = buyButton.getAttribute('data-description') || description || '';
+        newButtonsDiv.innerHTML = `
+            <button class="pill-button" disabled style="font-size: 0.8rem; padding: 0.3rem 0.6rem; opacity: 0.6; cursor: not-allowed;">Куплено</button>
+            <button class="pill-button danger-button" onclick="removeImplantPart('${category}', '${partName}', '${implantName}', '${partDisplayName}', ${price}, '${awarenessLoss}')" data-description="${btnDescription.replace(/'/g, "\\'")}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Удалить</button>
+        `;
+        
+        // Заменяем ТОЛЬКО кнопку, не трогая название и описание
+        buyButton.replaceWith(newButtonsDiv);
+    }
     
-    showModal('Часть импланта установлена', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: ${getThemeColors().success}; font-size: 1.1rem; margin-bottom: 1rem;">&#x2705; ${partDisplayName} установлена!</p>
-            <p style="color: ${getThemeColors().danger}; margin-bottom: 1rem;">Потеря осознанности: ${lossRoll}</p>
-            <p style="color: ${getThemeColors().muted};">Текущая осознанность: ${typeof state.awareness === 'object' ? state.awareness.current : state.awareness}</p>
-            <p style="color: ${getThemeColors().muted};">Теперь вы можете установить модули через "Управление имплантами"</p>
-            <button class="pill-button" onclick="closeModal(this)">
-                Закрыть
-            </button>
-        </div>
-    `);
+    // Показываем toast уведомление вместо модального окна
+    showToast(`${partDisplayName} установлена! Потеря осознанности: ${lossRoll}`, 3000);
 }
 
 function removeImplantPart(category, partName, implantName, partDisplayName, price, awarenessLoss) {
@@ -2680,18 +5940,56 @@ function confirmRemoveImplantPart(category, partName, partDisplayName, price, aw
     
     scheduleSave();
     
-    // Закрываем все модалы
-    const allModals = document.querySelectorAll('.modal-overlay');
-    allModals.forEach(modal => modal.remove());
+    // Закрываем только модал подтверждения, не трогая магазин
+    const confirmModal = document.querySelector('.modal-overlay:last-child');
+    if (confirmModal) {
+        confirmModal.remove();
+    }
     
-    showModal('Часть импланта удалена', `
-        <div style="text-align: center; padding: 1rem;">
-            <p style="color: ${getThemeColors().success}; font-size: 1.1rem; margin-bottom: 1rem;">✅ ${partDisplayName} удалена!</p>
-            <p style="color: ${getThemeColors().text}; margin-bottom: 0.5rem;"><img src="https://static.tildacdn.com/tild3663-3731-4561-b539-383739323739/money.png" alt="💰" style="width: 16px; height: 16px; vertical-align: middle;"> Возвращено денег: ${price} уе</p>
-            <p style="color: ${getThemeColors().text}; margin-bottom: 1rem;">🧠 Восстановлено осознанности: ${awarenessReturn}</p>
-            <p style="color: ${getThemeColors().muted};">Текущая осознанность: ${typeof state.awareness === 'object' ? state.awareness.current : state.awareness}</p>
-        </div>
-    `);
+    // Ищем магазин частей имплантов
+    const shopModal = Array.from(document.querySelectorAll('.modal-overlay')).find(modal => 
+        modal.querySelector('.modal-header h3')?.textContent?.includes('Магазин частей имплантов')
+    );
+    
+    if (shopModal) {
+        // Находим нужный контейнер с кнопкой удаления и обновляем его
+        const deleteButtons = shopModal.querySelectorAll('.pill-button.danger-button');
+        for (const btn of deleteButtons) {
+            const onclickAttr = btn.getAttribute('onclick');
+            if (onclickAttr && onclickAttr.includes(`'${category}'`) && onclickAttr.includes(`'${partName}'`)) {
+                // Нашли нужную кнопку - меняем весь контейнер обратно на "Купить"
+                const buttonContainer = btn.parentElement?.parentElement;
+                if (buttonContainer) {
+                    // Получаем данные из onclick для воссоздания кнопки покупки
+                    const match = onclickAttr.match(/removeImplantPart\('([^']+)',\s*'([^']+)',\s*'([^']+)',\s*'([^']+)',\s*(\d+),\s*'([^']+)'\)/);
+                    if (match) {
+                        const [, cat, pName, implName, pDisplayName, pr, awLoss] = match;
+                        // Находим описание и слоты
+                        const priceDisplay = buttonContainer.querySelector('.implant-part-price-display');
+                        const slots = priceDisplay?.getAttribute('data-slots') || '2';
+                        const description = btn.getAttribute('data-description') || '';
+                        
+                        // Убираем "(куплена)" из названия, если есть
+                        const cleanDisplayName = pDisplayName.replace(' (куплена)', '');
+                        
+                        buttonContainer.innerHTML = `
+                            <div>
+                                <strong>${cleanDisplayName}</strong>
+                                <div class="implant-part-price-display" style="color: ${getThemeColors().muted}; font-size: 0.8rem;" data-original-price="${pr}" data-slots="${slots}" data-awareness="${awLoss}">
+                                    ${slots} слотов | Цена: ${pr} уе | ПО: ${awLoss}
+                                </div>
+                            </div>
+                            <button class="pill-button primary-button implant-part-buy-button" onclick="buyImplantPart('${cat}', '${pName}', '${implName}', '${cleanDisplayName}', ${pr}, '${awLoss}', '${description}', ${slots})" data-category="${cat}" data-part-name="${pName}" data-implant-name="${implName}" data-display-name="${cleanDisplayName}" data-price="${pr}" data-awareness-loss="${awLoss}" data-description="${description}" data-slots="${slots}" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить</button>
+                        `;
+                    }
+                }
+                break;
+            }
+        }
+    }
+    
+    // Показываем toast вместо модального окна
+    showToast(`${partDisplayName} удалена! Возврат: ${price} уе, +${awarenessReturn} осознанности`, 3000);
 }
 
 function toggleImplantPartsFreeMode() {
@@ -4814,7 +8112,20 @@ function installDeckModuleOnDeck(moduleId, deckId) {
     
     const deckName = deckId === 'main' ? state.deck.name : state.decks.find(d => d.id == deckId)?.name || 'Неизвестная дека';
     console.log('Installing module on deck:', deckName);
-    showModal('Модуль установлен', `${module.name} установлен на ${deckName} за ${module.purchasePrice.toLocaleString()} уе!`);
+    showModal('Модуль установлен', `
+        <div style="text-align: center; padding: 1.5rem;">
+            <div style="background: ${getThemeColors().bgLight}; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().border};">
+                <div style="font-size: 2rem; margin-bottom: 0.75rem; color: ${getThemeColors().accent};">✓</div>
+                <h4 style="color: ${getThemeColors().text}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 500;">${module.name} установлен на ${deckName}</h4>
+                <div style="color: ${getThemeColors().muted}; font-size: 0.9rem; margin-top: 0.5rem;">
+                    Стоимость: ${module.purchasePrice.toLocaleString()} уе
+                </div>
+            </div>
+            <button class="pill-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem; background: ${getThemeColors().accent}; color: ${getThemeColors().bg}; border: none;">
+                Отлично
+            </button>
+        </div>
+    `);
     scheduleSave();
     updateAllDisplays();
     console.log('Module installation completed successfully');
@@ -4853,7 +8164,17 @@ function installDeckModule(moduleId) {
     // Устанавливаем модуль
     module.installedDeckId = 'main';
     
-    showModal('Модуль установлен', `${module.name} установлен на деку!`);
+    showModal('Модуль установлен', `
+        <div style="text-align: center; padding: 1.5rem;">
+            <div style="background: ${getThemeColors().bgLight}; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid ${getThemeColors().border};">
+                <div style="font-size: 2rem; margin-bottom: 0.75rem; color: ${getThemeColors().accent};">✓</div>
+                <h4 style="color: ${getThemeColors().text}; margin: 0 0 0.5rem 0; font-size: 1.1rem; font-weight: 500;">${module.name} установлен на деку</h4>
+            </div>
+            <button class="pill-button" onclick="closeModal(this)" style="padding: 0.75rem 2rem; font-size: 1rem; background: ${getThemeColors().accent}; color: ${getThemeColors().bg}; border: none;">
+                Отлично
+            </button>
+        </div>
+    `);
     scheduleSave();
     updateAllDisplays();
     closeModal(document.querySelector('.modal-overlay .icon-button'));

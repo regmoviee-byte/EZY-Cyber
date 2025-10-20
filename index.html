@@ -34,7 +34,7 @@
 
     <!-- Загрузочный экран -->
     <div class="loading-screen" id="loadingScreen">
-        <div class="loading-logo">EZY: CYBER // HUMAN_DESIGN [ПОЧТИRELEASE v0.99.999999]</div>
+        <div class="loading-logo">EZY: CYBER // HUMAN_DESIGN [1ST-DAY v1.0]</div>
         <div class="loading-log" id="loadingLog">
             <div class="loading-log-item" id="logItem1"></div>
             <div class="loading-log-item" id="logItem2"></div>
@@ -318,13 +318,13 @@
                         <h3 class="section-title"><img src="https://static.tildacdn.com/tild3864-3638-4361-b139-616436373366/woman.png" alt="🦾" style="width: 24px; height: 24px; margin-right: 0.5rem;"> Киберимпланты</h3>
                     </div>
                     <div class="section-content expanded">
-                        <div id="implantsContainer">
-                            <p style="color: var(--muted); text-align: center; padding: 2rem;">Киберимпланты не установлены</p>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 1rem;">
+                        <div style="display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1rem;">
                             <button class="pill-button primary-button" onclick="showImplantShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить модуль</button>
                             <button class="pill-button" onclick="showImplantPartsShop()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Купить часть импланта</button>
                             <button class="pill-button" onclick="showImplantsManagement()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Управление имплантами</button>
+                        </div>
+                        <div id="implantsContainer">
+                            <p style="color: var(--muted); text-align: center; padding: 2rem;">Киберимпланты не установлены</p>
                         </div>
                     </div>
                 </div>
@@ -410,6 +410,9 @@
                                 <label class="input-label" style="display: block; margin-bottom: 0.5rem;">ОПИСАНИЕ БРОНИ</label>
                                 <textarea class="input-field" id="armorDescription" placeholder="Опишите, что надето на персонаже..." onchange="state.armor.description = this.value; scheduleSave();" style="min-height: 80px; resize: vertical;"></textarea>
                             </div>
+                            
+                            <!-- Сообщение об укреплениях -->
+                            <div id="reinforcementMessage"></div>
                             
                             <!-- Инвентарь купленной брони -->
                             <div style="margin-top: 1.5rem;">
@@ -574,28 +577,57 @@
         </main>
     </div>
 
-    <!-- Плавающая кнопка счетчиков -->
-    <div class="counter-button" id="counterButton" onclick="showCountersModal()" style="position: fixed; bottom: 340px; left: 20px; width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); z-index: 1000; transition: all 0.3s ease; border: 2px solid #2a3d4f;">
+    <!-- Старые плавающие кнопки скрыты (теперь в бургер-меню) -->
+    <div class="counter-button" id="counterButton" onclick="showCountersModal()" style="position: fixed; bottom: 340px; left: 20px; width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); z-index: 1000; transition: all 0.3s ease; border: 2px solid #2a3d4f;">
         <img src="https://static.tildacdn.com/tild3437-6537-4161-b166-323464626265/counter.png" alt="🔢" style="width: 32px; height: 32px;">
     </div>
 
-    <!-- Плавающая кнопка расчета расстояния -->
-    <div class="distance-button" id="distanceButton" onclick="showDistanceModal()" style="position: fixed; bottom: 260px; left: 20px; width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); z-index: 1000; transition: all 0.3s ease; border: 2px solid #2a3d4f;">
+    <div class="distance-button" id="distanceButton" onclick="showDistanceModal()" style="position: fixed; bottom: 260px; left: 20px; width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); z-index: 1000; transition: all 0.3s ease; border: 2px solid #2a3d4f;">
         <img src="https://static.tildacdn.com/tild6165-6336-4430-b838-623834316461/height.png" alt="📏" style="width: 32px; height: 32px;">
     </div>
 
-    <!-- Плавающая кнопка бросалки кубов -->
-    <div class="dice-button" id="diceButton" onclick="showUniversalDiceModal()" style="position: fixed; bottom: 180px; left: 20px; width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); z-index: 1000; transition: all 0.3s ease; border: 2px solid #2a3d4f;">
+    <div class="dice-button" id="diceButton" onclick="showUniversalDiceModal()" style="position: fixed; bottom: 180px; left: 20px; width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); z-index: 1000; transition: all 0.3s ease; border: 2px solid #2a3d4f;">
         <img src="https://static.tildacdn.com/tild6461-3139-4934-a463-333563633064/dice.png" alt="&#x1F3B2;" style="width: 32px; height: 32px;">
     </div>
 
-    <!-- Плавающая кнопка заметок -->
-    <div class="notes-button" id="notesButton" onclick="showNotesModal()" style="position: fixed; bottom: 20px; left: 20px; width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); z-index: 1000; transition: all 0.3s ease; border: 2px solid #2a3d4f;">
-        <span style="font-size: 1.5rem; color: var(--bg); font-weight: bold;">&#x1F4DD;</span>
+    <!-- Бургер-меню -->
+    <div class="burger-menu-container" id="burgerMenuContainer" style="position: fixed; bottom: 20px; left: 20px; z-index: 1000;">
+        <!-- Главная кнопка бургера -->
+        <div class="burger-button" id="burgerButton" onclick="toggleBurgerMenu(); event.stopPropagation();" style="width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); transition: all 0.3s ease; border: 2px solid #2a3d4f;">
+            <img src="https://static.tildacdn.com/tild3432-3637-4230-b362-353530396430/application.png" alt="🍔" style="width: 32px; height: 32px;">
+        </div>
+        
+        <!-- Кнопки меню (скрыты по умолчанию) -->
+        <div class="burger-menu-items" id="burgerMenuItems">
+            <!-- Кнопка счетчиков -->
+            <div class="burger-menu-item" id="burgerCounterItem" onclick="showCountersModal()">
+                <img src="https://static.tildacdn.com/tild3437-6537-4161-b166-323464626265/counter.png" alt="🔢" style="width: 32px; height: 32px;">
+            </div>
+            
+            <!-- Кнопка расчета расстояния -->
+            <div class="burger-menu-item" id="burgerDistanceItem" onclick="showDistanceModal()">
+                <img src="https://static.tildacdn.com/tild6165-6336-4430-b838-623834316461/height.png" alt="📏" style="width: 32px; height: 32px;">
+            </div>
+            
+            <!-- Кнопка бросалки кубов -->
+            <div class="burger-menu-item" id="burgerDiceItem" onclick="showUniversalDiceModal()">
+                <img src="https://static.tildacdn.com/tild6461-3139-4934-a463-333563633064/dice.png" alt="&#x1F3B2;" style="width: 32px; height: 32px;">
+            </div>
+            
+            <!-- Кнопка логов -->
+            <div class="burger-menu-item" id="burgerLogItem" onclick="showFloatingLog()">
+                <img src="https://static.tildacdn.com/tild3432-3537-4564-a261-623265663130/log-data.png" alt="📡" style="width: 32px; height: 32px;">
+            </div>
+            
+            <!-- Кнопка заметок -->
+            <div class="burger-menu-item" id="burgerNotesItem" onclick="showNotesModal()">
+                <span style="font-size: 1.5rem; color: var(--bg); font-weight: bold;">&#x1F4DD;</span>
+            </div>
+        </div>
     </div>
 
-    <!-- Плавающая кнопка логов -->
-    <div class="log-button" id="logButton" onclick="showFloatingLog()" style="position: fixed; bottom: 100px; left: 20px; width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); z-index: 1000; transition: all 0.3s ease; border: 2px solid #2a3d4f;">
+    <!-- Плавающая кнопка логов скрыта (теперь в бургер-меню) -->
+    <div class="log-button" id="logButton" onclick="showFloatingLog()" style="position: fixed; bottom: 100px; left: 20px; width: 60px; height: 60px; background: linear-gradient(135deg, #131f2a, #1a2633); border-radius: 50%; display: none; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(19, 31, 42, 0.6); z-index: 1000; transition: all 0.3s ease; border: 2px solid #2a3d4f;">
         <img src="https://static.tildacdn.com/tild3432-3537-4564-a261-623265663130/log-data.png" alt="📡" style="width: 32px; height: 32px;">
     </div>
 
@@ -789,6 +821,11 @@
                 
                 if (typeof initializeNumericInputs === 'function') {
                     initializeNumericInputs();
+                }
+                
+                // Проверяем видимость блока Дека при загрузке
+                if (typeof checkDeckVisibility === 'function') {
+                    checkDeckVisibility();
                 }
                 
                 // Запускаем загрузочный экран

@@ -4,6 +4,28 @@
 // ============================================================================
 
 // Базовая функция рендеринга профессиональных навыков
+// Функция проверки наличия хакерских/программистских навыков для отображения блока Дека
+window.checkDeckVisibility = function() {
+    const deckSection = document.getElementById('deckSection');
+    if (!deckSection) return;
+    
+    // Проверяем наличие навыков, связанных с деккой
+    const hasDeckSkill = state.professionalSkills && state.professionalSkills.some(skill => 
+        skill && (
+            skill.name === 'Чёрный хакер' || 
+            skill.name === 'Белый хакер' || 
+            skill.name === 'Программист'
+        )
+    );
+    
+    // Показываем или скрываем блок Дека
+    if (hasDeckSkill) {
+        deckSection.style.display = '';
+    } else {
+        deckSection.style.display = 'none';
+    }
+};
+
 window.renderProfessionalSkills = function() {
     const container = document.getElementById('professionalSkillsContainer');
     if (!container) return;
@@ -53,6 +75,9 @@ window.renderProfessionalSkills = function() {
     }
     
     container.innerHTML = html;
+    
+    // Обновляем видимость блока Дека
+    checkDeckVisibility();
 }
 
 // Показать модальное окно выбора профессионального навыка
@@ -375,6 +400,7 @@ window.removeProfessionalSkillFromSlot = function(slotIndex) {
     
     renderProfessionalSkills();
     scheduleSave();
+    checkDeckVisibility();
     
     showToast(`Навык "${skillName}" удален!`, 2000);
 }
@@ -388,6 +414,7 @@ window.updateProfessionalSkillLevelNew = function(slotIndex, newLevel) {
     state.professionalSkills[slotIndex].level = Math.max(1, Math.min(maxLevel, parseInt(newLevel) || 1));
     renderProfessionalSkills();
     scheduleSave();
+    checkDeckVisibility();
 }
 
 window.showProfessionalSkillInfo = function(slotIndex) {

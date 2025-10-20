@@ -20,6 +20,7 @@ function getThemeColors() {
             danger: '#8b0000',
             success: '#006400',
             warning: '#8b5a00',
+            info: '#0066cc',
             border: 'rgba(74, 74, 74, 0.4)',
             shadow: '0 0 22px rgba(74, 74, 74, 0.2)',
             // Дополнительные цвета для инлайн-стилей
@@ -29,6 +30,7 @@ function getThemeColors() {
             successLight: 'rgba(0, 100, 0, 0.1)',
             dangerLight: 'rgba(139, 0, 0, 0.1)',
             warningLight: 'rgba(139, 90, 0, 0.1)',
+            infoLight: 'rgba(0, 102, 204, 0.1)',
             accentLight: 'rgba(74, 74, 74, 0.1)'
         };
     } else {
@@ -43,6 +45,7 @@ function getThemeColors() {
             danger: '#ff5b87',
             success: '#7df4c6',
             warning: '#ffa500',
+            info: '#00bfff',
             border: 'rgba(182, 103, 255, 0.38)',
             shadow: '0 0 22px rgba(182, 103, 255, 0.28)',
             // Дополнительные цвета для инлайн-стилей
@@ -52,6 +55,7 @@ function getThemeColors() {
             successLight: 'rgba(125, 244, 198, 0.1)',
             dangerLight: 'rgba(255, 91, 135, 0.1)',
             warningLight: 'rgba(255, 165, 0, 0.1)',
+            infoLight: 'rgba(0, 191, 255, 0.1)',
             accentLight: 'rgba(182, 103, 255, 0.1)'
         };
     }
@@ -89,6 +93,26 @@ function loadState() {
         if (!state.armorInventory) {
             state.armorInventory = [];
             console.log('Инициализирован armorInventory');
+        }
+        
+        // Инициализируем armor.reinforcement, если его нет
+        if (!state.armor) {
+            state.armor = {
+                head: { os: 0, type: 'Лёгкая' },
+                body: { os: 0, type: 'Лёгкая' },
+                arms: { os: 0, type: 'Лёгкая' },
+                legs: { os: 0, type: 'Лёгкая' },
+                description: ''
+            };
+        }
+        if (!state.armor.reinforcement) {
+            state.armor.reinforcement = {
+                head: null,
+                body: null,
+                arms: null,
+                legs: null
+            };
+            console.log('Инициализирован armor.reinforcement');
         }
         
         // Инициализируем implants правильной структурой, если это массив или undefined
@@ -192,6 +216,34 @@ function loadState() {
                     vehicle.trunk = [];
                 }
             });
+        }
+        
+        // Нормализуем модули имплантов в снаряжении
+        if (state.gear && Array.isArray(state.gear) && typeof CYBERIMPLANTS_LIBRARY !== 'undefined') {
+            state.gear.forEach(item => {
+                if (item.type === 'implant' && item.implantData && item.implantData.category && item.implantData.name) {
+                    const category = item.implantData.category;
+                    const name = item.implantData.name;
+                    const libraryModule = CYBERIMPLANTS_LIBRARY[category]?.find(m => m.name === name);
+                    
+                    if (libraryModule) {
+                        // Копируем специальные поля из библиотеки (specialInstall, totalSlots и т.д.)
+                        if (libraryModule.specialInstall && !item.implantData.specialInstall) {
+                            item.implantData.specialInstall = libraryModule.specialInstall;
+                        }
+                        if (libraryModule.totalSlots && !item.implantData.totalSlots) {
+                            item.implantData.totalSlots = libraryModule.totalSlots;
+                        }
+                        if (libraryModule.slots && !item.implantData.slots) {
+                            item.implantData.slots = libraryModule.slots;
+                        }
+                        if (libraryModule.requiredParts && !item.implantData.requiredParts) {
+                            item.implantData.requiredParts = libraryModule.requiredParts;
+                        }
+                    }
+                }
+            });
+            console.log('Модули имплантов в снаряжении нормализованы');
         }
         
         updateUIFromState();
@@ -497,13 +549,12 @@ function updateUIFromState() {
     const armorLegsType = document.getElementById('armorLegsType');
     
     if (armorHeadOS) armorHeadOS.value = state.armor.head.os || 0;
-    if (armorHeadType) armorHeadType.textContent = state.armor.head.os > 0 ? state.armor.head.type || 'Лёгкая' : '';
     if (armorBodyOS) armorBodyOS.value = state.armor.body.os || 0;
-    if (armorBodyType) armorBodyType.textContent = state.armor.body.os > 0 ? state.armor.body.type || 'Лёгкая' : '';
     if (armorArmsOS) armorArmsOS.value = state.armor.arms.os || 0;
-    if (armorArmsType) armorArmsType.textContent = state.armor.arms.os > 0 ? state.armor.arms.type || 'Лёгкая' : '';
     if (armorLegsOS) armorLegsOS.value = state.armor.legs.os || 0;
-    if (armorLegsType) armorLegsType.textContent = state.armor.legs.os > 0 ? state.armor.legs.type || 'Лёгкая' : '';
+    
+    // НЕ обновляем названия типов брони здесь - это будет сделано в updateArmorDisplay()
+    // чтобы правильно учесть укрепления
     
     // Обновляем описание брони
     const armorDescription = document.getElementById('armorDescription');
@@ -512,8 +563,22 @@ function updateUIFromState() {
     // Обновляем штраф от брони
     if (typeof updateArmorPenalty === 'function') updateArmorPenalty();
     
+    // Инициализируем укрепления, если их нет
+    if (!state.armor.reinforcement) {
+        state.armor.reinforcement = {
+            head: null,
+            body: null,
+            arms: null,
+            legs: null
+        };
+        console.log('Инициализированы укрепления костной системы');
+    }
+    
     // Обновляем инвентарь брони
     if (typeof renderArmorInventory === 'function') renderArmorInventory();
+    
+    // Обновляем отображение брони с учетом укреплений (после инициализации укреплений)
+    if (typeof updateArmorDisplay === 'function') updateArmorDisplay();
     
     // Обновляем кнопки снятия брони
     if (typeof updateArmorRemoveButtons === 'function') updateArmorRemoveButtons();
