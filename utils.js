@@ -157,6 +157,18 @@ function loadState() {
             };
         }
         
+        // Инициализируем drugs, если его нет
+        if (!state.drugs) {
+            state.drugs = [];
+            console.log('Инициализирован drugs');
+        }
+        
+        // Инициализируем installedModules, если его нет
+        if (!state.installedModules) {
+            state.installedModules = [];
+            console.log('Инициализирован installedModules');
+        }
+        
         // Инициализируем массивы, если их нет
         if (!state.property.housing) {
             state.property.housing = [];
@@ -619,14 +631,142 @@ function updateUIFromState() {
 
 // Экспорт и импорт данных
 function exportData() {
-    const dataStr = JSON.stringify(state, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `ezy-cyber-character-${Date.now()}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+    try {
+        // Создаем копию state с правильной обработкой всех полей
+        const exportData = {
+            // Основная информация
+            characterName: state.characterName || '',
+            characterClass: state.characterClass || '',
+            characterLevel: state.characterLevel || 1,
+            experiencePoints: state.experiencePoints || 0,
+            roleplayPoints: state.roleplayPoints || 0,
+            avatar: state.avatar || '',
+            
+            // Характеристики
+            stats: { ...state.stats },
+            
+            // Удача
+            luck: { ...state.luck },
+            
+            // Производные характеристики
+            awareness: { ...state.awareness },
+            reputation: state.reputation || 0,
+            
+            // Здоровье и ресурсы
+            health: { ...state.health },
+            money: state.money || 0,
+            
+            // Предыстория
+            backstory: state.backstory || '',
+            
+            // Навыки
+            skills: [...(state.skills || [])],
+            professionalSkills: [...(state.professionalSkills || [])],
+            bargainEnabled: state.bargainEnabled !== undefined ? state.bargainEnabled : true,
+            
+            // Дека
+            deck: { ...state.deck },
+            
+            // ОЗУ деки
+            deckRam: { ...state.deckRam },
+            
+            // Снаряжение
+            gear: [...(state.gear || [])],
+            
+            // Оружие
+            weapons: [...(state.weapons || [])],
+            
+            // Боеприпасы
+            ammo: [...(state.ammo || [])],
+            
+            // Программы деки
+            deckPrograms: [...(state.deckPrograms || [])],
+            
+            // Модули оружия
+            weaponModules: [...(state.weaponModules || [])],
+            
+            // Модули транспорта
+            vehicleModules: [...(state.vehicleModules || [])],
+            
+            // Имущество
+            property: {
+                vehicles: [...(state.property?.vehicles || [])],
+                housing: [...(state.property?.housing || [])],
+                commercialProperty: [...(state.property?.commercialProperty || [])]
+            },
+            
+            // Препараты
+            drugs: [...(state.drugs || [])],
+            
+            // Нагрузка
+            load: { ...state.load },
+            
+            // Скупщик
+            fenceShop: { ...state.fenceShop },
+            
+            // Лог бросков
+            rollLog: [...(state.rollLog || [])],
+            
+            // Заметки
+            notes: state.notes || '',
+            
+            // Счетчики
+            counters: [...(state.counters || [])],
+            
+            // Критические травмы
+            criticalInjuries: [...(state.criticalInjuries || [])],
+            
+            // Щепки памяти
+            deckChips: [...(state.deckChips || [])],
+            
+            // Имплантаты
+            implants: { ...state.implants },
+            
+            // Установленные модули имплантов
+            installedModules: [...(state.installedModules || [])],
+            
+            // Броня по зонам
+            armor: { ...state.armor },
+            
+            // Инвентарь брони
+            armorInventory: [...(state.armorInventory || [])],
+            
+            // Титаническая броня
+            titanicArmorConnected: state.titanicArmorConnected || false,
+            
+            // Лог транзакций
+            transactionLog: [...(state.transactionLog || [])],
+            
+            // Графы предыстории
+            backstoryGraphs: { ...state.backstoryGraphs },
+            
+            // Настройки интерфейса
+            uiSettings: { ...state.uiSettings },
+            
+            // Размеры и порядок секций
+            sectionSizes: { ...state.sectionSizes },
+            layoutOrder: [...(state.layoutOrder || [])],
+            
+            // Версия экспорта
+            exportVersion: '1.0',
+            exportDate: new Date().toISOString()
+        };
+        
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ezy-cyber-character-${state.characterName || 'unnamed'}-${Date.now()}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+        
+        // Показываем уведомление об успешном экспорте
+        showNotification('Персонаж успешно сохранен!', 'success');
+    } catch (error) {
+        console.error('Ошибка при экспорте данных:', error);
+        showNotification('Ошибка при сохранении персонажа: ' + error.message, 'error');
+    }
 }
 
 function importData() {
@@ -642,10 +782,15 @@ function importData() {
                     const importedState = JSON.parse(e.target.result);
                     Object.assign(state, importedState);
                     saveState();
+                    showNotification('Персонаж успешно загружен!', 'success');
                     location.reload();
                 } catch (error) {
-                    showAlertModal('Ошибка', 'Ошибка при импорте файла');
+                    console.error('Ошибка при импорте файла:', error);
+                    showNotification('Ошибка при загрузке файла: ' + error.message, 'error');
                 }
+            };
+            reader.onerror = () => {
+                showNotification('Ошибка при чтении файла', 'error');
             };
             reader.readAsText(file);
         }
