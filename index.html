@@ -34,7 +34,7 @@
 
     <!-- Загрузочный экран -->
     <div class="loading-screen" id="loadingScreen">
-        <div class="loading-logo">EZY: CYBER // HUMAN_DESIGN [v1.01]</div>
+        <div class="loading-logo">EZY: CYBER // HUMAN_DESIGN [v1.06]</div>
         <div class="loading-log" id="loadingLog">
             <div class="loading-log-item" id="logItem1"></div>
             <div class="loading-log-item" id="logItem2"></div>
@@ -137,50 +137,92 @@
                             <div class="stats-grid-derived">
                                 <div class="input-group-compact">
                                     <div class="input-label-compact">Очки обучения</div>
-                                    <input type="text" class="input-field-compact" id="experiencePoints" value="0" data-numeric="true" min="0" max="9999" onchange="state.experiencePoints = parseInt(this.value); scheduleSave();">
+                                    <div class="integrated-numeric-input">
+                                        <button class="integrated-numeric-btn" onclick="changeStatValue('experiencePoints', -1, 0, 9999)">-</button>
+                                        <input type="text" class="integrated-numeric-field" id="experiencePoints" value="0" data-numeric="true" min="0" max="9999" onchange="state.experiencePoints = parseInt(this.value) || 0; scheduleSave();">
+                                        <button class="integrated-numeric-btn" onclick="changeStatValue('experiencePoints', 1, 0, 9999)">+</button>
+                                    </div>
                                 </div>
                                 <div class="input-group-compact">
                                     <div class="input-label-compact">РОЛЕВЫЕ ОЧКИ</div>
-                                    <input type="text" class="input-field-compact" id="roleplayPoints" value="0" data-numeric="true" min="0" max="9999" onchange="state.roleplayPoints = parseInt(this.value); scheduleSave();">
+                                    <div class="integrated-numeric-input">
+                                        <button class="integrated-numeric-btn" onclick="changeStatValue('roleplayPoints', -1, 0, 9999)">-</button>
+                                        <input type="text" class="integrated-numeric-field" id="roleplayPoints" value="0" data-numeric="true" min="0" max="9999" onchange="state.roleplayPoints = parseInt(this.value) || 0; scheduleSave();">
+                                        <button class="integrated-numeric-btn" onclick="changeStatValue('roleplayPoints', 1, 0, 9999)">+</button>
+                                    </div>
                                 </div>
                                 <div class="stat-dual-compact">
                                     <div class="stat-label-compact">ОСОЗНАННОСТЬ</div>
-                                    <div class="dual-values-compact">
-                                        <input type="text" class="dual-value-compact" id="awarenessCurrent" value="50" min="0" max="999" onchange="state.awareness.current = parseInt(this.value); scheduleSave();">
+                                    <div class="dual-numeric-row">
+                                        <div class="integrated-numeric-input" style="flex: 1;">
+                                            <button class="integrated-numeric-btn" onclick="changeStatValue('awarenessCurrent', -1, 0, 999)">-</button>
+                                            <input type="text" class="integrated-numeric-field" id="awarenessCurrent" value="50" min="0" max="999" onchange="state.awareness.current = parseInt(this.value) || 0; scheduleSave();">
+                                            <button class="integrated-numeric-btn" onclick="changeStatValue('awarenessCurrent', 1, 0, 999)">+</button>
+                                        </div>
                                         <span class="dual-separator-compact">/</span>
-                                        <input type="text" class="dual-value-compact" id="awarenessMax" value="50" min="1" max="999" onchange="state.awareness.max = parseInt(this.value); scheduleSave();">
+                                        <div class="integrated-numeric-input" style="flex: 1;">
+                                            <button class="integrated-numeric-btn" onclick="changeStatValue('awarenessMax', -1, 1, 999)">-</button>
+                                            <input type="text" class="integrated-numeric-field" id="awarenessMax" value="50" min="1" max="999" onchange="state.awareness.max = parseInt(this.value) || 1; scheduleSave();">
+                                            <button class="integrated-numeric-btn" onclick="changeStatValue('awarenessMax', 1, 1, 999)">+</button>
+                                        </div>
                                     </div>
                                     <div class="stat-formula-compact">Максимальная Осознанность = УМ*10</div>
                                 </div>
                                 <div class="stat-box-compact">
                                     <div class="stat-label-compact" title="Ум">УМ</div>
-                                    <input type="text" class="stat-value-compact" id="statINT" value="5" min="1" max="20" onchange="state.stats.INT = parseInt(this.value); updateAwarenessMax(); scheduleSave();">
+                                    <div class="integrated-numeric-input">
+                                        <button class="integrated-numeric-btn" onclick="decreaseStat('INT')">-</button>
+                                        <input type="text" class="integrated-numeric-field" id="statINT" value="5" min="1" max="20" onchange="state.stats.INT = parseInt(this.value) || 1; updateAwarenessMax(); scheduleSave();">
+                                        <button class="integrated-numeric-btn" onclick="increaseStat('INT')">+</button>
+                                    </div>
                                 </div>
                                 <div class="stat-box-compact">
                                     <div class="stat-label-compact" title="Ловкость">ЛВК</div>
-                                    <input type="text" class="stat-value-compact" id="statDEX" value="5" min="1" max="20" onchange="state.stats.DEX = parseInt(this.value); updateDerivedStats(); scheduleSave();">
+                                    <div class="integrated-numeric-input">
+                                        <button class="integrated-numeric-btn" onclick="decreaseStat('DEX')">-</button>
+                                        <input type="text" class="integrated-numeric-field" id="statDEX" value="5" min="1" max="20" onchange="state.stats.DEX = parseInt(this.value) || 1; updateDerivedStats(); scheduleSave();">
+                                        <button class="integrated-numeric-btn" onclick="increaseStat('DEX')">+</button>
+                                    </div>
                                 </div>
                                 <div class="stat-box-compact">
                                     <div class="stat-label-compact" title="Телосложение">ТЕЛО</div>
-                                    <input type="text" class="stat-value-compact" id="statBODY" value="5" min="1" max="20" onchange="state.stats.BODY = parseInt(this.value); calculateAndUpdateHealth(); updateDerivedStats(); if(typeof updateBikeDescription === 'function') updateBikeDescription(); scheduleSave();">
+                                    <div class="integrated-numeric-input">
+                                        <button class="integrated-numeric-btn" onclick="decreaseStat('BODY')">-</button>
+                                        <input type="text" class="integrated-numeric-field" id="statBODY" value="5" min="1" max="20" onchange="state.stats.BODY = parseInt(this.value) || 1; calculateAndUpdateHealth(); updateDerivedStats(); if(typeof updateBikeDescription === 'function') updateBikeDescription(); scheduleSave();">
+                                        <button class="integrated-numeric-btn" onclick="increaseStat('BODY')">+</button>
+                                    </div>
                                 </div>
                                 <div class="stat-box-compact">
                                     <div class="stat-label-compact" title="Техника">ТЕХ</div>
-                                    <input type="text" class="stat-value-compact" id="statTECH" value="5" min="1" max="20" onchange="state.stats.TECH = parseInt(this.value); scheduleSave();">
+                                    <div class="integrated-numeric-input">
+                                        <button class="integrated-numeric-btn" onclick="decreaseStat('TECH')">-</button>
+                                        <input type="text" class="integrated-numeric-field" id="statTECH" value="5" min="1" max="20" onchange="state.stats.TECH = parseInt(this.value) || 1; scheduleSave();">
+                                        <button class="integrated-numeric-btn" onclick="increaseStat('TECH')">+</button>
+                                    </div>
                                     <div id="techBonus" style="display: none;"></div>
                                 </div>
                                 <div class="stat-box-compact">
                                     <div class="stat-label-compact" title="Характер">ХАР</div>
-                                    <input type="text" class="stat-value-compact" id="statCHA" value="5" min="1" max="20" onchange="state.stats.CHA = parseInt(this.value); scheduleSave();">
+                                    <div class="integrated-numeric-input">
+                                        <button class="integrated-numeric-btn" onclick="decreaseStat('CHA')">-</button>
+                                        <input type="text" class="integrated-numeric-field" id="statCHA" value="5" min="1" max="20" onchange="state.stats.CHA = parseInt(this.value) || 1; scheduleSave();">
+                                        <button class="integrated-numeric-btn" onclick="increaseStat('CHA')">+</button>
+                                    </div>
                                 </div>
                                 <div class="stat-box-compact">
                                     <div class="stat-label-compact" title="Реакция">РЕА</div>
-                                    <input type="text" class="stat-value-compact" id="statREA" value="5" min="1" max="20" onchange="state.stats.REA = parseInt(this.value); scheduleSave();">
+                                    <div class="integrated-numeric-input">
+                                        <button class="integrated-numeric-btn" onclick="decreaseStat('REA')">-</button>
+                                        <input type="text" class="integrated-numeric-field" id="statREA" value="5" min="1" max="20" onchange="state.stats.REA = parseInt(this.value) || 1; scheduleSave();">
+                                        <button class="integrated-numeric-btn" onclick="increaseStat('REA')">+</button>
+                                    </div>
                                 </div>
                                 <div class="stat-dual-compact">
                                     <div class="stat-label-compact">ВОЛЯ</div>
-                                    <div class="dual-values-compact">
-                                        <input type="text" class="dual-value-compact" id="statWILL" value="5" min="1" max="20" onchange="state.stats.WILL = parseInt(this.value); calculateAndUpdateHealth(); updateDerivedStats(); scheduleSave();">
+                                    <div class="integrated-numeric-input">
+                                        <button class="integrated-numeric-btn" onclick="decreaseStat('WILL')">-</button>
+                                        <input type="text" class="integrated-numeric-field" id="statWILL" value="5" min="1" max="20" onchange="state.stats.WILL = parseInt(this.value) || 1; calculateAndUpdateHealth(); updateDerivedStats(); scheduleSave();">
+                                        <button class="integrated-numeric-btn" onclick="increaseStat('WILL')">+</button>
                                     </div>
                                 </div>
                                 <div class="derived-stat-compact">
@@ -197,11 +239,19 @@
                                     <div class="derived-value-compact" id="derivedAttackSpeed">2</div>
                                 </div>
                                 <div class="stat-dual-compact">
-                                    <div class="stat-label-compact">УДАЧА</div>                           
-                                    <div class="dual-values-compact">
-                                        <input type="text" class="dual-value-compact" id="luckCurrent" value="1" min="0" max="99" onchange="state.luck.current = parseInt(this.value); scheduleSave();">
+                                    <div class="stat-label-compact">УДАЧА</div>
+                                    <div class="dual-numeric-row">
+                                        <div class="integrated-numeric-input" style="flex: 1;">
+                                            <button class="integrated-numeric-btn" onclick="changeStatValue('luckCurrent', -1, 0, 99)">-</button>
+                                            <input type="text" class="integrated-numeric-field" id="luckCurrent" value="1" min="0" max="99" onchange="state.luck.current = parseInt(this.value) || 0; scheduleSave();">
+                                            <button class="integrated-numeric-btn" onclick="changeStatValue('luckCurrent', 1, 0, 99)">+</button>
+                                        </div>
                                         <span class="dual-separator-compact">/</span>
-                                        <input type="text" class="dual-value-compact" id="luckMax" value="1" min="1" max="99" onchange="state.luck.max = parseInt(this.value); scheduleSave();">
+                                        <div class="integrated-numeric-input" style="flex: 1;">
+                                            <button class="integrated-numeric-btn" onclick="changeStatValue('luckMax', -1, 1, 99)">-</button>
+                                            <input type="text" class="integrated-numeric-field" id="luckMax" value="1" min="1" max="99" onchange="state.luck.max = parseInt(this.value) || 1; scheduleSave();">
+                                            <button class="integrated-numeric-btn" onclick="changeStatValue('luckMax', 1, 1, 99)">+</button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="initiative-compact" onclick="rollInitiative()">
@@ -238,6 +288,7 @@
                                             <img src="https://static.tildacdn.com/tild3539-3065-4366-b139-656331356537/write.png" style="width: 16px; height: 16px;" alt="✏️">
                                         </button>
                                         <button class="pill-button primary-button" onclick="generateBackstory()">&#x1F3B2; Сгенерировать</button>
+                                        <button class="pill-button primary-button" onclick="toggleBackstoryDropdownEditor()">Редактировать списком</button>
                                         <button class="pill-button dark-blue-button" onclick="showManualBackstorySelection()"><img src="https://static.tildacdn.com/tild6233-3935-4063-b062-356337336561/pencil.png" alt="✏️" style="width: 16px; height: 16px; margin-right: 0.25rem; vertical-align: middle;"> Выбрать вручную</button>
                                     </div>
                                 </div>
@@ -256,6 +307,7 @@
                                         <!-- Скрытый textarea для совместимости -->
                                         <textarea id="backstoryText" style="display: none;" spellcheck="false"></textarea>
                                     </div>
+                                    <div id="backstoryDropdownEditor" class="backstory-dropdown-editor" style="display: none; margin-top: 0.75rem;"></div>
                                 </div>
                             </div>
                             
@@ -654,7 +706,7 @@
 
     <!-- Модальное окно расчета расстояния -->
     <div class="modal-overlay" id="distanceModal" style="display: none;">
-        <div class="modal" style="width: 800px; max-width: 90vw;">
+        <div class="modal" style="width: 95vw; max-width: 800px;">
             <div class="modal-header">
                 <h3><img src="https://static.tildacdn.com/tild6165-6336-4430-b838-623834316461/height.png" alt="📏" style="width: 24px; height: 24px; margin-right: 0.5rem; vertical-align: middle;"> КАЛЬКУЛЯТОР РАССТОЯНИЯ ДО ЦЕЛИ</h3>
                 <button class="icon-button" onclick="hideDistanceModal()">&times;</button>
@@ -821,6 +873,13 @@
                 
                 if (typeof initializeNumericInputs === 'function') {
                     initializeNumericInputs();
+                }
+                
+                // Инициализируем валидацию для integrated-numeric-field полей
+                if (typeof initializeIntegratedNumericFields === 'function') {
+                    setTimeout(() => {
+                        initializeIntegratedNumericFields();
+                    }, 100);
                 }
                 
                 // Проверяем видимость блока Дека при загрузке

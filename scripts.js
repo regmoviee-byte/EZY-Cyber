@@ -1598,69 +1598,64 @@ function saveSkillWithCustomName(baseName, stat, level, special, multiplier) {
 
 function refreshAddSkillModal() {
     // Ищем открытый модал добавления навыков
-    const existingModal = document.querySelector('.modal-overlay');
-    if (existingModal && existingModal.querySelector('h3').textContent.includes('Добавить навык')) {
-        // Обновляем содержимое модала
-        const modalBody = existingModal.querySelector('.modal-body');
-        if (modalBody) {
-            // Пересоздаем содержимое модала
-            const statNames = {
-                'WILL': 'Воля',
-                'INT': 'Ум',
-                'DEX': 'Ловкость',
-                'BODY': 'Телосложение',
-                'REA': 'Реакция',
-                'TECH': 'Техника',
-                'CHA': 'Характер'
-            };
-            
-            // Проверяем наличие профессиональных навыков
-            const hasFixerSkill = state.professionalSkills && state.professionalSkills.some(skill => 
-                skill && skill.name === 'Решала'
-            );
-            const medicSkills = ['Фармацевт', 'Инженер криосистем', 'Специалист по клонированию'];
-            const hasMedicSkill = state.professionalSkills && state.professionalSkills.some(skill => 
-                skill && medicSkills.includes(skill.name)
-            );
-            
-            const availableSkills = STANDARD_SKILLS.filter(skill => {
-                const canAddMultiple = skill.name === "Язык" || skill.name.startsWith("Боевые искусства");
-                if (canAddMultiple) return true;
-                
-                // Скрываем "Торг" если нет профессии "Решала"
-                if (skill.name === 'Торг' && !hasFixerSkill) return false;
-                
-                // Скрываем "Медицина" если нет медицинской профессии
-                if (skill.name === 'Медицина' && !hasMedicSkill) return false;
-                
-                return !state.skills.find(s => s.name === skill.name);
-            });
-            
-            modalBody.innerHTML = `
-                <div style="margin-bottom: 1.5rem;">
-                    <h4 style="color: var(--accent); margin-bottom: 0.75rem;">Стандартные навыки</h4>
-                    ${availableSkills.length > 0 ? `
-                        <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; padding: 0.75rem;">
-                            ${availableSkills.map(skill => `
-                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid rgba(182, 103, 255, 0.15); margin-bottom: 0.5rem;">
-                                    <div>
-                                    <div>
-                                        <span style="color: ${getThemeColors().text}; font-weight: 500;">${skill.name}</span>
-                                        <span style="color: var(--muted); font-size: 0.85rem;"> (${statNames[skill.stat] || skill.stat})</span>
-                                            ${skill.special ? '<span style="color: var(--success); font-size: 0.8rem;"> </span>' : ''}
-                                        ${skill.multiplier > 1 ? `<span style="color: var(--accent-2); font-size: 0.8rem;"> ×${skill.multiplier}</span>` : ''}
-                                        </div>
-                                        ${skill.footnote ? `<div style="color: var(--muted); font-size: 0.75rem; font-style: italic; margin-top: 0.25rem;">(${skill.footnote})</div>` : ''}
-                                    </div>
-                                    <button class="pill-button primary-button" onclick="addStandardSkill('${skill.name}');" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Добавить</button>
+    const existingModal = [...document.querySelectorAll('.modal-overlay')]
+        .find(modal => modal.querySelector('.modal-header h3')?.textContent.includes('Добавить навык'));
+    if (!existingModal) return;
+
+    const modalBody = existingModal.querySelector('.modal-body');
+    if (!modalBody) return;
+
+    const statNames = {
+        'WILL': 'Воля',
+        'INT': 'Ум',
+        'DEX': 'Ловкость',
+        'BODY': 'Телосложение',
+        'REA': 'Реакция',
+        'TECH': 'Техника',
+        'CHA': 'Характер'
+    };
+
+    const hasFixerSkill = state.professionalSkills && state.professionalSkills.some(skill =>
+        skill && skill.name === 'Решала'
+    );
+    const medicSkills = ['Фармацевт', 'Инженер криосистем', 'Специалист по клонированию'];
+    const hasMedicSkill = state.professionalSkills && state.professionalSkills.some(skill =>
+        skill && medicSkills.includes(skill.name)
+    );
+
+    const availableSkills = STANDARD_SKILLS.filter(skill => {
+        const canAddMultiple = skill.name === "Язык" || skill.name.startsWith("Боевые искусства");
+        if (canAddMultiple) return true;
+
+        if (skill.name === 'Торг' && !hasFixerSkill) return false;
+        if (skill.name === 'Медицина' && !hasMedicSkill) return false;
+
+        return !state.skills.find(s => s.name === skill.name || s.customName === skill.name);
+    });
+
+    modalBody.innerHTML = `
+        <div style="margin-bottom: 1.5rem;">
+            <h4 style="color: var(--accent); margin-bottom: 0.75rem;">Стандартные навыки</h4>
+            ${availableSkills.length > 0 ? `
+                <div style="max-height: 400px; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--border); border-radius: 12px; padding: 0.75rem;">
+                    ${availableSkills.map(skill => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; padding: 0.75rem; border-bottom: 1px solid rgba(77, 163, 255, 0.15); margin-bottom: 0.5rem;">
+                            <div style="flex: 1 1 auto; min-width: 0;">
+                                <div style="min-width: 0;">
+                                    <span style="color: ${getThemeColors().text}; font-weight: 500;">${skill.name}</span>
+                                    <span style="color: var(--muted); font-size: 0.85rem;"> (${statNames[skill.stat] || skill.stat})</span>
+                                    ${skill.special ? '<span style="color: var(--success); font-size: 0.8rem;"> </span>' : ''}
+                                    ${skill.multiplier > 1 ? `<span style="color: var(--accent-2); font-size: 0.8rem;"> ×${skill.multiplier}</span>` : ''}
                                 </div>
-                            `).join('')}
+                                ${skill.footnote ? `<div style="color: var(--muted); font-size: 0.75rem; font-style: italic; margin-top: 0.25rem;">(${skill.footnote})</div>` : ''}
+                            </div>
+                            <button class="pill-button primary-button" onclick="addStandardSkill('${skill.name}');" style="font-size: 0.8rem; padding: 0.3rem 0.6rem; flex: 0 0 auto;">Добавить</button>
                         </div>
-                    ` : '<p style="color: var(--muted); text-align: center; padding: 2rem;">Все стандартные навыки добавлены</p>'}
+                    `).join('')}
                 </div>
-            `;
-        }
-    }
+            ` : '<p style="color: var(--muted); text-align: center; padding: 2rem;">Все стандартные навыки добавлены</p>'}
+        </div>
+    `;
 }
 
 function addCustomSkill() {
@@ -1820,6 +1815,18 @@ function renderSkills() {
         const nameB = (b.customName || b.name).toLowerCase();
         return nameA.localeCompare(nameB);
     });
+
+    const getSkillMultiplier = (skill) => {
+        const mult = Number(skill.multiplier) || 1;
+        if (mult > 1) return mult;
+        const name = (skill.customName || skill.name || '').toLowerCase();
+        return /[x×х]2/.test(name) ? 2 : 1;
+    };
+
+    const totalSkillLevels = sortedSkills.reduce((sum, skill) => {
+        const level = parseInt(skill.level) || 0;
+        return sum + (level * getSkillMultiplier(skill));
+    }, 0);
     
     container.innerHTML = `
         <div class="skills-grid-compact">
@@ -1868,6 +1875,10 @@ function renderSkills() {
                     </div>
                 </div>
             `}).join('')}
+        </div>
+        <div class="skills-total">
+            <span>Сумма уровней:</span>
+            <span class="skills-total-value">${totalSkillLevels}</span>
         </div>
     `;
     
@@ -1939,7 +1950,7 @@ function showAddSkillModal() {
         originalRemove();
     };
     modal.innerHTML = `
-        <div class="modal" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+        <div class="modal" style="width: 95vw; max-width: 600px; max-height: 90vh; overflow-y: auto;">
             <div class="modal-header">
                 <h3>🔫 Добавить навык</h3>
                 <button class="icon-button" onclick="closeModal(this)">×</button>
@@ -1948,11 +1959,11 @@ function showAddSkillModal() {
                 <div style="margin-bottom: 1.5rem;">
                     <h4 style="color: var(--accent); margin-bottom: 0.75rem;">Стандартные навыки</h4>
                     ${availableSkills.length > 0 ? `
-                        <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 12px; padding: 0.75rem;">
+                        <div style="max-height: 400px; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--border); border-radius: 12px; padding: 0.75rem;">
                             ${availableSkills.map(skill => `
-                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid rgba(182, 103, 255, 0.15); margin-bottom: 0.5rem;">
-                                    <div>
-                                    <div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; padding: 0.75rem; border-bottom: 1px solid rgba(182, 103, 255, 0.15); margin-bottom: 0.5rem;">
+                                    <div style="flex: 1 1 auto; min-width: 0;">
+                                    <div style="min-width: 0;">
                                         <span style="color: ${getThemeColors().text}; font-weight: 500;">${skill.name}</span>
                                         <span style="color: var(--muted); font-size: 0.85rem;"> (${statNames[skill.stat] || skill.stat})</span>
                                         ${skill.special ? '<span style="color: var(--success); font-size: 0.8rem;"> </span>' : ''}
@@ -1960,7 +1971,7 @@ function showAddSkillModal() {
                                         </div>
                                         ${skill.footnote ? `<div style="color: var(--muted); font-size: 0.75rem; font-style: italic; margin-top: 0.25rem;">(${skill.footnote})</div>` : ''}
                                     </div>
-                                    <button class="pill-button primary-button" onclick="addStandardSkill('${skill.name}');" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">Добавить</button>
+                                    <button class="pill-button primary-button" onclick="addStandardSkill('${skill.name}');" style="font-size: 0.8rem; padding: 0.3rem 0.6rem; flex: 0 0 auto;">Добавить</button>
                                 </div>
                             `).join('')}
                         </div>
@@ -2381,9 +2392,9 @@ function executeShotgunShoot(weaponId) {
 
 // Дубли функций критических травм удалены (первое определение на строке 1227)
 
-// Генератор предыстории
-function generateBackstory() {
-    const backstoryTables = {
+// Таблицы для генерации/выбора предыстории
+function getBackstoryTables() {
+    return {
         birth: {
             title: "Ты родился",
             options: [
@@ -2582,7 +2593,12 @@ function generateBackstory() {
             ]
         }
     };
-    
+}
+
+// Генератор предыстории
+function generateBackstory() {
+    const backstoryTables = getBackstoryTables();
+
     // Генерируем случайные результаты
     let backstoryText = "";
     
@@ -2621,206 +2637,7 @@ function showManualBackstorySelection() {
     `;
     
     // Данные для выбора предыстории
-    const backstoryTables = {
-        birth: {
-            title: "Ты родился",
-            options: [
-                "Среди бедняков (+1 предмет)",
-                "Среди военных (+1 Навык ОДБ)",
-                "На улице (+1 Навык ОББ)",
-                "С вольным народом (+1 Вождение)",
-                "Беспризорник (+1 к Поиску)",
-                "Тебя нашли на улице (+1 Выживание)",
-                "Тебя подкинули богатой семье (+1 Бюрократия)",
-                "Тебя украли из лаборатории (+1 Техническое чудо)",
-                "Среди Технолибертарианцев",
-                "Ты не помнишь (+1 Удача)",
-                "В богатой обеспеченной семье (+1 Внешний вид)",
-                "Во время войны (+1 Уклонение)"
-            ]
-        },
-        childhood: {
-            title: "Ты рос",
-            options: [
-                "С дворовыми пацанами",
-                "В гиперзаботе и гиперопеке",
-                "Спокойно и без приключений",
-                "Постоянно расшибал коленки и всем было плевать",
-                "Почему-то был голоден и воровал еду",
-                "В постоянных разъездах или командировках",
-                "В тире, среди бородатых мужиков с ружьями",
-                "Где-то в дикой природе в палатке",
-                "В дорогой престижной школе, смотря на мир из окон небоскрёба",
-                "Сколотил подростковую банду",
-                "Избивал бомжей на видео и выкладывал это в Сеть",
-                "Был нелюдимым ребенком, смотрел мультики, избегал других детей"
-            ]
-        },
-        teenEvent: {
-            title: "Что-то важное случилось в подростковом возрасте",
-            options: [
-                "Нет, не случилось (+1 ЛВК)",
-                "Нашёл кучу денег (+1 УДАЧА)",
-                "Потерял важного человека (+1 ВОЛЯ)",
-                "Крайне неудачная первая любовь (+1 ХАР)",
-                "Угнал не ту тачку (+1 ТЕХ)",
-                "Связался с плохими людьми (+1 ТЕЛО)",
-                "Подсел на наркоту (+1 зависимость)",
-                "Любовь изменила твою жизнь (+1 ХАР)",
-                "Потерял доверенное тебе (-1 репутация)",
-                "Случайно кого-то убил (+1 РЕА)",
-                "Познакомился с важной шишкой (+1000уе в крипте)",
-                "Пытался сделать бизнес и прогорел (10 000уе долга перед инвесторами)"
-            ]
-        },
-        love: {
-            title: "История любви с... (выбери или придумай персонажа)",
-            options: [
-                "Всегда по-настоящему любил только себя",
-                "Были знакомы с самого детства",
-                "Случайно пересеклись в толпе",
-                "Познакомились на работе",
-                "Какая-то фанатка бегает за мной много лет",
-                "Бегал за ней много лет, и она сжалилась",
-                "Вечная френдзона, но я добьюсь",
-                "Отбил у друга",
-                "Отбил у врага",
-                "Зашел в магазин, а там он/-а на кассе",
-                "Светлая любовь с первого взгляда",
-                "Меня никто не любит"
-            ]
-        },
-        enemy: {
-            title: "История вражды с... (выбери или придумай персонажа)",
-            options: [
-                "С детства ненавидим друг друга",
-                "...задел плечом в топле",
-                "...увёл любовь",
-                "...украл что-то",
-                "...враг семьи",
-                "...убил кого-то важного",
-                "...забрал себе работу",
-                "...подставил перед законом",
-                "\"Срёт в кашу сколько его помню\"",
-                "Просто лицо у ... слишком мерзкое/милое",
-                "...подставил перед бандитами",
-                "У меня нет врагов"
-            ]
-        },
-        guilt: {
-            title: "Кто на самом деле виноват в вашей вражде",
-            options: [
-                "Конечно он",
-                "Какое-то третье лицо",
-                "Его друг",
-                "Мой друг",
-                "Случайность",
-                "Конечно я"
-            ]
-        },
-        revenge: {
-            title: "Как произойдет месть обидчику",
-            options: [
-                "Придёт толпа народу с битами",
-                "Унизит в Сети",
-                "Постарается подставить в тяжком преступлении",
-                "Один на один на ножах",
-                "Ждёт серьёзный разговор",
-                "Периодически появляется и делает мелкие пакости",
-                "Наймёт киллера. Или двух…или сколько потребуется",
-                "Будет пытаться сорвать работу",
-                "Будет шпионить и предупреждать врагов… если они его не пристрелят",
-                "Постарается убить в самый неподходящий момент (задавить машиной/застрелить/прислать вирус через Сеть и пр.)",
-                "Простит и продолжить жить дальше",
-                "Не станет марать руки, но не простит"
-            ]
-        },
-        reason: {
-            title: "Почему ты здесь",
-            options: [
-                "Нужна работа",
-                "Дома скучно",
-                "Долги напоминают о себе",
-                "Хочу купить что-то дорогое",
-                "Устал жить терпилой",
-                "Потому что я — БЕЗУМЕЦ",
-                "Позвали в приложении знакомств сюда",
-                "Потому что я должен быть тут",
-                "Это моя работа",
-                "Хочу показать себя для (указать персонажа)",
-                "Долг зовёт (это важно для тебя с моральной точки зрения)",
-                "Я до сих пор сам не понимаю"
-            ]
-        },
-        meeting: {
-            title: "Как ты познакомился с… (Выбери одного из группы и укажи отношения с ним)",
-            options: [
-                "Я должен доказать, что я лучше, чем…",
-                "…требуется моя защита.",
-                "Отдаю … долг.",
-                "Я поклялся себе защищать …",
-                "Я хочу затащить в постель …",
-                "Я хочу помочь с работой … а потом удрать с его бабками.",
-                "Я просто не могу отпустить … одну/одного.",
-                "Почувствовал, что … грозит опасность.",
-                "У меня заказ на голову … Но это должен выглядеть, как несчастный случаей.",
-                "Узнал, что за голову … награда и должен защитить.",
-                "Однажды Эрнест Хэмингуэй поспорил...",
-                "Да я плевал на всех них. Работа есть работа, если они все помрут, я и глазом не моргну."
-            ]
-        },
-        moneyAttitude: {
-            title: "Твоё отношение к деньгам",
-            options: [
-                "Мусор",
-                "Инструмент",
-                "Цель в жизни",
-                "Необходимость",
-                "У меня их, как грязи",
-                "Готов убить за них",
-                "Честь превыше денег",
-                "За разумную цену могу всё",
-                "Хочу все деньги мира",
-                "Ненавижу их, из-за них все проблемы",
-                "Деньги, как деньги. Без них нельзя, но они не сама цель",
-                "Деньги нужно уничтожить!"
-            ]
-        },
-        peopleAttitude: {
-            title: "Твоё отношение к людям",
-            options: [
-                "Мусор",
-                "Инструмент",
-                "Хочу нравиться всем",
-                "Общение с людьми не более чем необходимость",
-                "Я душа кампании",
-                "Готов на всё, если человек в опасности",
-                "Моя жизнь важнее",
-                "Если человек выгоден мне – я выгоден ему",
-                "Хочу известности на весь мир",
-                "Ненавижу их, из-за них все проблемы",
-                "Люди, как люди. Без них нельзя, но мне на них плевать",
-                "Они не знают, но я сам не человек. Я не знаю как сюда попал. Нельзя, чтобы они узнали мою тайну."
-            ]
-        },
-        recentEvent: {
-            title: "Внезапное событие на прошлой неделе",
-            options: [
-                "Потерял состояние (у тебя нет стартовых денег)",
-                "Убили близкого (выбери персонажа/человека из предыстории, который по твоему мнению сейчас мёртв)",
-                "Украли любимую вещь (выбери любую вещь стоимостью до 5000 уе, которую у тебя украли и ты можешь её вернуть)",
-                "Угнали любимую машину (твою стартовую машину угнали)",
-                "Убили любимую собаку (ты получаешь бесплатный дробовик, пачку зажигательных и ненависть)",
-                "Обнесли жилье (в твоей квартире ничего не осталось, кроме 1 комплекта одежды, в котором ты сейчас, и компьютера, вмонтированного в стену)",
-                "Нашел труп корпората в мусорке (получи корпоративную ID-карточку и самонаводящйся пистолет, являющийся собственностью этой корпорации)",
-                "Нашёл загадочный чип (получи щепку с ИИ, этот ИИ может использоваться Мастер, как еще 1 персонаж)",
-                "Жёстко проебался на деле, но вынес \"трофей\" (пропиши себе любой нарративный предмет стоимость 5000уе, за владельца этой вещи — тебя — назначена награда, но никто не знает у кого она)",
-                "Нашел загадочный чемодан с ДНК замком, который Сёрфер не смог открыть (у тебя есть закрытый ДНК-замком противоударный кейс. Все попытки его взломать или открыть — проваливаются. Что внутри не ясно, кто владелец — тоже, на ящике может быть логотип корпорации или узнаваемого человека)",
-                "Нашёл чип с крупной суммой денег (если ты его вставишь себе в порт, то получи бонусные 20.000 уе на старте, но после перевода твоя ЦНС как-то странно барахлит)",
-                "Ничего особенного не происходило"
-            ]
-        }
-    };
+    const backstoryTables = getBackstoryTables();
     
     // Состояние выбора
     let currentStep = 0;
@@ -2983,6 +2800,108 @@ function showManualBackstorySelection() {
             document.body.style.overflow = '';
         }
     });
+}
+
+// Выпадающий редактор предыстории (как при создании персонажа)
+function toggleBackstoryDropdownEditor() {
+    const editor = document.getElementById('backstoryDropdownEditor');
+    if (!editor) return;
+
+    if (editor.style.display === 'none' || editor.style.display === '') {
+        renderBackstoryDropdownEditor();
+        editor.style.display = 'block';
+    } else {
+        editor.style.display = 'none';
+    }
+}
+
+function renderBackstoryDropdownEditor() {
+    const editor = document.getElementById('backstoryDropdownEditor');
+    if (!editor) return;
+
+    const backstoryTables = getBackstoryTables();
+    const currentText = (state.backstory || document.getElementById('backstoryText')?.value || '').trim();
+    const currentElements = currentText ? parseBackstoryText(currentText) : [];
+    const currentMap = {};
+    currentElements.forEach(element => {
+        currentMap[element.title] = element.content;
+    });
+
+    const optionsHtml = Object.entries(backstoryTables).map(([key, table]) => {
+        const selected = currentMap[table.title] || '';
+        return `
+            <div class="input-group">
+                <label class="input-label">${escapeHtml(table.title)}</label>
+                <select class="input-field" id="backstorySelect_${key}">
+                    <option value="">— Не выбрано —</option>
+                    ${table.options.map(option => {
+                        const safeOption = escapeHtml(option);
+                        const isSelected = option === selected ? 'selected' : '';
+                        return `<option value="${safeOption}" ${isSelected}>${safeOption}</option>`;
+                    }).join('')}
+                </select>
+            </div>
+        `;
+    }).join('');
+
+    editor.innerHTML = `
+        <div class="backstory-dropdown-grid">
+            ${optionsHtml}
+        </div>
+        <div class="backstory-dropdown-actions">
+            <button class="pill-button muted-button" onclick="clearBackstoryDropdownSelection()">Очистить</button>
+            <button class="pill-button primary-button" onclick="applyBackstoryDropdownSelection()">Применить</button>
+        </div>
+    `;
+}
+
+function applyBackstoryDropdownSelection() {
+    const backstoryTables = getBackstoryTables();
+    let backstoryText = '';
+
+    Object.keys(backstoryTables).forEach((key) => {
+        const select = document.getElementById(`backstorySelect_${key}`);
+        if (!select || !select.value) return;
+        const value = unescapeHtml(select.value.trim());
+        if (value) {
+            backstoryText += `${backstoryTables[key].title}: ${value}. `;
+        }
+    });
+
+    const textarea = document.getElementById('backstoryText');
+    if (textarea) {
+        textarea.value = backstoryText.trim();
+        state.backstory = backstoryText.trim();
+        updateBackstoryDisplay();
+        scheduleSave();
+        showToast('Предыстория обновлена', 'success');
+    }
+}
+
+function clearBackstoryDropdownSelection() {
+    const backstoryTables = getBackstoryTables();
+    Object.keys(backstoryTables).forEach((key) => {
+        const select = document.getElementById(`backstorySelect_${key}`);
+        if (select) select.value = '';
+    });
+}
+
+function escapeHtml(text) {
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function unescapeHtml(text) {
+    return String(text)
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&');
 }
 
 // Функции для работы с аватаром
@@ -3246,6 +3165,13 @@ document.addEventListener('DOMContentLoaded', () => {
         initNumericInputs();
         renderWeapons();
         initFloatingLogDrag();
+        
+        // Инициализируем валидацию для integrated-numeric-field полей
+        setTimeout(() => {
+            if (typeof initializeIntegratedNumericFields === 'function') {
+                initializeIntegratedNumericFields();
+            }
+        }, 200);
         
         // Обновляем отображение брони после загрузки DOM
         setTimeout(() => {
@@ -4684,30 +4610,19 @@ function enhanceButtonsForTouch(modal) {
 // Функции для встроенных кнопок +/-
 
 function initializeNumericInputs() {
-    // Характеристики
-    createNumericInput('statINT', 1, 20);
-    createNumericInput('statDEX', 1, 20);
-    createNumericInput('statBODY', 1, 20);
-    createNumericInput('statTECH', 1, 20);
-    createNumericInput('statCHA', 1, 20);
-    createNumericInput('statREA', 1, 20);
-    createNumericInput('statWILL', 1, 20);
+    // ВАЖНО: Поля характеристик теперь используют integrated-numeric-input в HTML,
+    // поэтому не нужно создавать для них numeric-input-container через createNumericInput()
+    // Убраны: statINT, statDEX, statBODY, statTECH, statCHA, statREA, statWILL,
+    // luckCurrent, luckMax, awarenessCurrent, awarenessMax, experiencePoints, roleplayPoints
     
-    // Удача и осознанность
-    createNumericInput('luckCurrent', 0, 99);
-    createNumericInput('luckMax', 1, 99);
-    createNumericInput('awarenessCurrent', 0, 999);
-    createNumericInput('awarenessMax', 1, 999);
+    // Здоровье (если оно не использует integrated-numeric-input)
+    const healthInput = document.getElementById('healthCurrent');
+    if (healthInput && !healthInput.closest('.integrated-numeric-input')) {
+        createNumericInput('healthCurrent', 0, 999);
+    }
     
-    // Здоровье
-    createNumericInput('healthCurrent', 0, 999);
-    
-    // Очки обучения и ролевые очки
-    createNumericInput('experiencePoints', 0, 9999);
-    createNumericInput('roleplayPoints', 0, 9999);
-    
-    // Броня ОС - убрано для использования простых полей ввода
-    
+    // Другие поля, которые могут не использовать integrated-numeric-input
+    // (добавьте сюда только те поля, которые действительно нуждаются в createNumericInput)
 }
 
 // Инициализация определения сенсорного устройства при загрузке страницы
@@ -4954,6 +4869,69 @@ function decreaseStat(statName) {
         
         scheduleSave();
     }
+}
+
+// Универсальная функция для изменения значений полей (не характеристик)
+function changeStatValue(fieldId, delta, minValue, maxValue) {
+    const input = document.getElementById(fieldId);
+    if (!input) return;
+    
+    const currentValue = parseInt(input.value) || minValue;
+    let newValue = currentValue + delta;
+    
+    // Ограничиваем значения
+    newValue = Math.max(minValue, Math.min(maxValue, newValue));
+    
+    input.value = newValue;
+    
+    // Обновляем state в зависимости от поля
+    switch(fieldId) {
+        case 'experiencePoints':
+            state.experiencePoints = newValue;
+            break;
+        case 'roleplayPoints':
+            state.roleplayPoints = newValue;
+            break;
+        case 'awarenessCurrent':
+            state.awareness.current = newValue;
+            break;
+        case 'awarenessMax':
+            state.awareness.max = newValue;
+            break;
+        case 'luckCurrent':
+            state.luck.current = newValue;
+            break;
+        case 'luckMax':
+            state.luck.max = newValue;
+            break;
+    }
+    
+    // Вызываем событие change для обработчиков
+    input.dispatchEvent(new Event('change'));
+    scheduleSave();
+}
+
+// Инициализация валидации для integrated-numeric-field полей
+function initializeIntegratedNumericFields() {
+    // Находим все поля с классом integrated-numeric-field
+    const fields = document.querySelectorAll('.integrated-numeric-field');
+    
+    fields.forEach(input => {
+        // Устанавливаем тип text для правильного отображения
+        input.type = 'text';
+        input.inputMode = 'numeric';
+        
+        // Добавляем валидацию только цифр
+        input.addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+        
+        input.addEventListener('keypress', function(e) {
+            if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Escape', 'Enter'].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+    });
 }
 
 // Функции для управления уровнем навыков с кнопками +/-
@@ -6689,3 +6667,4 @@ function initCircuitParallax() {
 document.addEventListener('DOMContentLoaded', function() {
     initCircuitParallax();
 });
+

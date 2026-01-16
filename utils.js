@@ -355,6 +355,9 @@ function createNumericInput(inputId, min = 0, max = 999, step = 1) {
     const input = document.getElementById(inputId);
     if (!input) return;
     
+    // Проверяем, не находится ли input уже внутри integrated-numeric-input
+    if (input.closest('.integrated-numeric-input')) return;
+    
     // Проверяем, не создан ли уже контейнер
     if (input.parentElement.classList.contains('numeric-input-container')) return;
     
