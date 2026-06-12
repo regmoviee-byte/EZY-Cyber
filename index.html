@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EZY: Cyber // Контрольная панель</title>
+  <meta name="description" content="Цифровой интерфейс для настольной ролевой игры EZY: Cyber — лист персонажа, боевая система, кибернетика, снаряжение и пульт Мастера в одном приложении.">
+  <!-- Open Graph / Telegram / VK -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://ezy-serfing.ru/">
+  <meta property="og:site_name" content="EZY: Cyber">
+  <meta property="og:title" content="EZY: Cyber // Контрольная панель">
+  <meta property="og:description" content="Цифровой интерфейс для настольной ролевой игры EZY: Cyber — лист персонажа, боевая система, кибернетика, снаряжение и пульт Мастера в одном приложении.">
+  <meta property="og:image" content="https://static.tildacdn.com/tild3037-6565-4133-b430-363832636466/IMG_8068.PNG">
+  <meta property="og:image:secure_url" content="https://static.tildacdn.com/tild3037-6565-4133-b430-363832636466/IMG_8068.PNG">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:alt" content="EZY: Cyber — контрольная панель для настольной RPG">
+  <meta property="vk:image" content="https://ezy-serfing.ru/og-image.jpg">
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="EZY: Cyber // Контрольная панель">
+  <meta name="twitter:description" content="Цифровой интерфейс для настольной ролевой игры EZY: Cyber — лист персонажа, боевая система, кибернетика, снаряжение и пульт Мастера в одном приложении.">
+  <meta name="twitter:image" content="https://static.tildacdn.com/tild3037-6565-4133-b430-363832636466/IMG_8068.PNG">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800;900&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="./assets/index-BfbwFv9x.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CKXjq9R0.css">
+</head>
+<body>
+
+<!-- ══ BOOT SCREEN ══════════════════════════════════════════════════════════ -->
+<div id="boot-screen" class="boot-screen">
+  <!-- Falling binary digits background -->
+  <div class="boot-digits" aria-hidden="true">
+    <span class="boot-digit-col" style="left:3%;animation-duration:7s;animation-delay:0s">0·1·0·1·0·0·1·1·0·1·0·1·1·0·0·1·0·1·1·0·1·0·0·1</span>
+    <span class="boot-digit-col" style="left:9%;animation-duration:5s;animation-delay:-1.4s">1·0·0·1·1·0·1·0·0·1·1·1·0·1·0·1·0·0·1·0·1·1·0·0</span>
+    <span class="boot-digit-col" style="left:16%;animation-duration:9s;animation-delay:-0.7s">0·1·1·0·0·1·0·1·1·0·1·0·0·1·1·0·0·1·0·1·0·1·1·0</span>
+    <span class="boot-digit-col" style="left:24%;animation-duration:6s;animation-delay:-3s">1·0·1·1·0·0·1·1·0·1·0·1·0·0·1·1·0·1·0·0·1·0·1·1</span>
+    <span class="boot-digit-col" style="left:35%;animation-duration:8s;animation-delay:-2s">0·0·1·0·1·1·0·1·0·0·1·0·1·1·0·1·0·1·0·0·1·1·0·1</span>
+    <span class="boot-digit-col" style="left:47%;animation-duration:5.5s;animation-delay:-0.4s">1·1·0·0·1·0·1·0·1·1·0·0·1·0·1·0·1·1·0·1·0·0·1·0</span>
+    <span class="boot-digit-col" style="left:58%;animation-duration:7.5s;animation-delay:-1s">0·1·0·1·1·0·0·1·0·1·0·1·1·0·1·0·0·1·1·0·1·0·1·0</span>
+    <span class="boot-digit-col" style="left:69%;animation-duration:6.5s;animation-delay:-2.5s">1·0·1·0·0·1·1·0·1·1·0·1·0·1·0·0·1·0·1·1·0·1·0·1</span>
+    <span class="boot-digit-col" style="left:78%;animation-duration:8.5s;animation-delay:-0.2s">0·1·1·0·1·0·1·0·0·1·0·1·1·0·0·1·1·0·1·0·1·0·0·1</span>
+    <span class="boot-digit-col" style="left:88%;animation-duration:5.8s;animation-delay:-1.8s">1·0·0·1·0·1·0·1·1·0·1·0·0·1·0·1·1·0·0·1·0·1·1·0</span>
+    <span class="boot-digit-col" style="left:94%;animation-duration:7.2s;animation-delay:-3.5s">0·1·0·0·1·1·0·1·0·1·0·0·1·1·0·1·0·1·0·1·0·0·1·1</span>
+  </div>
+  <!-- Scanlines -->
+  <div class="boot-scanlines" aria-hidden="true"></div>
+
+  <div class="boot-content">
+    <div class="boot-logo-line">EZY:<em>CYBER</em></div>
+    <div class="boot-subtitle">// СИСТЕМА ИНИЦИАЛИЗАЦИИ ПЕРСОНАЖА //</div>
+
+    <div class="boot-spinner-row">
+      <div class="boot-spinner"></div>
+      <div class="boot-spinner-inner"></div>
+      <span class="boot-spinner-label" id="boot-module-name">ЗАПУСК...</span>
+    </div>
+
+    <div class="boot-console" id="boot-console"></div>
+
+    <div class="boot-progress-wrap">
+      <div class="boot-progress-bar-outer">
+        <div class="boot-progress-bar-fill" id="boot-fill"></div>
+      </div>
+      <div class="boot-progress-numbers">
+        <span id="boot-status-text">ОС: ИНИЦИАЛИЗАЦИЯ</span>
+        <span id="boot-pct">0%</span>
+      </div>
+    </div>
+
+    <div class="boot-progress-pct" id="boot-big-pct">0%</div>
+  </div>
+</div>
+
+<!-- ══ ROLE SELECT ═══════════════════════════════════════════════════════════ -->
+<div id="role-select">
+  <div class="role-select__inner">
+    <div class="role-select__brand">
+      <img class="role-select__logo-img"
+           src="https://static.tildacdn.com/tild3236-3137-4663-b033-313466366130/__.png"
+           alt="EZY:CYBER" onerror="this.parentElement.innerHTML='EZY:<em>CYBER</em>';this.parentElement.classList.add('role-select__brand--text')">
+    </div>
+    <div class="role-select__subtitle">// ВЫБЕРИТЕ РАБОЧЕЕ ПРОСТРАНСТВО //</div>
+    <div class="role-select__buttons">
+      <button class="role-btn role-btn--citizen" id="role-citizen">
+        <span class="role-btn__icon"><img
+          src="https://static.tildacdn.com/tild3363-6531-4132-a138-663132646531/remote-control.png"
+          alt="" onerror="this.replaceWith(document.createTextNode('🧑'))"></span>
+        <span class="role-btn__title">Я — ГРАЖДАНИН</span>
+        <span class="role-btn__desc">Интерфейс персонажа</span>
+      </button>
+      <button class="role-btn role-btn--mentor" id="role-mentor">
+        <span class="role-btn__icon"><img
+          src="https://static.tildacdn.com/tild3633-6632-4463-a435-353036636235/live-streaming.png"
+          alt="" onerror="this.replaceWith(document.createTextNode('🎭'))"></span>
+        <span class="role-btn__title">Я — МЕНТОР</span>
+        <span class="role-btn__desc">Пульт мастера игры</span>
+      </button>
+    </div>
+    <label class="role-remember">
+      <input type="checkbox" id="role-remember-cb">
+      <span>Запомнить мой выбор (до очистки данных)</span>
+    </label>
+    <div class="role-select__system">
+      <span>работает на</span>
+      <img class="role-select__system-img"
+           src="https://static.tildacdn.com/tild3037-6565-4133-b430-363832636466/IMG_8068.PNG"
+           alt="система" onerror="this.style.display='none'">
+    </div>
+  </div>
+</div>
+
+<!-- ══ DEATH OVERLAY ═════════════════════════════════════════════════════════ -->
+<div id="death-overlay" style="display:none" aria-hidden="true">
+  <div class="death-bg"></div>
+  <div class="death-vignette"></div>
+</div>
+
+<div id="app">
+
+  <!-- ══ TOP BAR ══════════════════════════════════════════════════════════════ -->
+  <header class="topbar">
+    <div class="topbar__logo">
+      <span>EZY</span>:<em>CYBER</em> // ИНТЕРФЕЙС ПЕРСОНАЖА
+    </div>
+    <div class="topbar__status">
+      <span class="topbar__dot"></span>
+      СИСТЕМА ОНЛАЙН
+    </div>
+    <div class="topbar__actions">
+      <button class="btn btn--ghost" id="btn-to-mentor" title="Переключиться в пространство Ментора">Я — МЕНТОР</button>
+      <button class="btn btn--ghost" id="btn-new-note">+ ЗАМЕТКА</button>
+      <button class="btn btn--ghost" id="btn-fence">СКУПЩИК</button>
+      <button class="btn btn--ghost" id="btn-import">ИМПОРТ</button>
+      <button class="btn btn--accent" id="btn-export">ЭКСПОРТ</button>
+      <button class="btn btn--ghost" id="btn-reset-all" title="Полностью очистить все данные приложения" style="color:#e53935;border-color:#e53935">УДАЛИТЬ ВСЁ</button>
+    </div>
+  </header>
+
+  <!-- ══ TAB NAV ══════════════════════════════════════════════════════════════ -->
+  <nav class="tabnav" id="tabnav">
+    <!-- Бургер (только мобилка) -->
+    <button class="tabnav__burger" id="tabnav-burger" aria-label="Навигация">
+      <span class="tabnav__burger-bar"></span>
+      <span class="tabnav__burger-bar"></span>
+      <span class="tabnav__burger-bar"></span>
+    </button>
+    <span class="tabnav__current" id="tabnav-current">СВОДКА</span>
+    <!-- Пункты меню -->
+    <div class="tabnav__items" id="tabnav-items">
+      <button class="tab-btn tab-btn--active" data-tab="dashboard">Сводка</button>
+      <button class="tab-btn" data-tab="identity">Личность</button>
+      <button class="tab-btn" data-tab="attributes">Характеристики</button>
+      <button class="tab-btn" data-tab="skills">Навыки</button>
+      <button class="tab-btn" data-tab="dice">Бросок</button>
+      <button class="tab-btn" data-tab="weapons">Оружие</button>
+      <button class="tab-btn" data-tab="equipment">Снаряжение</button>
+      <button class="tab-btn" data-tab="cybernetics">Кибернетика</button>
+      <button class="tab-btn" data-tab="surf">Сёрфинг</button>
+      <button class="tab-btn" data-tab="transport">Транспорт</button>
+      <button class="tab-btn" data-tab="housing">Недвижимость</button>
+      <button class="tab-btn" data-tab="drugs">Препараты</button>
+      <button class="tab-btn" data-tab="condition">Удача, отдых и травмы</button>
+    </div>
+  </nav>
+
+  <!-- ══ CONTENT ══════════════════════════════════════════════════════════════ -->
+  <main class="content">
+
+    <!-- ── DASHBOARD ─────────────────────────────────────────────────────────── -->
+    <section id="tab-dashboard" class="tab-panel tab-panel--active">
+      <div class="section-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:0">
+          <span class="section-num">00</span>
+          <h2 class="section-title">Сводка персонажа</h2>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button id="btn-physics-dice" class="btn btn--accent btn--sm"
+            style="font-size:11px;letter-spacing:.12em;padding:6px 14px">
+            🎲 БРОСИТЬ КОСТИ
+          </button>
+          <button id="btn-remove-dice" class="btn btn--sm"
+            style="font-size:11px;letter-spacing:.12em;padding:6px 14px;
+              background:#c0392b;color:#fff;border:none;display:none">
+            🗑 УБРАТЬ КОСТИ
+          </button>
+          <button id="btn-draw-zone" class="btn btn--sm"
+            style="font-size:11px;letter-spacing:.12em;padding:6px 14px;
+              background:transparent;color:var(--c-accent2);border:2px solid var(--c-accent2)">
+            🎯 ЗОНА
+          </button>
+        </div>
+      </div>
+      <div id="dashboard-panel"></div>
+    </section>
+
+    <!-- ── IDENTITY ─────────────────────────────────────────────────────────── -->
+    <section id="tab-identity" class="tab-panel">
+      <div class="section-head" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:0">
+          <span class="section-num">01</span>
+          <h2 class="section-title">Личность персонажа</h2>
+        </div>
+        <div class="section-actions">
+          <button class="btn btn--accent" id="btn-generate-char">🎲 СГЕНЕРИРОВАТЬ</button>
+        </div>
+      </div>
+
+      <!-- Portrait + Identity grid -->
+      <div class="identity-grid">
+        <!-- Portrait -->
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+          <div class="portrait-upload" id="portrait-upload" title="Нажмите для загрузки фото">
+            <img id="portrait-img" class="portrait-upload__img" src="" alt="Портрет" style="display:none">
+            <div class="portrait-upload__placeholder" id="portrait-placeholder">
+              <span class="portrait-upload__icon">⬛</span>
+              <span class="portrait-upload__text">ЗАГРУЗИТЬ<br>ПОРТРЕТ<br>4:3</span>
+            </div>
+            <input type="file" id="portrait-file" accept="image/*" style="display:none">
+          </div>
+          <button class="btn btn--accent btn--sm" id="btn-portrait-paint"
+            style="width:100%;font-size:9px;letter-spacing:.15em;padding:5px 0">🎨 РИСОВАТЬ</button>
+        </div>
+
+        <!-- Fields -->
+        <div>
+          <div class="card card--yellow" style="margin-bottom:12px">
+            <span class="card__label">Идентификация</span>
+            <div class="grid-2">
+              <div class="field">
+                <label class="field__label">Имя / Псевдоним</label>
+                <input class="field__input" id="field-name" type="text" placeholder="Введите имя…" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="field__label">Позывной (хэндл)</label>
+                <input class="field__input" id="field-handle" type="text" placeholder="Ваш хэндл…" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="field__label">Фракция / Принадлежность</label>
+                <input class="field__input" id="field-faction" type="text" placeholder="Корпорация, банда…" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="field__label">Возраст</label>
+                <input class="field__input" id="field-age" type="text" placeholder="…" autocomplete="off">
+              </div>
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="card" style="margin:0">
+              <span class="card__label">Внешность</span>
+              <textarea class="field__textarea" id="field-appearance" rows="3"
+                placeholder="Опишите внешний вид персонажа…"></textarea>
+            </div>
+            <div class="card" style="margin:0">
+              <span class="card__label">Предыстория</span>
+              <textarea class="field__textarea" id="field-background" rows="3"
+                placeholder="История персонажа…"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- История персонажа -->
+      <div class="card" style="margin-top:16px">
+        <span class="card__label">История персонажа</span>
+        <div class="grid-2" style="gap:10px">
+          <div class="field">
+            <label class="field__label">Ты родился…</label>
+            <textarea class="field__textarea" id="field-born" rows="2" placeholder="Где и в каких условиях…"></textarea>
+          </div>
+          <div class="field">
+            <label class="field__label">Ты рос…</label>
+            <textarea class="field__textarea" id="field-raised" rows="2" placeholder="Как прошло детство и юность…"></textarea>
+          </div>
+          <div class="field">
+            <label class="field__label">Важное событие в подростковом возрасте</label>
+            <textarea class="field__textarea" id="field-teen-event" rows="2" placeholder="Что изменило тебя…"></textarea>
+          </div>
+          <div class="field">
+            <label class="field__label">Почему ты здесь?</label>
+            <textarea class="field__textarea" id="field-why-here" rows="2" placeholder="Твоя цель и мотивация…"></textarea>
+          </div>
+          <div class="field">
+            <label class="field__label">История любви с…</label>
+            <textarea class="field__textarea" id="field-love-story" rows="2" placeholder="Имя и история…"></textarea>
+          </div>
+          <div class="field">
+            <label class="field__label">История вражды с…</label>
+            <textarea class="field__textarea" id="field-rivalry" rows="2" placeholder="Имя и история…"></textarea>
+          </div>
+          <div class="field">
+            <label class="field__label">Кто виноват в вашей вражде?</label>
+            <textarea class="field__textarea" id="field-rivalry-cause" rows="2" placeholder="Причина вражды…"></textarea>
+          </div>
+          <div class="field">
+            <label class="field__label">Как проходит месть сейчас?</label>
+            <textarea class="field__textarea" id="field-current-situation" rows="2" placeholder="Текущая ситуация…"></textarea>
+          </div>
+          <div class="field">
+            <label class="field__label">Как ты познакомился с командой?</label>
+            <textarea class="field__textarea" id="field-how-met-team" rows="2" placeholder="История знакомства…"></textarea>
+          </div>
+          <div class="field">
+            <label class="field__label">Важное событие на прошлой неделе</label>
+            <textarea class="field__textarea" id="field-last-week" rows="2" placeholder="Что произошло…"></textarea>
+          </div>
+          <div class="field">
+            <label class="field__label">Твоё отношение к деньгам</label>
+            <input class="field__input" id="field-money-attitude" type="text" placeholder="Жадный? Щедрый? Безразличен?">
+          </div>
+          <div class="field">
+            <label class="field__label">Твоё отношение к людям</label>
+            <input class="field__input" id="field-people-attitude" type="text" placeholder="Циник? Альтруист? Параноик?">
+          </div>
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label class="field__label">Твои контакты</label>
+          <textarea class="field__textarea" id="field-contacts" rows="3" placeholder="Имена, роли, связи…"></textarea>
+        </div>
+      </div>
+
+      <!-- Professional Skills -->
+      <div class="card" style="margin-top:16px">
+        <span class="card__label">Профессиональные навыки — до 4 одновременно из любых профессий</span>
+        <p class="attr-formula-note" style="margin-bottom:12px">
+          Каждый персонаж может изучать до 4 Профессиональных навыков любых профессий. Ранг 0–10. Стартовые очки: 10 СО (1 уровень = 1 СО, 5-й уровень = 2 СО).
+        </p>
+        <div class="profskill-adder" id="profskill-adder">
+          <button class="btn btn--purple" id="profskill-browse-btn">📖 ВЫБРАТЬ НАВЫК</button>
+          <span id="profskill-count-hint" class="profskill-count-hint"></span>
+        </div>
+        <div id="profskills-list" class="profskills-list"></div>
+      </div>
+
+      <div class="tape" style="margin-top:16px"></div>
+
+      <div class="credits-block">
+        <img src="https://static.tildacdn.com/tild3939-6162-4633-a238-623334613265/photo.png"
+          class="credits-ezy-logo" alt="EZY" onerror="this.style.display='none'">
+        <span class="credits-label">уе</span>
+        <input class="credits-input" id="field-credits" type="number" min="0" value="0">
+      </div>
+    </section>
+
+    <!-- ── ATTRIBUTES ────────────────────────────────────────────────────────── -->
+    <section id="tab-attributes" class="tab-panel">
+      <div class="section-head">
+        <span class="section-num">02</span>
+        <h2 class="section-title">Характеристики</h2>
+      </div>
+
+      <div class="card card--yellow">
+        <span class="card__label">Формула броска: Навык + Характеристика + 2d6 = Результат</span>
+        <p class="attr-formula-note">
+          Провал (1 на любом d6): −1d4 к результату &nbsp;|&nbsp;
+          Успех (6 на любом d6): +1d4 к результату &nbsp;|&nbsp;
+          Оба 1: Экст. провал (катастрофа) &nbsp;|&nbsp;
+          Оба 6: Экст. успех (максимум) &nbsp;|&nbsp;
+          Одновременно 1 и 6: Патовая ситуация — без бонуса/штрафа
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="attrs-card-header">
+          <span class="card__label">Врождённые характеристики</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span style="font-family:var(--font-mono);font-size:11px;font-weight:900;color:var(--c-accent2);
+              letter-spacing:.04em;max-width:200px;line-height:1.4;text-align:right">
+              Переключите кнопку в состояние «ИГРА», чтобы изменение Характеристик не влияло на связанные характеристики в процессе игры!
+            </span>
+            <button id="btn-stats-lock" class="stats-lock-btn" title="В режиме игры: изменение атрибутов не пересчитывает производные характеристики">🔓 СОЗДАНИЕ</button>
+          </div>
+        </div>
+        <div class="grid-4" id="attrs-grid"></div>
+      </div>
+
+      <div class="card" style="margin-top:0">
+        <span class="card__label">Производные характеристики</span>
+        <div id="derived-stats" class="derived-stats"></div>
+      </div>
+
+      <!-- ПЗ и Осознанность -->
+      <div class="card" style="margin-top:0">
+        <span class="card__label">Ресурсы персонажа</span>
+
+        <div id="pz-warning" class="pz-warning" style="display:none">
+          ⚠&nbsp; КРИТИЧЕСКОЕ СОСТОЯНИЕ — ПЗ ≤ 5. Любой урон смертельно опасен.
+          При каждом провале проверки Мастер назначает Критическую травму или спасбросок.
+        </div>
+
+        <!-- ПЗ -->
+        <div class="resource-section">
+          <div class="resource-header">
+            <span class="resource-name">ПУНКТЫ ЗДОРОВЬЯ (ПЗ)</span>
+            <span class="resource-formula">= (ТЕЛО + ВОЛЯ) × 2</span>
+          </div>
+          <div class="hp-bar" style="margin:8px 0">
+            <div class="hp-bar__fill" id="pz-bar"></div>
+          </div>
+          <div class="hp-inputs">
+            <label class="field__label">Текущее</label>
+            <input id="pz-current" type="number" min="-99" class="hp-input" value="4">
+            <span class="hp-sep">/</span>
+            <span class="hp-max-label">Макс:</span>
+            <span class="hp-max-val" id="pz-max-display">4</span>
+          </div>
+          <p class="attr-formula-note" style="margin-top:8px;font-size:9px">
+            Естественное заживление: +ТЕЛО ПЗ в сутки (в покое). ЛайфСтим: восстанавливает 2×(ТЕЛО+ВОЛЯ) немедленно.
+          </p>
+        </div>
+
+        <!-- Осознанность -->
+        <div class="resource-section" style="margin-top:16px">
+          <div class="resource-header">
+            <span class="resource-name">ОСОЗНАННОСТЬ (ОС)</span>
+            <span class="resource-formula">= УМ × 2</span>
+          </div>
+          <div class="hp-bar" style="margin:8px 0">
+            <div class="hp-bar__fill hp-bar__fill--os" id="os-bar"></div>
+          </div>
+          <div class="hp-inputs">
+            <label class="field__label">Текущее</label>
+            <input id="os-current" type="number" min="0" class="hp-input" value="2">
+            <span class="hp-sep">/</span>
+            <span class="hp-max-label">Макс:</span>
+            <span class="hp-max-val" id="os-max-display">2</span>
+          </div>
+          <p class="attr-formula-note" style="margin-top:8px;font-size:9px">
+            Урон Осознанности: потеря человечности, психические травмы, смерть клона (4d6). Лечение в госпитале.
+          </p>
+        </div>
+
+        <!-- Armor Type Selector -->
+        <div id="armor-type-selector" style="margin-top:20px"></div>
+
+        <!-- Armor Display -->
+        <div class="armor-row" style="margin-top:12px">
+          <div class="armor-row__item">
+            <span class="armor-row__label">БРОНЯ ТЕЛА (ВОС)</span>
+            <input class="armor-val-input" id="armor-body-val" type="number" min="0" max="99" value="1"
+              title="Текущая броня тела. Уменьшается от попаданий. Начальное значение = ВОС.">
+          </div>
+          <div class="armor-row__item">
+            <span class="armor-row__label">БРОНЯ ГОЛОВЫ</span>
+            <input class="armor-val-input" id="armor-head-val" type="number" min="0" max="99" value="0"
+              title="Броня головы (шлем и т.д.). По умолчанию 0.">
+          </div>
+          <button class="armor-reset-btn" id="btn-reset-armor" title="Сбросить броню тела до базового ВОС">↺ СБРОСИТЬ</button>
+        </div>
+
+        <!-- Damage Section moved to dashboard (Сводка) -->
+
+      </div>
+    </section>
+
+    <!-- ── SKILLS ────────────────────────────────────────────────────────────── -->
+    <section id="tab-skills" class="tab-panel">
+      <div class="section-head">
+        <span class="section-num">03</span>
+        <h2 class="section-title">Навыки</h2>
+      </div>
+      <div class="card">
+        <span class="card__label">Навык (ранг) + Характеристика + 2d6 = Проверка</span>
+        <p class="attr-formula-note">Навыки с уровнем 0 нельзя использовать (кроме Ближнего и Дальнего боя). ×2ОО — двойная стоимость прокачки.</p>
+        <div id="skills-list"></div>
+      </div>
+    </section>
+
+    <!-- ── DICE ROLLER ───────────────────────────────────────────────────────── -->
+    <section id="tab-dice" class="tab-panel">
+      <div class="section-head">
+        <span class="section-num">04</span>
+        <h2 class="section-title">Бросок кубиков</h2>
+      </div>
+
+      <div class="grid-2" style="align-items:start;gap:20px" id="dice-panel">
+        <div class="card" style="margin:0">
+          <span class="card__label">Настройка броска</span>
+
+          <div class="field">
+            <label class="field__label">Навык персонажа</label>
+            <select class="field__input" id="dice-skill"></select>
+          </div>
+
+          <div class="field" style="margin-top:10px">
+            <label class="field__label">Характеристика для броска (можно изменить)</label>
+            <select class="field__input" id="dice-attr"></select>
+          </div>
+
+          <div class="field" style="margin-top:10px">
+            <label class="field__label">Сложность (СЛ)</label>
+            <select class="field__input" id="dice-diff"></select>
+          </div>
+
+          <div class="field" style="margin-top:10px">
+            <label class="field__label">Ручной модификатор (+ или −)</label>
+            <input class="field__input" id="dice-modifier" type="number" value="0"
+              style="text-align:center;max-width:120px;font-family:var(--font-mono);font-weight:900;font-size:18px">
+          </div>
+
+          <button class="btn btn--accent" id="btn-roll"
+            style="margin-top:16px;width:100%;justify-content:center;padding:12px 0;font-size:12px">
+            🎲 БРОСИТЬ 2d6
+          </button>
+
+          <!-- Luck display + reroll -->
+          <div class="dice-luck-bar" style="margin-top:10px">
+            <span class="dice-luck-bar__label">✦ УДАЧА:</span>
+            <span class="dice-luck-bar__val" id="dice-luck-info">1 / 1</span>
+          </div>
+          <button class="btn btn--luck" id="btn-spend-luck" disabled
+            style="margin-top:6px;width:100%;justify-content:center;padding:10px 0;font-size:11px">
+            ↺ ПОТРАТИТЬ 1 УДАЧУ — ПЕРЕБРОСИТЬ
+          </button>
+
+          <!-- ПЗ warning in dice -->
+          <div id="dice-pz-warning" class="pz-warning" style="display:none;margin-top:12px">
+            ⚠ ПЗ ≤ 5 — персонаж при смерти!
+          </div>
+
+          <div class="tape" style="margin-top:16px"></div>
+
+          <div class="card__label" style="margin-top:16px">Таблица сложностей</div>
+          <table class="diff-table">
+            <thead><tr><th>Уровень</th><th>СЛ</th><th>Описание</th></tr></thead>
+            <tbody>
+              <tr><td>Мелочь</td><td>10</td><td>Мимо ошибка не промахнёшь</td></tr>
+              <tr><td>Ерунда</td><td>13</td><td>Сто раз так делал</td></tr>
+              <tr><td>Только учусь</td><td>16</td><td>Начал серьёзно осваивать дело</td></tr>
+              <tr><td>Профессионал</td><td>19</td><td>Имеет большой опыт</td></tr>
+              <tr><td>Выполнимо</td><td>22</td><td>Задача для лучших из мастеров</td></tr>
+              <tr><td>Сложно</td><td>25</td><td>Без помощи вряд ли выйдет</td></tr>
+              <tr><td>Невыносимо</td><td>28</td><td>Лучше найти другой способ</td></tr>
+              <tr><td>Невозможно</td><td>31</td><td>Только единицы способны — нужна удача</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card" style="margin:0">
+          <span class="card__label">Результат</span>
+          <div id="dice-result" class="dice-result-area">
+            <p class="inv-empty">Настрой бросок и нажми кнопку</p>
+          </div>
+
+          <div class="tape" style="margin-top:16px"></div>
+
+          <!-- ── Боевые броски ─────────────────────────── -->
+          <div class="card__label" style="margin-top:16px">Боевые броски</div>
+
+          <!-- Инициатива -->
+          <div style="margin-top:10px">
+            <button class="btn" id="btn-roll-init"
+              style="width:100%;justify-content:center;padding:9px 0;font-size:11px;border-color:var(--c-accent)">
+              ⚡ ИНИЦИАТИВА (РЕА + 2d6)
+            </button>
+            <div id="init-result" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(247,204,46,.07);border:1px solid rgba(247,204,46,.2);font-family:var(--font-mono);font-size:13px"></div>
+          </div>
+
+          <!-- Спасбросок от смерти -->
+          <div style="margin-top:8px">
+            <button class="btn" id="btn-roll-deathsave"
+              style="width:100%;justify-content:center;padding:9px 0;font-size:11px;border-color:#e53935;color:#e53935">
+              💀 СПАСБРОСОК ОТ СМЕРТИ (2d6 > ТЕЛО)
+            </button>
+            <div id="deathsave-result" style="display:none;margin-top:8px;padding:8px 10px;font-family:var(--font-mono);font-size:13px"></div>
+          </div>
+
+          <div class="tape" style="margin-top:14px"></div>
+
+          <!-- Критические травмы -->
+          <div class="card__label" style="margin-top:14px">Критическая травма (2d6)</div>
+          <p style="font-size:10px;color:var(--c-muted);font-family:var(--font-mono);margin:4px 0 10px;line-height:1.5">
+            Бросить когда: 2+ кубиков урона показали 6+, или Экстремальный успех при атаке
+          </p>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn--accent" id="btn-crit-body" style="flex:1;justify-content:center;padding:9px 0;font-size:11px">
+              🩹 ТЕЛО
+            </button>
+            <button class="btn btn--accent" id="btn-crit-head" style="flex:1;justify-content:center;padding:9px 0;font-size:11px">
+              💢 ГОЛОВА
+            </button>
+          </div>
+          <div id="crit-result" style="display:none;margin-top:10px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── WEAPONS ───────────────────────────────────────────────────────────── -->
+    <section id="tab-weapons" class="tab-panel">
+      <div class="section-head">
+        <span class="section-num">05</span>
+        <h2 class="section-title">Оружие</h2>
+        <div class="section-actions">
+          <button class="btn btn--accent" id="btn-add-weapons">+ ОРУЖИЕ</button>
+          <button class="btn btn--secondary" id="btn-add-weapon_modules" style="margin-left:6px">МОДУЛИ</button>
+          <button class="btn btn--secondary" id="btn-add-unique_weapons" style="margin-left:6px">УНИКАЛЬНОЕ</button>
+          <button class="btn btn--secondary" id="btn-buy-ammo" style="margin-left:6px">БОЕПРИПАСЫ</button>
+        </div>
+      </div>
+      <div class="card">
+        <span class="card__label">Арсенал</span>
+        <div id="inv-weapons"></div>
+      </div>
+
+      <!-- Weapon modules sub-section -->
+      <div class="card" style="margin-top:16px">
+        <span class="card__label">Бесхозные модули</span>
+
+        <div id="inv-weapon-modules"></div>
+      </div>
+
+      <!-- Unique weapons sub-section -->
+      <div class="card" style="margin-top:16px">
+        <span class="card__label">Уникальное оружие</span>
+        <div id="inv-unique-weapons"></div>
+      </div>
+
+      <!-- Ammo inventory sub-section -->
+      <div class="card" style="margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span class="card__label" style="margin-bottom:0">Боеприпасы</span>
+          <button class="btn btn--accent btn--sm" id="btn-buy-ammo-2" style="font-size:11px;padding:4px 12px">🛒 Купить</button>
+        </div>
+        <div id="inv-ammo"></div>
+      </div>
+    </section>
+
+    <!-- ── EQUIPMENT ─────────────────────────────────────────────────────────── -->
+    <section id="tab-equipment" class="tab-panel">
+      <div class="section-head">
+        <span class="section-num">06</span>
+        <h2 class="section-title">Снаряжение</h2>
+        <div class="section-actions">
+          <button class="btn btn--accent" id="btn-add-equipment">+ ИЗ БИБЛИОТЕКИ</button>
+          <button class="btn btn--secondary" id="btn-add-bag" style="margin-left:6px">👜 СУМКА</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="card__label">Список снаряжения</span>
+        <div id="inv-equipment"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <span class="card__label">Распределение предметов</span>
+        <p style="font-size:11px;color:var(--c-muted);font-family:var(--font-mono);margin:2px 0 10px">
+          // Где находится каждый предмет: в руках, подготовлено (без объёма), в инвентаре, в сумке, на полу, дома или в багажнике.
+        </p>
+        <div id="inventory-locations"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <span class="card__label">Носимый объём (сетка)</span>
+        <div id="inventory-main"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <span class="card__label">Сумки</span>
+        <div id="inventory-bags" style="margin-top:6px"></div>
+      </div>
+    </section>
+
+    <!-- ── CYBERNETICS ───────────────────────────────────────────────────────── -->
+    <section id="tab-cybernetics" class="tab-panel">
+      <div class="section-head">
+        <span class="section-num">07</span>
+        <h2 class="section-title">Кибернетика</h2>
+        <div class="section-actions">
+          <button class="btn btn--purple" id="btn-add-cyberpart">+ ЧАСТЬ ИМПЛАНТА</button>
+        </div>
+      </div>
+
+      <div class="grid-2" style="gap:16px;margin-bottom:20px">
+        <div class="card" style="margin:0">
+          <span class="card__label">Осознанность</span>
+          <div id="os-cyber-tracker"></div>
+        </div>
+        <div class="card" style="margin:0">
+          <span class="card__label">Сводка слотов</span>
+          <div id="cyberware-slot-summary" style="margin-top:4px"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="card__label">Установленные части и модули</span>
+        <div id="cyberware-parts"></div>
+      </div>
+
+      <!-- Legacy flat list: shown only if char.implants has old items -->
+      <div class="card" id="cyberware-legacy-card" style="margin-top:16px;display:none">
+        <span class="card__label">Импланты (устаревший формат)</span>
+        <div class="section-actions" style="margin-bottom:8px">
+          <button class="btn btn--purple btn--sm" id="btn-add-implants">+ ИЗ БИБЛИОТЕКИ</button>
+        </div>
+        <div id="inv-implants"></div>
+      </div>
+
+    </section>
+
+    <!-- ── SURF ─────────────────────────────────────────────────────────────── -->
+    <section id="tab-surf" class="tab-panel">
+      <div class="section-head">
+        <span class="section-num">◈</span>
+        <h2 class="section-title">Сёрфинг</h2>
+        <button id="btn-island-map" class="btn btn--sm surf-map-btn" title="Открыть карту взлома острова">
+          🗺 КАРТА ОСТРОВА
+        </button>
+      </div>
+
+      <!-- Deck block -->
+      <div id="surf-deck-section"></div>
+
+      <!-- Deck upgrades block -->
+      <div id="surf-upgrades-section" style="margin-top:16px"></div>
+
+      <!-- Programs block -->
+      <div id="surf-programs-section" style="margin-top:16px"></div>
+    </section>
+
+    <!-- ── TRANSPORT ─────────────────────────────────────────────────────────── -->
+    <section id="tab-transport" class="tab-panel">
+      <div class="section-head">
+        <span class="section-num">08</span>
+        <h2 class="section-title">Транспорт</h2>
+        <div class="section-actions">
+          <button class="btn btn--accent" id="btn-add-transport">+ ТРАНСПОРТ</button>
+        </div>
+      </div>
+      <div class="card">
+        <span class="card__label">Гараж</span>
+        <p style="font-size:12px;color:var(--c-muted);font-family:var(--font-mono);letter-spacing:.05em;margin:0 0 12px">
+          // У каждого механизма своя Структурная целостность (СЦ). Урон идёт в СЦ; при СЦ&nbsp;=&nbsp;0 транспорт сломан.
+          Модули устанавливаются на конкретный транспорт (Навык «Транспорт» 4+ или 500 уе за сутки у механика).
+        </p>
+        <div id="inv-transport"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span class="card__label" style="position:static;margin:0">Бесхозные модули</span>
+          <button class="btn btn--accent btn--sm" id="btn-buy-loose-mod">+ КУПИТЬ МОДУЛЬ</button>
+        </div>
+        <p style="font-size:12px;color:var(--c-muted);font-family:var(--font-mono);letter-spacing:.05em;margin:0 0 12px">
+          // Снятые или купленные впрок модули. Установите на транспорт или сдайте в хлам за 100 уе.
+        </p>
+        <div id="inv-loose-mods"></div>
+      </div>
+    </section>
+
+    <!-- ── HOUSING ───────────────────────────────────────────────────────────── -->
+    <section id="tab-housing" class="tab-panel">
+      <div class="section-head">
+        <span class="section-num">11</span>
+        <h2 class="section-title">Недвижимость</h2>
+      </div>
+
+      <!-- Жильё -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span class="card__label" style="margin:0">ЖИЛЬЁ</span>
+          <button class="btn btn--accent btn--sm" id="btn-browse-housing">СМЕНИТЬ ЖИЛЬЁ</button>
+        </div>
+        <div id="residence-card"></div>
+      </div>
+
+      <!-- Коммерческая -->
+      <div class="card" style="margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span class="card__label" style="margin:0">КОММЕРЧЕСКАЯ НЕДВИЖИМОСТЬ</span>
+          <button class="btn btn--secondary btn--sm" id="btn-add-commercial">+ ДОБАВИТЬ</button>
+        </div>
+        <div id="commercial-props-list"></div>
+      </div>
+    </section>
+
+    <!-- ── DRUGS ─────────────────────────────────────────────────────────────── -->
+    <section id="tab-drugs" class="tab-panel">
+      <div class="section-head">
+        <span class="section-num">09</span>
+        <h2 class="section-title">Препараты</h2>
+        <div class="section-actions">
+          <button class="btn btn--accent" id="btn-add-drugs">+ ИЗ БИБЛИОТЕКИ</button>
+        </div>
+      </div>
+      <div class="card">
+        <span class="card__label">Химия и аугментации</span>
+        <div id="inv-drugs"></div>
+      </div>
+    </section>
+
+    <!-- ── CONDITION ─────────────────────────────────────────────────────────── -->
+    <section id="tab-condition" class="tab-panel">
+      <div class="section-head">
+        <span class="section-num">10</span>
+        <h2 class="section-title">Удача, отдых и травмы</h2>
+      </div>
+
+      <div class="grid-2" style="gap:16px">
+        <div class="card" style="margin:0">
+          <span class="card__label">Критические травмы</span>
+          <div id="crit-trauma-list" style="margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn--secondary btn--sm" id="btn-add-crit-body">+ Тело</button>
+            <button class="btn btn--secondary btn--sm" id="btn-add-crit-head">+ Голова</button>
+            <button class="btn btn--secondary btn--sm" id="btn-roll-crit-body">Бросок (тело)</button>
+            <button class="btn btn--secondary btn--sm" id="btn-roll-crit-head">Бросок (голова)</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin:0">
+          <span class="card__label">Удача</span>
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 0">
+            <span style="font-family:var(--font-mono);font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--c-muted)">ТЕКУЩАЯ</span>
+            <input id="udacha-current" type="number" min="0" max="20"
+              style="width:60px;height:44px;text-align:center;font-family:var(--font-mono);font-size:22px;font-weight:900;border:2px solid var(--c-rule-dark);background:rgba(255,255,255,.7);color:var(--c-accent2);outline:none"
+              value="1">
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--c-muted)" id="udacha-max-label">макс. 1</span>
+          </div>
+          <p style="font-size:12px;color:var(--c-muted);margin:6px 0 0;line-height:1.5">
+            Тратится на переброс после броска (выбрать лучший результат). Нельзя перебросить Экстремальный провал/успех. Максимум = значение УДАЧИ.
+          </p>
+          <button class="btn btn--luck-rest" id="btn-long-rest" style="margin-top:14px;width:100%;justify-content:center;padding:10px 0;font-size:11px">
+            ☽ ДЛИТЕЛЬНЫЙ ОТДЫХ — ВОССТАНОВИТЬ УДАЧУ И ПЗ
+          </button>
+          <p style="font-size:10px;color:var(--c-muted);margin:6px 0 0;line-height:1.5;font-family:var(--font-mono)">
+            Длительный отдых ≈ 1 сутки без боёв. Восстанавливает Удачу до максимума (= характеристика УДАЧА).
+          </p>
+        </div>
+      </div>
+
+      <div class="tape" style="margin-top:24px"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ══ MENTOR WORKSPACE (пульт мастера игры) ════════════════════════════════ -->
+<div id="app-mentor">
+  <header class="topbar">
+    <div class="topbar__logo">
+      <span>EZY</span>:<em>CYBER</em> // ПУЛЬТ МЕНТОРА
+    </div>
+    <div class="topbar__status">
+      <span class="topbar__dot"></span>
+      РЕЖИМ МАСТЕРА
+    </div>
+    <div class="topbar__actions">
+      <button class="btn btn--ghost" id="btn-to-citizen" title="Вернуться к интерфейсу персонажа">Я — ГРАЖДАНИН</button>
+      <button class="btn btn--ghost" id="btn-new-note-m">+ ЗАМЕТКА</button>
+      <button class="btn btn--accent" id="btn-physics-dice-m">БРОСИТЬ КОСТИ</button>
+      <button class="btn" id="btn-remove-dice-m" style="background:#c0392b;color:#fff;border:none;display:none">УБРАТЬ КОСТИ</button>
+      <button class="btn" id="btn-draw-zone-m" style="background:transparent;color:var(--c-accent2);border:2px solid var(--c-accent2)">ЗОНА</button>
+      <button class="btn btn--ghost" id="btn-import-m">ИМПОРТ</button>
+      <button class="btn btn--accent" id="btn-export-m">ЭКСПОРТ</button>
+      <button class="btn btn--ghost" id="btn-reset-all-m" title="Полностью очистить все данные приложения" style="color:#e53935;border-color:#e53935">УДАЛИТЬ ВСЁ</button>
+    </div>
+  </header>
+
+  <!-- ══ ТАБЛИЦА БАЗОВЫХ СЛ — постоянная сворачиваемая заметка ══════════════ -->
+  <div id="mentor-sl-note" class="mentor-sl-note">
+    <div class="mentor-sl-note__head" id="mentor-sl-toggle">
+      <span>ТАБЛИЦА БАЗОВЫХ СЛ</span>
+      <span class="mentor-sl-note__arrow" id="mentor-sl-arrow">▾</span>
+    </div>
+    <div class="mentor-sl-note__body" id="mentor-sl-body">
+      <table class="mentor-sl-table">
+        <thead><tr><th>СЛ</th><th>Название</th></tr></thead>
+        <tbody>
+          <tr><td>10</td><td>Мелочь</td></tr>
+          <tr><td>13</td><td>Ерунда</td></tr>
+          <tr><td>16</td><td>Только учусь</td></tr>
+          <tr><td>19</td><td>Профессионал</td></tr>
+          <tr><td>22</td><td>Выполнимо</td></tr>
+          <tr><td>25</td><td>Сложно</td></tr>
+          <tr><td>28</td><td>Невыносимо</td></tr>
+          <tr><td>31</td><td>Невозможно</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ MENTOR TAB NAV ═══════════════════════════════════════════════════════ -->
+  <nav class="tabnav" id="tabnav-m">
+    <button class="tabnav__burger" id="tabnav-m-burger" aria-label="Навигация">
+      <span class="tabnav__burger-bar"></span>
+      <span class="tabnav__burger-bar"></span>
+      <span class="tabnav__burger-bar"></span>
+    </button>
+    <span class="tabnav__current" id="tabnav-m-current">КОНСТРУКТОР ГОРОДА</span>
+    <div class="tabnav__items" id="tabnav-m-items">
+      <button class="tab-btn tab-btn--active" data-tab="city">Город</button>
+      <button class="tab-btn" data-tab="gangs">Банды / Корпы</button>
+      <button class="tab-btn" data-tab="encounters">Встречи / Лавки</button>
+      <button class="tab-btn" data-tab="npcs">НИП / Болванчики</button>
+      <button class="tab-btn" data-tab="mission">Задание</button>
+      <button class="tab-btn" data-tab="weather">Погода</button>
+      <button class="tab-btn" data-tab="trash">Мусор</button>
+      <button class="tab-btn" data-tab="gacha">Гача</button>
+      <button class="tab-btn" data-tab="msurf">Сёрфинг</button>
+    </div>
+  </nav>
+
+  <main class="content">
+
+    <!-- ── КОНСТРУКТОР ГОРОДА ─────────────────────────────────────────────────── -->
+    <section id="tab-city" class="tab-panel tab-panel--active">
+      <div class="section-head"><span class="section-num">Г</span><h2 class="section-title">Конструктор города</h2></div>
+      <div id="city-map"></div>
+      <div id="city-root"></div>
+    </section>
+
+    <!-- ── БАНДЫ / КОРПОРАЦИИ ──────────────────────────────────────────────────── -->
+    <section id="tab-gangs" class="tab-panel">
+      <div class="section-head"><span class="section-num">Б</span><h2 class="section-title">Конструктор банд и корпораций</h2></div>
+      <div id="gangs-corps-root"></div>
+    </section>
+
+    <!-- ── СЛУЧАЙНЫЕ ВСТРЕЧИ / ЛАВКИ ──────────────────────────────────────────── -->
+    <section id="tab-encounters" class="tab-panel">
+      <div class="section-head"><span class="section-num">В</span><h2 class="section-title">Случайные встречи, лавки и магазины</h2></div>
+      <div id="encounters-root"></div>
+    </section>
+
+    <!-- ── НИП И БОЛВАНЧИКИ ────────────────────────────────────────────────────── -->
+    <section id="tab-npcs" class="tab-panel">
+      <div class="section-head"><span class="section-num">Н</span><h2 class="section-title">НИП и Болванчики</h2></div>
+      <div id="mentor-npcs-root"></div>
+    </section>
+
+    <!-- ── ЗАДАНИЕ ─────────────────────────────────────────────────────────────── -->
+    <section id="tab-mission" class="tab-panel">
+      <div class="section-head"><span class="section-num">З</span><h2 class="section-title">Как они справились с заданием?</h2></div>
+      <div id="mission-calc-root"></div>
+    </section>
+
+    <!-- ── ПОГОДА ──────────────────────────────────────────────────────────────── -->
+    <section id="tab-weather" class="tab-panel">
+      <div class="section-head"><span class="section-num">П</span><h2 class="section-title">Какая сегодня погода?</h2></div>
+      <div id="mentor-weather-root"></div>
+    </section>
+
+    <!-- ── СЛУЧАЙНЫЙ МУСОР ────────────────────────────────────────────────────── -->
+    <section id="tab-trash" class="tab-panel">
+      <div class="section-head"><span class="section-num">М</span><h2 class="section-title">Случайные предметы и мусор</h2></div>
+      <div id="trash-root"></div>
+    </section>
+
+    <!-- ── ГАЧА ───────────────────────────────────────────────────────────────── -->
+    <section id="tab-gacha" class="tab-panel">
+      <div class="section-head"><span class="section-num">Гч</span><h2 class="section-title">Гача</h2></div>
+      <div id="mentor-gacha-root"></div>
+    </section>
+
+    <!-- ── СЁРФИНГ (МЕНТОР) ───────────────────────────────────────────────────── -->
+    <section id="tab-msurf" class="tab-panel">
+      <div class="section-head"><span class="section-num">С</span><h2 class="section-title">Сёрфинг</h2></div>
+      <div id="mentor-surf-root"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Общий файловый input для ИМПОРТА (доступен из обоих пространств) -->
+<input type="file" id="input-import" accept=".json" style="display:none">
+
+<!-- ══ NOTES LAYER ═══════════════════════════════════════════════════════════ -->
+<div id="notes-layer"></div>
+
+<!-- ══ NOTES TASKBAR ════════════════════════════════════════════════════════ -->
+<div id="notes-taskbar" class="notes-taskbar"></div>
+
+<!-- ══ LIBRARY MODAL ═════════════════════════════════════════════════════════ -->
+<div id="lib-modal" class="lib-modal">
+  <div class="lib-modal__panel">
+    <div class="lib-modal__head">
+      <h3 class="lib-modal__title" id="lib-title">БИБЛИОТЕКА</h3>
+      <input class="lib-modal__search" id="lib-search" type="text" placeholder="Поиск…">
+    </div>
+    <div id="lib-filter-bar" class="lib-filter-bar" style="display:none"></div>
+    <div class="lib-modal__body">
+      <div id="lib-list"></div>
+    </div>
+    <div class="lib-modal__foot">
+      <button class="btn" id="lib-close">ОТМЕНА</button>
+      <button class="btn btn--purple" id="lib-add">ДОБАВИТЬ ВЫБРАННОЕ</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ INITIATIVE BUTTON ═══════════════════════════════════════════════════ -->
+<button id="btn-initiative" title="Инициатива — РЕА + 2d6">
+  <span id="init-btn-inner">
+    <img src="https://static.tildacdn.com/tild3765-3433-4435-b435-636665663530/target_1.png" alt="init" id="init-btn-img">
+  </span>
+</button>
+
+<!-- ══ WIDGET FAB GROUP ═════════════════════════════════════════════════════ -->
+<div id="widget-fab" class="widget-fab">
+  <!-- Sub-buttons (shown when expanded) -->
+  <div class="widget-fab-items" id="widget-fab-items">
+    <button class="widget-fab-item" data-create="log"       title="Лог событий">
+      <img class="wfab-icon-img" src="https://static.tildacdn.com/tild3432-3537-4564-a261-623265663130/log-data.png" alt="Лог">
+      <span class="wfab-lbl">ЛОГ</span>
+    </button>
+    <button class="widget-fab-item" data-create="ballistic" title="Баллистика">
+      <img class="wfab-icon-img" src="https://static.tildacdn.com/tild6165-6336-4430-b838-623834316461/height.png" alt="Балл">
+      <span class="wfab-lbl">БАЛЛ</span>
+    </button>
+    <button class="widget-fab-item" data-create="dice"      title="Бросок костей">
+      <img class="wfab-icon-img" src="https://static.tildacdn.com/tild6461-3139-4934-a463-333563633064/dice.png" alt="Кости">
+      <span class="wfab-lbl">КОСТИ</span>
+    </button>
+    <button class="widget-fab-item" data-create="counter"   title="Счётчик">
+      <img class="wfab-icon-img" src="https://static.tildacdn.com/tild3437-6537-4161-b166-323464626265/counter.png" alt="Счётчик">
+      <span class="wfab-lbl">СЧЁТЧИК</span>
+    </button>
+  </div>
+  <!-- Main toggle button -->
+  <button class="widget-fab-main" id="widget-fab-toggle" title="Виджеты">
+    <img class="wfab-main-img" src="https://static.tildacdn.com/tild3432-3637-4230-b362-353530396430/application.png" alt="Виджеты">
+  </button>
+</div>
+</body>
+</html>

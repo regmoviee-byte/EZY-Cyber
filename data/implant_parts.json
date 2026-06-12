@@ -1,0 +1,80 @@
+[
+  {
+    "id": "part_head",
+    "name": "Кибер-//-Голова",
+    "type": "head",
+    "has_sides": false,
+    "description": "Заменяет голову на имплант, сохраняя мозг, слуховой и зрительный каналы. Из мясного остаются только уши и ноздри. 4 слота зрения + 4 слуха + 2 лица.",
+    "parts": [
+      {
+        "id": "head",
+        "label": "Голова",
+        "price": 1000,
+        "po": "2d6",
+        "slots": {
+          "head_vision": 4,
+          "head_hearing": 4,
+          "head_face": 2
+        }
+      }
+    ]
+  },
+  {
+    "id": "part_spine",
+    "name": "Кибер-//-Спина",
+    "type": "back",
+    "has_sides": false,
+    "description": "Имплант, заменяющий мышечный каркас спины (от шеи до крестца). 5 частей, каждая по 3 слота. Каждая часть может увеличить ТЕЛО на 1. Необходима для установки эндоскелета.",
+    "parts": [
+      { "id": "spine_neck",    "label": "Шейная",       "price": 500, "po": "1d6", "slots": {"back": 3} },
+      { "id": "spine_chest_l", "label": "Грудная (Л)",  "price": 500, "po": "1d6", "slots": {"back": 3} },
+      { "id": "spine_chest_r", "label": "Грудная (П)",  "price": 500, "po": "1d6", "slots": {"back": 3} },
+      { "id": "spine_lumbar",  "label": "Поясничная",   "price": 500, "po": "1d6", "slots": {"back": 3} },
+      { "id": "spine_sacral",  "label": "Крестцовая",   "price": 500, "po": "1d6", "slots": {"back": 3} }
+    ]
+  },
+  {
+    "id": "part_arm",
+    "name": "Кибер-//-Рука",
+    "type": "arm",
+    "has_sides": true,
+    "description": "Замена человеческой руки. 3 части: кисть, предплечье, плечо. Каждую часть можно установить отдельно. Каждая часть — 2 слота.",
+    "parts": [
+      { "id": "arm_hand",     "label": "Кисть",      "price": 100, "po": "1d6", "slots": {"arm": 2} },
+      { "id": "arm_forearm",  "label": "Предплечье", "price": 100, "po": "1d6", "slots": {"arm": 2} },
+      { "id": "arm_shoulder", "label": "Плечо",      "price": 100, "po": "1d6", "slots": {"arm": 2} }
+    ]
+  },
+  {
+    "id": "part_leg",
+    "name": "Кибер-//-Нога",
+    "type": "leg",
+    "has_sides": true,
+    "description": "Замена человеческой ноги. 3 части: стопа, голень, бедро. Каждую часть можно установить отдельно. Каждая часть — 2 слота.",
+    "parts": [
+      { "id": "leg_foot",  "label": "Стопа",  "price": 100, "po": "1d6", "slots": {"leg": 2} },
+      { "id": "leg_shin",  "label": "Голень", "price": 100, "po": "1d6", "slots": {"leg": 2} },
+      { "id": "leg_thigh", "label": "Бедро",  "price": 100, "po": "1d6", "slots": {"leg": 2} }
+    ]
+  },
+  {
+    "id": "part_internal",
+    "name": "Кибер-//-Внутренности",
+    "type": "internal",
+    "has_sides": false,
+    "description": "Заменяет внутренние органы или дублирует их. Можно заменить вообще все органы кибернетическими. 2 слота для опций внутренних органов.",
+    "parts": [
+      { "id": "internal", "label": "Внутренности", "price": 1000, "po": "4d6", "slots": {"internal": 2} }
+    ]
+  },
+  {
+    "id": "part_neuro",
+    "name": "Нейромодуль",
+    "type": "neural",
+    "has_sides": false,
+    "description": "Модуль нейронной сети в шее. ЦНС-модуль (1 слот) установлен у всех изначально. Передаёт информацию в мозг и ускоряет её обработку. 7 нейронных слотов.",
+    "parts": [
+      { "id": "neuro", "label": "Нейромодуль", "price": 500, "po": "1d6", "slots": {"neural": 7} }
+    ]
+  }
+]
